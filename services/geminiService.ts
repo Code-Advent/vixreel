@@ -1,10 +1,22 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+// Safe access to environment variables
+const getApiKey = () => {
+  try {
+    return process.env.API_KEY || '';
+  } catch (e) {
+    return '';
+  }
+};
+
+const apiKey = getApiKey();
 
 export const generateAIText = async (prompt: string): Promise<string> => {
-  if (!apiKey) return "AI Caption: Could not connect to Gemini API.";
+  if (!apiKey) {
+    console.warn("VixReel: No Gemini API Key found. Using fallback captions.");
+    return "Exploring new horizons! 🌟";
+  }
   
   try {
     const ai = new GoogleGenAI({ apiKey });
