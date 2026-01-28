@@ -1,8 +1,8 @@
 
 import React from 'react';
 
-const VerificationBadge: React.FC<{ size?: string }> = ({ size = 'w-[14px] h-[14px]' }) => (
-  <span className="inline-flex items-center ml-0.5 align-middle">
+const VerificationBadge: React.FC<{ size?: string }> = ({ size = 'w-3 h-3' }) => (
+  <span className="inline-flex items-center ml-[2px] shrink-0 self-center">
     <svg 
       viewBox="0 0 24 24" 
       aria-label="Verified" 

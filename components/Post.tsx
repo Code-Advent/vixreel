@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
@@ -53,7 +53,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
     }
   };
 
-  const handleDoubleTap = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleDoubleTap = () => {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
@@ -64,21 +64,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
     lastTap.current = now;
   };
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    const { data } = await supabase
-      .from('comments')
-      .insert({ post_id: post.id, user_id: currentUserId, content: newComment })
-      .select('*, user:profiles(*)').single();
-    if (data) {
-      setComments([data as any, ...comments]);
-      setNewComment('');
-    }
-  };
-
   const handleDelete = async () => {
-    if (window.confirm("Delete this post?")) {
+    if (window.confirm("Permanently delete this post from VixReel?")) {
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (!error && onDelete) onDelete(post.id);
     }
@@ -92,44 +79,63 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
             <img 
               src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} 
               className="w-full h-full rounded-full object-cover bg-black" 
+              alt={post.user.username}
             />
           </div>
-          <div className="flex items-center">
-            <span className="font-bold text-sm text-white flex items-center">
-              {post.user.username} {post.user.is_verified && <VerificationBadge />}
+          <div className="flex items-center overflow-hidden">
+            <span className="font-bold text-sm text-white flex items-center truncate">
+              {post.user.username}
+              {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
             </span>
           </div>
         </div>
         {post.user.id === currentUserId && (
-          <button onClick={handleDelete} className="p-2 text-zinc-600 hover:text-red-500">
+          <button onClick={handleDelete} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      <div className="relative aspect-square w-full bg-zinc-950 flex items-center justify-center overflow-hidden cursor-pointer" onClick={handleDoubleTap}>
+      <div className="relative aspect-square w-full bg-zinc-950 flex items-center justify-center overflow-hidden cursor-pointer group" onClick={handleDoubleTap}>
         {post.media_type === 'video' ? (
-          <video src={post.media_url} loop muted autoPlay playsInline className="w-full h-full object-cover" />
+          <video 
+            src={post.media_url} 
+            loop 
+            muted 
+            autoPlay 
+            playsInline 
+            className="w-full h-full object-cover" 
+          />
         ) : (
-          <img src={post.media_url} className="w-full h-full object-cover" alt="VixReel" />
+          <img src={post.media_url} className="w-full h-full object-cover" alt="VixReel Media" />
         )}
+        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
         {showHeartOverlay && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <Heart className="w-24 h-24 text-white fill-white animate-heart-beat" />
+            <Heart className="w-24 h-24 text-white fill-white animate-heart-beat drop-shadow-2xl" />
           </div>
         )}
       </div>
 
       <div className="p-4 space-y-3">
         <div className="flex items-center gap-4">
-          <Heart onClick={handleLike} className={`w-6 h-6 cursor-pointer ${liked ? 'fill-[#ff0080] text-[#ff0080]' : 'text-zinc-200'}`} />
-          <MessageCircle onClick={() => setShowComments(!showComments)} className="w-6 h-6 cursor-pointer text-zinc-200" />
-          <Send className="w-6 h-6 cursor-pointer text-zinc-200" />
+          <Heart 
+            onClick={handleLike} 
+            className={`w-6 h-6 cursor-pointer transition-all active:scale-125 ${liked ? 'fill-[#ff0080] text-[#ff0080]' : 'text-zinc-200 hover:text-zinc-400'}`} 
+          />
+          <MessageCircle 
+            onClick={() => setShowComments(!showComments)} 
+            className="w-6 h-6 cursor-pointer text-zinc-200 hover:text-zinc-400 transition-colors" 
+          />
+          <Send className="w-6 h-6 cursor-pointer text-zinc-200 hover:text-zinc-400 transition-colors" />
         </div>
         <div>
           <div className="font-extrabold text-sm text-white mb-1">{formatNumber(likesCount)} likes</div>
-          <div className="text-sm text-zinc-300">
-            <span className="font-bold mr-2 text-white">{post.user.username}</span>
+          <div className="text-sm text-zinc-300 leading-relaxed">
+            <span className="font-bold mr-2 text-white inline-flex items-center">
+              {post.user.username}
+              {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+            </span>
             {post.caption}
           </div>
         </div>
