@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Story, UserProfile } from '../types';
+import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 
 interface StoriesProps {
@@ -34,7 +35,8 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
     if (!file || !currentUser) return;
 
     setIsUploading(true);
-    const fileName = `${currentUser.id}-${Date.now()}-${file.name}`;
+    const safeFilename = sanitizeFilename(file.name);
+    const fileName = `${currentUser.id}-${Date.now()}-${safeFilename}`;
     const filePath = `active/${fileName}`;
 
     try {

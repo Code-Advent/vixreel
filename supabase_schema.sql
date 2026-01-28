@@ -14,6 +14,38 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
+-- LINKED ACCOUNTS (THE "BUCKET" DB TRACKER)
+CREATE TABLE IF NOT EXISTS public.linked_accounts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  primary_user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  linked_user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  UNIQUE(primary_user_id, linked_user_id)
+);
+
+-- FUNCTION TO HANDLE NEW USER SIGNUP
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, full_name, avatar_url)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'avatar_url', NULL)
+  );
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- TRIGGER FOR NEW USER
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
 -- POSTS TABLE
 CREATE TABLE IF NOT EXISTS public.posts (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -34,44 +66,67 @@ CREATE TABLE IF NOT EXISTS public.stories (
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (timezone('utc'::text, now()) + interval '24 hours')
 );
 
--- STORAGE SETUP
--- Manual bucket insertion (if possible in your environment)
-INSERT INTO storage.buckets (id, name, public) 
-VALUES 
-  ('avatars', 'avatars', true), 
-  ('posts', 'posts', true), 
-  ('stories', 'stories', true)
-ON CONFLICT (id) DO NOTHING;
+-- MESSAGES TABLE
+CREATE TABLE IF NOT EXISTS public.messages (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
--- RLS for Storage
--- Allow anyone to see files
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (true);
+-- FOLLOWS TABLE
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  following_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  PRIMARY KEY (follower_id, following_id)
+);
 
--- Allow authenticated users to upload to specific buckets
-CREATE POLICY "Avatar Uploads" ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
-
-CREATE POLICY "Post Media Uploads" ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'posts' AND auth.role() = 'authenticated');
-
-CREATE POLICY "Story Media Uploads" ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'stories' AND auth.role() = 'authenticated');
-
--- Allow users to delete their own uploads
-CREATE POLICY "Owner Deletion" ON storage.objects FOR DELETE 
-USING (auth.uid()::text = (storage.foldername(name))[1]);
-
--- Enable RLS on public tables
+-- RLS POLICIES - ADDING DROP IF EXISTS TO PREVENT ERRORS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linked_accounts ENABLE ROW LEVEL SECURITY;
 
--- App level policies
-CREATE POLICY "Public Profiles" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Update Own Profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Profiles are public" ON public.profiles;
+    CREATE POLICY "Profiles are public" ON public.profiles FOR SELECT USING (true);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
 
-CREATE POLICY "Public Posts" ON public.posts FOR SELECT USING (true);
-CREATE POLICY "Insert Own Posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
 
-CREATE POLICY "Public Stories" ON public.stories FOR SELECT USING (true);
-CREATE POLICY "Insert Own Stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Posts are public" ON public.posts;
+    CREATE POLICY "Posts are public" ON public.posts FOR SELECT USING (true);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can create posts" ON public.posts;
+    CREATE POLICY "Users can create posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can delete own posts" ON public.posts;
+    CREATE POLICY "Users can delete own posts" ON public.posts FOR DELETE USING (auth.uid() = user_id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Messages are private" ON public.messages;
+    CREATE POLICY "Messages are private" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
+    CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Linked accounts are private" ON public.linked_accounts;
+    CREATE POLICY "Linked accounts are private" ON public.linked_accounts FOR SELECT USING (auth.uid() = primary_user_id);
+EXCEPTION WHEN undefined_object THEN NULL; END $$;

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Image as ImageIcon, Sparkles, X, Video, Wand2, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText } from '../services/geminiService';
+import { sanitizeFilename } from '../lib/utils';
 
 interface CreatePostProps {
   userId: string;
@@ -49,8 +50,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
     if (!file || isPosting) return;
     setIsPosting(true);
 
-    // Use specific 'posts' bucket
-    const fileName = `${userId}-${Date.now()}-${file.name}`;
+    const safeFilename = sanitizeFilename(file.name);
+    const fileName = `${userId}-${Date.now()}-${safeFilename}`;
     const filePath = `feed/${fileName}`;
 
     try {

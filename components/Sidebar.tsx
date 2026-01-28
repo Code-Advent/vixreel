@@ -1,17 +1,19 @@
 
 import React from 'react';
 import { 
-  Home, Search, Compass, PlaySquare, MessageCircle, Heart, PlusSquare, User, Menu 
+  Home, Search, Compass, PlaySquare, MessageCircle, Heart, PlusSquare, User, Menu, Shield
 } from 'lucide-react';
-import { ViewType } from '../types';
+import { ViewType, UserProfile } from '../types';
 
 interface SidebarProps {
   currentView: ViewType;
   setView: (view: ViewType) => void;
   onLogout: () => void;
+  currentUser?: UserProfile | null;
+  isAdminUnlocked?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked }) => {
   const navItems = [
     { id: 'FEED' as ViewType, label: 'Home', icon: Home },
     { id: 'SEARCH' as ViewType, label: 'Search', icon: Search },
@@ -37,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
         </div>
       </div>
 
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar pb-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -46,33 +48,36 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
               key={item.id}
               onClick={() => setView(item.id)}
               className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 hover:bg-zinc-900 group ${
-                isActive ? 'font-bold' : 'font-normal'
+                isActive ? 'font-bold text-white' : 'text-stone-300'
               }`}
             >
               <div className="relative">
                 <Icon 
-                  className={`w-6 h-6 transition-transform group-hover:scale-110 ${isActive ? 'vix-text-gradient' : 'text-stone-300'}`} 
+                  className={`w-6 h-6 transition-transform group-hover:scale-110 ${isActive ? 'vix-text-gradient' : ''}`} 
                   strokeWidth={isActive ? 3 : 2}
-                  style={isActive ? { stroke: 'url(#vix-gradient-svg)' } : {}}
                 />
-                {/* SVG for gradient stroke if needed, though Tailwind text-gradient usually works for icons with certain setups */}
-                <svg width="0" height="0" className="absolute">
-                  <linearGradient id="vix-gradient-svg" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#ff0080' }} />
-                    <stop offset="50%" style={{ stopColor: '#7928ca' }} />
-                    <stop offset="100%" style={{ stopColor: '#0070f3' }} />
-                  </linearGradient>
-                </svg>
               </div>
-              <span className={`ml-4 hidden lg:block text-lg ${isActive ? 'vix-text-gradient' : 'text-stone-300'}`}>
+              <span className={`ml-4 hidden lg:block text-lg ${isActive ? 'vix-text-gradient' : ''}`}>
                 {item.label}
               </span>
             </button>
           );
         })}
+
+        <button
+          onClick={() => setView('ADMIN')}
+          className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 hover:bg-zinc-900 group border border-purple-900/30 mt-4 bg-purple-900/5 ${
+            currentView === 'ADMIN' ? 'font-bold border-purple-500' : ''
+          }`}
+        >
+          <Shield className={`w-6 h-6 transition-transform group-hover:scale-110 ${currentView === 'ADMIN' || isAdminUnlocked ? 'text-purple-400' : 'text-purple-700'}`} />
+          <span className={`ml-4 hidden lg:block text-lg ${currentView === 'ADMIN' || isAdminUnlocked ? 'text-purple-400 font-bold' : 'text-purple-700 font-medium'}`}>
+            {isAdminUnlocked ? 'Admin Console' : 'Creator Access'}
+          </span>
+        </button>
       </nav>
 
-      <div className="mt-auto space-y-2">
+      <div className="mt-auto space-y-2 border-t border-zinc-800 pt-4">
         <button 
           onClick={onLogout}
           className="w-full flex items-center p-3 rounded-lg hover:bg-zinc-900 group"
