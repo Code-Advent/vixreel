@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Search as SearchIcon, X, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
+import VerificationBadge from './VerificationBadge';
 
 interface SearchProps {
   onSelectUser: (user: UserProfile) => void;
@@ -43,16 +44,13 @@ const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-500" />
         <input
           type="text"
-          placeholder="Search for users..."
+          placeholder="Search creators..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-stone-600 transition-colors"
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-stone-600"
         />
         {query && (
-          <button 
-            onClick={() => setQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-white"
-          >
+          <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -68,31 +66,25 @@ const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
             <div 
               key={user.id}
               onClick={() => onSelectUser(user)}
-              className="flex items-center gap-4 p-3 rounded-xl hover:bg-zinc-900 cursor-pointer transition-colors group"
+              className="flex items-center gap-4 p-3 rounded-xl hover:bg-zinc-900 cursor-pointer group"
             >
-              <div className="w-14 h-14 rounded-full bg-zinc-800 overflow-hidden group-hover:p-0.5 group-hover:vix-gradient transition-all">
-                <div className="w-full h-full rounded-full bg-black flex items-center justify-center p-0.5">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} className="w-full h-full rounded-full object-cover" alt={user.username} />
-                  ) : (
-                    <User className="w-6 h-6 text-stone-500" />
-                  )}
-                </div>
+              <div className="w-12 h-12 rounded-full overflow-hidden border border-zinc-800 bg-zinc-900">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} className="w-full h-full object-cover" alt={user.username} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-700"><User /></div>
+                )}
               </div>
               <div>
-                <div className="font-semibold">{user.username}</div>
-                <div className="text-stone-500 text-sm">{user.full_name || 'No name set'}</div>
+                <div className="font-bold flex items-center">
+                  {user.username} {user.is_verified && <VerificationBadge />}
+                </div>
+                <div className="text-stone-500 text-xs">{user.full_name || 'Individual Creator'}</div>
               </div>
             </div>
           ))
-        ) : query.length >= 2 ? (
-          <div className="text-center py-12 text-stone-500">
-            No users found matching "{query}"
-          </div>
-        ) : (
-          <div className="text-center py-12 text-stone-500">
-            Search for your friends on VixReel
-          </div>
+        ) : query.length >= 2 && (
+          <div className="text-center py-12 text-stone-500 italic">No users found for "{query}"</div>
         )}
       </div>
     </div>

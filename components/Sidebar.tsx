@@ -4,6 +4,7 @@ import {
   Home, Search, Compass, PlaySquare, MessageCircle, Heart, PlusSquare, User, Menu, Shield
 } from 'lucide-react';
 import { ViewType, UserProfile } from '../types';
+import VerificationBadge from './VerificationBadge';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -64,18 +65,32 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
           );
         })}
 
-        <button
-          onClick={() => setView('ADMIN')}
-          className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 hover:bg-zinc-900 group border border-purple-900/30 mt-4 bg-purple-900/5 ${
-            currentView === 'ADMIN' ? 'font-bold border-purple-500' : ''
-          }`}
-        >
-          <Shield className={`w-6 h-6 transition-transform group-hover:scale-110 ${currentView === 'ADMIN' || isAdminUnlocked ? 'text-purple-400' : 'text-purple-700'}`} />
-          <span className={`ml-4 hidden lg:block text-lg ${currentView === 'ADMIN' || isAdminUnlocked ? 'text-purple-400 font-bold' : 'text-purple-700 font-medium'}`}>
-            {isAdminUnlocked ? 'Admin Console' : 'Creator Access'}
-          </span>
-        </button>
+        {isAdminUnlocked && (
+          <button
+            onClick={() => setView('ADMIN')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 hover:bg-zinc-900 group border border-purple-900/30 mt-4 bg-purple-900/5 ${
+              currentView === 'ADMIN' ? 'font-bold border-purple-500' : ''
+            }`}
+          >
+            <Shield className="w-6 h-6 text-purple-400" />
+            <span className="ml-4 hidden lg:block text-lg text-purple-400 font-bold">Admin Console</span>
+          </button>
+        )}
       </nav>
+
+      {currentUser && (
+        <div className="mb-4 hidden lg:block px-3 py-2">
+          <div className="flex items-center gap-3">
+             <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
+             <div className="flex flex-col truncate">
+                <span className="text-xs font-bold text-white flex items-center truncate">
+                  {currentUser.username} {currentUser.is_verified && <VerificationBadge size="w-3 h-3" />}
+                </span>
+                <span className="text-[10px] text-zinc-500 truncate">Creator Access</span>
+             </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-auto space-y-2 border-t border-zinc-800 pt-4">
         <button 
