@@ -35,6 +35,9 @@ export interface Story {
   id: string;
   user_id: string;
   media_url: string;
+  media_type: 'image' | 'video';
+  created_at: string;
+  expires_at: string;
   user: UserProfile;
 }
 
@@ -44,6 +47,13 @@ export interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
+}
+
+export interface AccountSession {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  session: any;
 }
 
 export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN';

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Grid, Heart, Camera, Play, User as UserIcon } from 'lucide-react';
+import { Grid, Heart, Camera, Play } from 'lucide-react';
 import { UserProfile, Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber, sanitizeFilename } from '../lib/utils';
@@ -24,20 +24,20 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   }, [user.id, user.is_verified]);
 
   const fetchUserContent = async () => {
-    const { data: pData, count } = await supabase
+    // Fetch user's posts
+    const { data: pData, count: pCount } = await supabase
       .from('posts')
       .select('*, user:profiles(*)', { count: 'exact' })
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (pData) {
-      setPosts(pData as any);
-      setCounts(prev => ({ ...prev, posts: count || 0 }));
-    }
-
+    if (pData) setPosts(pData as any);
+    
+    // Live counts for Followers/Following
     const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
     const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
-    setCounts(prev => ({ ...prev, followers: fCount || 0, following: ingCount || 0 }));
+    
+    setCounts({ posts: pCount || 0, followers: fCount || 0, following: ingCount || 0 });
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session && !isOwnProfile) {
@@ -52,7 +52,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     if (isFollowing) {
       await supabase.from('follows').delete().eq('follower_id', session.user.id).eq('following_id', user.id);
       setIsFollowing(false);
-      setCounts(prev => ({ ...prev, followers: prev.followers - 1 }));
+      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
     } else {
       await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
       setIsFollowing(true);
@@ -82,7 +82,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
           <div className={`w-full h-full rounded-full p-1 vix-gradient ${isUploadingAvatar ? 'animate-pulse' : ''}`}>
             <div className="w-full h-full rounded-full bg-black p-1 overflow-hidden">
-              <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover" />
+              <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover" alt={user.username} />
             </div>
           </div>
           {isOwnProfile && (
@@ -130,7 +130,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
           <div className="text-sm">
             <div className="font-bold text-white mb-1">{user.full_name || user.username}</div>
-            <p className="text-zinc-300">{user.bio || 'Content Creator'}</p>
+            <p className="text-zinc-300">{user.bio || 'Premium VixReel Creator'}</p>
           </div>
         </div>
       </div>
@@ -145,10 +145,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                   <Play className="absolute top-2 right-2 w-4 h-4 text-white fill-white opacity-70" />
                 </div>
               ) : (
-                <img src={post.media_url} className="w-full h-full object-cover" />
+                <img src={post.media_url} className="w-full h-full object-cover" alt="Post" />
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-6 transition-opacity">
-                <div className="flex items-center gap-1 font-bold text-white text-lg"><Heart className="w-6 h-6 fill-white" /> {formatNumber((post.likes_count || 0) + (post.boosted_likes || 0))}</div>
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-6 transition-opacity">
+                <div className="flex items-center gap-2 font-bold text-white text-lg">
+                  <Heart className="w-6 h-6 fill-white" /> 
+                  {formatNumber((post.likes_count || 0) + (post.boosted_likes || 0))}
+                </div>
               </div>
             </div>
           ))}

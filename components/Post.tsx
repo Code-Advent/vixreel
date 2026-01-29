@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2 } from 'lucide-react';
-import { Post as PostType, Comment as CommentType } from '../types';
+import { Heart, MessageCircle, Send, Bookmark, Trash2 } from 'lucide-react';
+import { Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -19,29 +19,41 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
   const lastTap = useRef<number>(0);
 
   useEffect(() => {
-    checkLike();
-    setLikesCount((post.likes_count || 0) + (post.boosted_likes || 0));
-  }, [post.id, post.boosted_likes, post.likes_count]);
+    checkLikeStatus();
+    fetchLikesCount();
+  }, [post.id, post.boosted_likes]);
 
-  const checkLike = async () => {
+  const checkLikeStatus = async () => {
     const { data } = await supabase
       .from('likes')
       .select('id')
       .eq('post_id', post.id)
       .eq('user_id', currentUserId)
       .single();
-    if (data) setLiked(true);
+    setLiked(!!data);
+  };
+
+  const fetchLikesCount = async () => {
+    const { count } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', post.id);
+    setLikesCount((count || 0) + (post.boosted_likes || 0));
   };
 
   const handleLike = async () => {
     if (liked) {
-      await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', currentUserId);
-      setLiked(false);
-      setLikesCount(prev => Math.max(0, prev - 1));
+      const { error } = await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', currentUserId);
+      if (!error) {
+        setLiked(false);
+        setLikesCount(prev => Math.max(0, prev - 1));
+      }
     } else {
-      await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
-      setLiked(true);
-      setLikesCount(prev => prev + 1);
+      const { error } = await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+      if (!error) {
+        setLiked(true);
+        setLikesCount(prev => prev + 1);
+      }
     }
   };
 
@@ -55,13 +67,6 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
     lastTap.current = now;
   };
 
-  const handleDelete = async () => {
-    if (window.confirm("Delete this VixReel post?")) {
-      const { error } = await supabase.from('posts').delete().eq('id', post.id);
-      if (!error && onDelete) onDelete(post.id);
-    }
-  };
-
   return (
     <div className="mb-8 w-full max-w-[470px] mx-auto bg-black border border-zinc-900 rounded-lg overflow-hidden animate-vix-in">
       {/* Header */}
@@ -71,6 +76,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
             <img 
               src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} 
               className="w-full h-full rounded-full object-cover bg-black" 
+              alt={post.user.username}
             />
           </div>
           <div className="flex items-center font-bold text-sm text-white">
@@ -79,7 +85,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
           </div>
         </div>
         {post.user.id === currentUserId && (
-          <button onClick={handleDelete} className="p-1 text-zinc-500 hover:text-red-500">
+          <button onClick={() => onDelete?.(post.id)} className="p-1 text-zinc-500 hover:text-red-500">
             <Trash2 className="w-4 h-4" />
           </button>
         )}
@@ -113,7 +119,6 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete }) => {
           <Bookmark className="w-7 h-7 text-white cursor-pointer" />
         </div>
 
-        {/* Caption Area */}
         <div className="px-1">
           <div className="font-bold text-sm text-white mb-1">{formatNumber(likesCount)} likes</div>
           <div className="text-sm text-zinc-200">
