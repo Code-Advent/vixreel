@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Grid, Heart, Camera, Play } from 'lucide-react';
+import { Grid, Heart, Camera, Play, Video } from 'lucide-react';
 import { UserProfile, Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber, sanitizeFilename } from '../lib/utils';
@@ -81,7 +81,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       <div className="flex flex-col md:flex-row items-center md:items-start gap-10 md:gap-20 mb-12">
         <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
           <div className={`w-full h-full rounded-full p-1 vix-gradient ${isUploadingAvatar ? 'animate-pulse' : ''}`}>
-            <div className="w-full h-full rounded-full bg-black p-1 overflow-hidden">
+            <div className="w-full h-full rounded-full bg-black p-1 overflow-hidden shadow-2xl">
               <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover" alt={user.username} />
             </div>
           </div>
@@ -101,13 +101,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             </h2>
             <div className="flex gap-2">
               {isOwnProfile ? (
-                <button className="bg-zinc-900 px-6 py-2 rounded-lg text-sm font-bold border border-zinc-800">Edit Profile</button>
+                <button className="bg-zinc-900 px-6 py-2 rounded-lg text-sm font-bold border border-zinc-800 hover:bg-zinc-800 transition-colors">Edit Profile</button>
               ) : (
                 <>
-                  <button onClick={handleFollow} className={`px-6 py-2 rounded-lg text-sm font-bold ${isFollowing ? 'bg-zinc-900 border border-zinc-800' : 'vix-gradient text-white'}`}>
+                  <button onClick={handleFollow} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${isFollowing ? 'bg-zinc-900 border border-zinc-800' : 'vix-gradient text-white shadow-lg'}`}>
                     {isFollowing ? 'Following' : 'Follow'}
                   </button>
-                  <button onClick={() => onMessageUser?.(user)} className="bg-zinc-900 px-6 py-2 rounded-lg text-sm font-bold border border-zinc-800">Message</button>
+                  <button onClick={() => onMessageUser?.(user)} className="bg-zinc-900 px-6 py-2 rounded-lg text-sm font-bold border border-zinc-800 hover:bg-zinc-800 transition-colors">Message</button>
                 </>
               )}
             </div>
@@ -118,11 +118,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <span className="font-bold">{formatNumber(counts.posts)}</span>
               <span className="text-zinc-400 text-sm">posts</span>
             </div>
-            <button className="flex gap-1 items-baseline hover:opacity-70">
+            <button className="flex gap-1 items-baseline hover:opacity-70 transition-opacity">
               <span className="font-bold">{formatNumber(counts.followers)}</span>
               <span className="text-zinc-400 text-sm">followers</span>
             </button>
-            <button className="flex gap-1 items-baseline hover:opacity-70">
+            <button className="flex gap-1 items-baseline hover:opacity-70 transition-opacity">
               <span className="font-bold">{formatNumber(counts.following)}</span>
               <span className="text-zinc-400 text-sm">following</span>
             </button>
@@ -138,11 +138,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       <div className="border-t border-zinc-900 pt-8">
         <div className="grid grid-cols-3 gap-1 md:gap-4">
           {posts.map((post) => (
-            <div key={post.id} className="aspect-square bg-zinc-950 relative group cursor-pointer overflow-hidden rounded-sm">
+            <div key={post.id} className="aspect-square bg-zinc-950 relative group cursor-pointer overflow-hidden rounded-sm border border-zinc-900">
               {post.media_type === 'video' ? (
                 <div className="w-full h-full relative">
                   <video src={post.media_url} className="w-full h-full object-cover" />
-                  <Play className="absolute top-2 right-2 w-4 h-4 text-white fill-white opacity-70" />
+                  <div className="absolute top-2 right-2 p-1 bg-black/40 backdrop-blur-md rounded">
+                    <Video className="w-4 h-4 text-white fill-white" />
+                  </div>
                 </div>
               ) : (
                 <img src={post.media_url} className="w-full h-full object-cover" alt="Post" />
@@ -155,6 +157,14 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               </div>
             </div>
           ))}
+          {posts.length === 0 && (
+            <div className="col-span-3 py-20 text-center flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full border border-zinc-800 flex items-center justify-center">
+                 <Grid className="w-8 h-8 text-zinc-800" />
+              </div>
+              <p className="text-zinc-600 font-bold uppercase tracking-widest text-xs">No visual stories found</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

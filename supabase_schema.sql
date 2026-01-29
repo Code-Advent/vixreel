@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. STORIES TABLE (Added for watchable stories)
+-- 3. STORIES TABLE
 CREATE TABLE IF NOT EXISTS public.stories (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -45,7 +45,16 @@ CREATE TABLE IF NOT EXISTS public.likes (
   UNIQUE(post_id, user_id)
 );
 
--- 5. MESSAGES TABLE
+-- 5. COMMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.comments (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 6. MESSAGES TABLE
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -54,7 +63,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. FOLLOWS TABLE
+-- 7. FOLLOWS TABLE
 CREATE TABLE IF NOT EXISTS public.follows (
   follower_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   following_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -62,38 +71,46 @@ CREATE TABLE IF NOT EXISTS public.follows (
   PRIMARY KEY (follower_id, following_id)
 );
 
--- 7. RLS CONFIGURATION
+-- 8. RLS CONFIGURATION
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 
--- 8. POLICIES
-DROP POLICY IF EXISTS "Profiles are public" ON public.profiles;
-CREATE POLICY "Profiles are public" ON public.profiles FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+-- 9. POLICIES
+DROP POLICY IF EXISTS "Public access" ON public.profiles;
+CREATE POLICY "Public access" ON public.profiles FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Self update" ON public.profiles;
+CREATE POLICY "Self update" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
-DROP POLICY IF EXISTS "Posts are public" ON public.posts;
-CREATE POLICY "Posts are public" ON public.posts FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can insert posts" ON public.posts;
-CREATE POLICY "Users can insert posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Posts access" ON public.posts;
+CREATE POLICY "Posts access" ON public.posts FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Posts insert" ON public.posts;
+CREATE POLICY "Posts insert" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Posts delete" ON public.posts;
+CREATE POLICY "Posts delete" ON public.posts FOR DELETE USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Stories are public" ON public.stories;
-CREATE POLICY "Stories are public" ON public.stories FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can insert stories" ON public.stories;
-CREATE POLICY "Users can insert stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Likes access" ON public.likes;
+CREATE POLICY "Likes access" ON public.likes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Likes insert" ON public.likes;
+CREATE POLICY "Likes insert" ON public.likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Likes delete" ON public.likes;
+CREATE POLICY "Likes delete" ON public.likes FOR DELETE USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Likes are public" ON public.likes;
-CREATE POLICY "Likes are public" ON public.likes FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can like" ON public.likes;
-CREATE POLICY "Users can like" ON public.likes FOR INSERT WITH CHECK (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Users can unlike" ON public.likes;
-CREATE POLICY "Users can unlike" ON public.likes FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Comments access" ON public.comments;
+CREATE POLICY "Comments access" ON public.comments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Comments insert" ON public.comments;
+CREATE POLICY "Comments insert" ON public.comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 9. TRIGGER FOR AUTOMATIC PROFILE
+DROP POLICY IF EXISTS "Stories access" ON public.stories;
+CREATE POLICY "Stories access" ON public.stories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Stories insert" ON public.stories;
+CREATE POLICY "Stories insert" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 10. TRIGGER FOR AUTOMATIC PROFILE
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -105,7 +122,10 @@ BEGIN
     NEW.raw_user_meta_data->>'avatar_url',
     NEW.email
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    username = EXCLUDED.username,
+    full_name = EXCLUDED.full_name,
+    avatar_url = EXCLUDED.avatar_url;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
