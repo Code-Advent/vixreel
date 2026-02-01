@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
-import { ShieldCheck, ChevronRight, FileText, Loader2, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ChevronRight, FileText, Loader2, Calendar, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 interface AuthProps {
   onAuthSuccess: (user: UserProfile) => void;
@@ -46,45 +46,57 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         }
       } else {
         if (signupStep === 1) {
-           if (!username || !email || !password || !fullName) throw new Error("Please fill all fields.");
+           if (!username.trim() || !email.trim() || !password || !fullName.trim()) {
+             throw new Error("Missing system credentials.");
+           }
            setSignupStep(2);
            setLoading(false);
            return;
         }
         
         if (signupStep === 2) {
-           if (!dobDay || !dobMonth || !dobYear) throw new Error("Please select your full date of birth.");
+           if (!dobDay || !dobMonth || !dobYear) {
+             throw new Error("Identity age verification required.");
+           }
            setSignupStep(3);
            setLoading(false);
            return;
         }
 
         // Step 3: Accept & Create
-        const dob = `${dobYear}-${dobMonth.padStart(2, '0')}-${dobDay.padStart(2, '0')}`;
-        const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_.]/g, '');
+        const dobFormatted = `${dobYear}-${dobMonth.padStart(2, '0')}-${dobDay.padStart(2, '0')}`;
+        // Extra clean username for the backend
+        const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
         
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: {
             data: {
               username: cleanUsername,
-              full_name: fullName,
-              date_of_birth: dob,
+              full_name: fullName.trim(),
+              date_of_birth: dobFormatted,
             }
           }
         });
         
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          if (signUpError.message.includes("Database error")) {
+             throw new Error("Sync failure. Please try a different username.");
+          }
+          throw signUpError;
+        }
         
         if (data.user) {
-          alert(`Welcome to VixReel! Account created for @${cleanUsername}. Redirecting to sign in...`);
+          alert(`Success! @${cleanUsername} is now registered on the VixReel network. Please sign in.`);
           setIsLogin(true);
           setSignupStep(1);
+          setEmail('');
+          setPassword('');
         }
       }
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+      setError(err.message || "Network protocol error.");
     } finally {
       setLoading(false);
     }
@@ -130,91 +142,100 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           
           <div className="text-center mb-10 w-full">
             <h3 className="text-2xl font-bold tracking-tight text-white">
-              {isLogin ? 'Welcome Back' : signupStep === 1 ? 'Create Account' : signupStep === 2 ? 'Date of Birth' : 'Legal & Privacy'}
+              {isLogin ? 'Welcome Back' : signupStep === 1 ? 'Create Account' : signupStep === 2 ? 'Date of Birth' : 'Protocol Access'}
             </h3>
             <p className="text-sm text-stone-500 mt-2 font-medium">
-              {isLogin ? 'Sign in to your premium feed' : 'Join the elite community of creators'}
+              {isLogin ? 'Sign in to your premium feed' : 'Join the global network of high-fidelity creators'}
             </p>
           </div>
 
           <form onSubmit={handleAuth} className="w-full space-y-4">
             {isLogin ? (
               <>
-                <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required />
-                <input type="password" placeholder="Secure Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required />
+                <div className="space-y-4">
+                  <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600 text-white" required />
+                  <input type="password" placeholder="Secure Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600 text-white" required />
+                </div>
               </>
             ) : signupStep === 1 ? (
               <>
-                <input type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required />
-                <input type="text" placeholder="@handle" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required minLength={3} />
-                <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required />
-                <input type="password" placeholder="Secure Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all placeholder:text-stone-600" required />
+                <div className="space-y-3">
+                  <input type="text" placeholder="Full Identity Name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all text-white placeholder:text-stone-600" required />
+                  <input type="text" placeholder="@handle (Unique Identifier)" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all text-white placeholder:text-stone-600" required minLength={3} />
+                  <input type="email" placeholder="Electronic Mail" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all text-white placeholder:text-stone-600" required />
+                  <input type="password" placeholder="Access Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/40 border border-zinc-800 text-sm px-5 py-4 rounded-2xl focus:border-pink-500/60 outline-none transition-all text-white placeholder:text-stone-600" required />
+                </div>
               </>
             ) : signupStep === 2 ? (
               <div className="space-y-6">
-                <div className="flex items-center gap-3 text-stone-500 text-xs font-bold uppercase tracking-widest bg-black/20 p-4 rounded-2xl border border-zinc-800/50">
-                  <Calendar className="w-4 h-4 text-pink-500" /> Confirm your identity age
+                <div className="flex items-center gap-3 text-stone-500 text-[10px] font-black uppercase tracking-widest bg-black/40 p-5 rounded-3xl border border-zinc-800/50">
+                  <Calendar className="w-5 h-5 text-pink-500" /> Confirm your chronological identity
                 </div>
                 <div className="flex gap-2">
-                  <select value={dobDay} onChange={e => setDobDay(e.target.value)} className="flex-1 bg-black/40 border border-zinc-800 text-sm px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white" required>
-                    <option value="">Day</option>
+                  <select value={dobDay} onChange={e => setDobDay(e.target.value)} className="flex-1 bg-black/60 border border-zinc-800 text-xs px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white appearance-none text-center font-bold" required>
+                    <option value="">DAY</option>
                     {days.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
-                  <select value={dobMonth} onChange={e => setDobMonth(e.target.value)} className="flex-1 bg-black/40 border border-zinc-800 text-sm px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white" required>
-                    <option value="">Month</option>
+                  <select value={dobMonth} onChange={e => setDobMonth(e.target.value)} className="flex-1 bg-black/60 border border-zinc-800 text-xs px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white appearance-none text-center font-bold" required>
+                    <option value="">MONTH</option>
                     {months.map(m => <option key={m.v} value={m.v}>{m.l}</option>)}
                   </select>
-                  <select value={dobYear} onChange={e => setDobYear(e.target.value)} className="flex-1 bg-black/40 border border-zinc-800 text-sm px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white" required>
-                    <option value="">Year</option>
+                  <select value={dobYear} onChange={e => setDobYear(e.target.value)} className="flex-1 bg-black/60 border border-zinc-800 text-xs px-4 py-4 rounded-2xl outline-none focus:border-pink-500 text-white appearance-none text-center font-bold" required>
+                    <option value="">YEAR</option>
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar p-6 bg-black/40 rounded-3xl text-[11px] text-zinc-400 leading-relaxed border border-zinc-800/50">
-                <div className="font-black text-white mb-2 uppercase tracking-widest flex items-center gap-2 border-b border-zinc-800 pb-2"><FileText className="w-3 h-3 text-pink-500" /> Privacy Policy</div>
-                <p>We respect your visual data. VixReel uses end-to-end encryption for private messages and ensures your high-fidelity reels are stored on distributed edge networks. We do not sell your biometric data or interaction patterns.</p>
-                <div className="font-black text-white mb-2 uppercase tracking-widest flex items-center gap-2 mt-6 border-b border-zinc-800 pb-2"><ShieldCheck className="w-3 h-3 text-pink-500" /> Community Rules</div>
-                <ul className="list-disc pl-4 space-y-2">
-                  <li>No explicit adult content or excessive gore.</li>
-                  <li>No harassment or cyber-bullying.</li>
-                  <li>Always credit other creators if using their assets.</li>
-                  <li>Originality is the cornerstone of VixReel.</li>
+              <div className="space-y-5 max-h-[320px] overflow-y-auto no-scrollbar p-6 bg-black/60 rounded-[2rem] text-[11px] text-zinc-400 leading-relaxed border border-zinc-800/50 animate-in slide-in-from-bottom duration-500">
+                <div className="font-black text-white mb-3 uppercase tracking-widest flex items-center gap-3 border-b border-zinc-800/50 pb-3">
+                   <Lock className="w-4 h-4 text-pink-500" /> VixReel Encryption Standards
+                </div>
+                <p>By entering this network, you acknowledge that VixReel utilizes end-to-end encryption for all personal communications. Visual artifacts (Reels and Stories) are served via a high-fidelity edge network for maximum resolution.</p>
+                
+                <div className="font-black text-white mb-3 uppercase tracking-widest flex items-center gap-3 border-b border-zinc-800/50 pb-3 mt-6">
+                   <ShieldCheck className="w-4 h-4 text-pink-500" /> Integrity Protocol
+                </div>
+                <ul className="list-disc pl-5 space-y-3">
+                  <li className="font-medium"> Zero tolerance for explicit, uncredited, or harmful digital artifacts.</li>
+                  <li className="font-medium"> Harassment and cyber-bullying trigger immediate account termination.</li>
+                  <li className="font-medium"> Intellectual property must be respected; attribution is the default.</li>
                 </ul>
-                <div className="font-black text-white mb-2 uppercase tracking-widest mt-6 border-b border-zinc-800 pb-2">Violation Policy</div>
-                <p>Violations will lead to account suspension. Repeat offenders will be blacklisted from the VixReel edge network forever.</p>
+                
+                <div className="font-black text-white mb-3 uppercase tracking-widest mt-8 border-b border-zinc-800/50 pb-3">Violation Penalty</div>
+                <p>Confirmed violations will lead to a permanent blacklist of your hardware identifier across the VixReel network. There is no appeal protocol.</p>
               </div>
             )}
             
-            <button type="submit" disabled={loading} className="w-full vix-gradient hover:opacity-95 active:scale-[0.98] transition-all text-white font-black uppercase tracking-[0.2em] py-5 rounded-2xl text-xs mt-8 shadow-2xl disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full vix-gradient hover:opacity-95 active:scale-[0.98] transition-all text-white font-black uppercase tracking-[0.25em] py-5 rounded-2xl text-[10px] mt-8 shadow-2xl disabled:opacity-50">
               {loading ? (
-                <div className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Processing...</div>
+                <div className="flex items-center justify-center gap-3"><Loader2 className="w-4 h-4 animate-spin" /> ESTABLISHING LINK...</div>
               ) : isLogin ? (
-                'Enter VixReel'
+                'Sync Interface'
               ) : signupStep === 3 ? (
-                'Accept & Create'
+                'Accept Protocol & Create'
               ) : (
-                'Continue'
+                'Proceed'
               )}
             </button>
             
             {!isLogin && signupStep > 1 && (
-              <button type="button" onClick={() => setSignupStep(prev => prev - 1)} className="w-full text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em] mt-4 hover:text-zinc-400 transition-colors">Go Back</button>
+              <button type="button" onClick={() => setSignupStep(prev => prev - 1)} className="w-full text-zinc-600 text-[9px] font-black uppercase tracking-[0.3em] mt-5 hover:text-zinc-400 transition-colors">Abort Step</button>
             )}
           </form>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] mt-6 p-4 rounded-2xl w-full text-center font-bold flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] mt-8 p-4 rounded-2xl w-full text-center font-black uppercase tracking-widest flex items-center justify-center gap-3 animate-in shake duration-500">
                <AlertCircle className="w-4 h-4" /> {error}
             </div>
           )}
         </div>
 
         <div className="bg-zinc-900/40 backdrop-blur-2xl border border-stone-800/60 p-6 text-center rounded-[2rem]">
-          <p className="text-sm text-stone-400">
-            {isLogin ? "New to the platform?" : "Already part of the community?"}{' '}
-            <button onClick={() => { setIsLogin(!isLogin); setSignupStep(1); setError(null); }} className="vix-text-gradient font-black uppercase tracking-widest text-xs hover:underline ml-2">
-              {isLogin ? 'Join VixReel' : 'Log In'}
+          <p className="text-xs text-stone-500 font-bold">
+            {isLogin ? "NEW TO THE NETWORK?" : "ALREADY INTEGRATED?"}{' '}
+            <button onClick={() => { setIsLogin(!isLogin); setSignupStep(1); setError(null); }} className="vix-text-gradient font-black uppercase tracking-widest text-[10px] hover:underline ml-2">
+              {isLogin ? 'Initialize Account' : 'Return to Login'}
             </button>
           </p>
         </div>

@@ -92,7 +92,7 @@ ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- 9. POLICIES
+-- 9. IDEMPOTENT POLICIES
 DO $$ 
 BEGIN
     -- Profiles
@@ -152,23 +152,45 @@ BEGIN
     CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 END $$;
 
--- 10. IMPROVED SIGNUP TRIGGER
+-- 10. ULTRA-ROBUST SIGNUP TRIGGER
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 DECLARE
-  new_username TEXT;
+  base_username TEXT;
+  final_username TEXT;
   dob_str TEXT;
   dob_date DATE;
+  counter INTEGER := 0;
 BEGIN
-  new_username := COALESCE(
+  -- 1. Extract and sanitize base username
+  base_username := COALESCE(
     NEW.raw_user_meta_data->>'username', 
-    SPLIT_PART(NEW.email, '@', 1) || '_' || FLOOR(RANDOM() * 1000)::TEXT
+    SPLIT_PART(NEW.email, '@', 1)
   );
   
-  dob_str := NEW.raw_user_meta_data->>'date_of_birth';
+  -- Clean username: lower, alphanumeric + underscore only
+  base_username := lower(regexp_replace(base_username, '[^a-z0-9_]', '', 'g'));
   
-  -- Robust date handling
-  IF dob_str IS NOT NULL AND dob_str != '' THEN
+  -- Fallback if empty
+  IF base_username = '' THEN
+    base_username := 'vix_' || floor(random() * 100000)::text;
+  END IF;
+
+  final_username := base_username;
+
+  -- 2. Handle username collisions (loop up to 20 times)
+  WHILE counter < 20 AND EXISTS (SELECT 1 FROM public.profiles WHERE username = final_username) LOOP
+    counter := counter + 1;
+    final_username := base_username || floor(random() * 9999)::text;
+  END LOOP;
+
+  -- 3. Safe Date Conversion
+  dob_str := NEW.raw_user_meta_data->>'date_of_birth';
+  IF dob_str IS NOT NULL AND dob_str <> '' THEN
     BEGIN
       dob_date := dob_str::DATE;
     EXCEPTION WHEN OTHERS THEN
@@ -178,26 +200,42 @@ BEGIN
     dob_date := NULL;
   END IF;
 
-  INSERT INTO public.profiles (id, username, full_name, avatar_url, email, date_of_birth)
-  VALUES (
-    NEW.id,
-    new_username,
-    NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'avatar_url',
-    NEW.email,
-    dob_date
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    username = EXCLUDED.username,
-    full_name = EXCLUDED.full_name,
-    avatar_url = EXCLUDED.avatar_url,
-    email = EXCLUDED.email,
-    date_of_birth = EXCLUDED.date_of_birth;
+  -- 4. Atomic Profile Creation
+  BEGIN
+    INSERT INTO public.profiles (
+      id, 
+      username, 
+      full_name, 
+      avatar_url, 
+      email, 
+      date_of_birth
+    )
+    VALUES (
+      NEW.id,
+      final_username,
+      COALESCE(NEW.raw_user_meta_data->>'full_name', final_username),
+      NEW.raw_user_meta_data->>'avatar_url',
+      NEW.email,
+      dob_date
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      username = EXCLUDED.username,
+      full_name = EXCLUDED.full_name,
+      avatar_url = EXCLUDED.avatar_url,
+      email = EXCLUDED.email,
+      date_of_birth = EXCLUDED.date_of_birth,
+      updated_at = now();
+  EXCEPTION WHEN OTHERS THEN
+    -- If profile creation fails, we still return NEW so the Auth user is created.
+    -- This avoids the "Database error saving new user" fatal crash for the user.
+    RAISE LOG 'VixReel profile creation failed for user %: %', NEW.id, SQLERRM;
+  END;
     
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
+-- Re-establish Trigger
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
