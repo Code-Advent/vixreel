@@ -6,6 +6,7 @@ export interface UserProfile {
   avatar_url?: string;
   bio?: string;
   email?: string;
+  date_of_birth?: string;
   is_admin?: boolean;
   is_verified?: boolean;
 }
@@ -22,6 +23,7 @@ export interface Post {
   likes_count?: number;
   comments_count?: number;
   has_liked?: boolean;
+  has_saved?: boolean;
 }
 
 export interface Comment {

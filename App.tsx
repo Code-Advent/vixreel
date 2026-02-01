@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MoreHorizontal, Users, LogOut, UserPlus, Trash2, X, Check, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Users, LogOut, UserPlus, Trash2, X, Check, Loader2, Heart, PlaySquare, Shield, Settings } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
 import Sidebar from './components/Sidebar';
@@ -81,12 +81,25 @@ const App: React.FC = () => {
     localStorage.setItem('vixreel_accounts', JSON.stringify(updated));
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccountFromDevice = () => {
     if (!currentUser) return;
-    if (window.confirm("CRITICAL: This will permanently log you out and remove your profile from this device. Proceed?")) {
+    if (window.confirm("Remove this account from your device history?")) {
       handleRemoveAccount(currentUser.id);
-      await supabase.auth.signOut();
-      window.location.reload();
+      supabase.auth.signOut().then(() => {
+        window.location.reload();
+      });
+    }
+  };
+
+  const handlePermanentDeleteAccount = async () => {
+    if (!currentUser) return;
+    if (window.confirm("Permanently delete your VixReel presence? This cannot be undone.")) {
+      const { error } = await supabase.from('profiles').delete().eq('id', currentUser.id);
+      if (!error) {
+        handleRemoveAccount(currentUser.id);
+        await supabase.auth.signOut();
+        window.location.reload();
+      }
     }
   };
 
@@ -123,6 +136,7 @@ const App: React.FC = () => {
   const handleSidebarViewChange = (view: ViewType) => {
     if (view === 'PROFILE') setViewedUser(currentUser);
     setCurrentView(view);
+    setIsMenuOpen(false);
   };
 
   if (loading) return (
@@ -141,114 +155,75 @@ const App: React.FC = () => {
   if (!currentUser) return <Auth onAuthSuccess={() => init()} />;
 
   return (
-    <div className="bg-black min-h-screen text-white flex relative overflow-hidden">
-      <Sidebar 
-        currentView={currentView} 
-        setView={handleSidebarViewChange} 
-        onLogout={() => setIsMenuOpen(true)} 
-        currentUser={currentUser} 
-        isAdminUnlocked={isAdminUnlocked}
-      />
+    <div className="bg-black min-h-screen text-white flex relative overflow-x-hidden">
+      <Sidebar currentView={currentView} setView={handleSidebarViewChange} onLogout={() => setIsMenuOpen(true)} currentUser={currentUser} isAdminUnlocked={isAdminUnlocked} />
 
-      <main className="flex-1 lg:ml-64 pb-24 lg:pb-0 overflow-y-auto h-screen">
-        <div className="container mx-auto max-w-[935px] pt-4 px-4 relative min-h-full">
-          {/* Top Right Three Dot Menu */}
-          <div className="absolute top-4 right-4 z-[60]">
-             <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-zinc-900 rounded-full transition-colors bg-black/20 backdrop-blur-md">
-                <MoreHorizontal className="w-6 h-6" />
-             </button>
+      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen">
+        <div className="container mx-auto max-w-[935px] pt-2 sm:pt-4 px-2 sm:px-4 relative min-h-full">
+          <div className="sm:hidden flex items-center justify-between py-2 px-4 mb-4 border-b border-zinc-900 bg-black/60 backdrop-blur-md sticky top-0 z-40">
+            <h1 className="logo-font text-2xl font-bold vix-text-gradient" onClick={() => setCurrentView('FEED')}>VixReel</h1>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setCurrentView('NOTIFICATIONS')}><Heart className={`w-6 h-6 ${currentView === 'NOTIFICATIONS' ? 'text-pink-500 fill-pink-500' : ''}`} /></button>
+              <button onClick={() => setIsMenuOpen(true)}><MoreHorizontal className="w-6 h-6" /></button>
+            </div>
           </div>
 
-          {currentView === 'FEED' && (
-            <div className="flex flex-col items-center pb-10">
-              <Stories currentUser={currentUser} />
-              <div className="w-full max-w-[470px] mt-8">
-                {posts.map(p => <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={() => fetchPosts()} />)}
+          <div className="animate-vix-in">
+            {currentView === 'FEED' && (
+              <div className="flex flex-col items-center pb-10">
+                <Stories currentUser={currentUser} />
+                <div className="w-full max-w-[470px] mt-4 sm:mt-8 space-y-6">
+                  {posts.map(p => <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={fetchPosts} onUpdate={fetchPosts} />)}
+                </div>
               </div>
-            </div>
-          )}
-
-          {currentView === 'SEARCH' && <Search onSelectUser={(u) => { setViewedUser(u); setCurrentView('PROFILE'); }} />}
-
-          {currentView === 'PROFILE' && viewedUser && (
-            <Profile 
-              user={viewedUser} 
-              isOwnProfile={viewedUser.id === currentUser.id} 
-              onUpdateProfile={(u) => setCurrentUser(prev => prev ? {...prev, ...u} : null)} 
-              onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }}
-            />
-          )}
-
-          {currentView === 'CREATE' && (
-            <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />
-          )}
-
-          {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
-          {currentView === 'ADMIN' && isAdminUnlocked && <Admin />}
-          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={isAdminUnlocked} />}
+            )}
+            {currentView === 'PROFILE' && viewedUser && (
+              <Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
+                if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
+                setViewedUser(prev => prev ? {...prev, ...u} : null);
+              }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} />
+            )}
+            {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
+            {currentView === 'SEARCH' && <Search onSelectUser={(u) => { setViewedUser(u); setCurrentView('PROFILE'); }} />}
+            {currentView === 'EXPLORE' && (
+              <div className="grid grid-cols-3 gap-1 sm:gap-4 mt-4">
+                {posts.map(p => (
+                  <div key={p.id} onClick={() => { setViewedUser(p.user); setCurrentView('PROFILE'); }} className="aspect-square bg-zinc-950 border border-zinc-900 rounded-sm sm:rounded-xl overflow-hidden cursor-pointer hover:scale-[0.98] transition-all relative">
+                    {p.media_type === 'video' ? <video src={p.media_url} className="w-full h-full object-cover" /> : <img src={p.media_url} className="w-full h-full object-cover" />}
+                    {p.media_type === 'video' && <PlaySquare className="absolute top-2 right-2 w-4 h-4 text-white/50" />}
+                  </div>
+                ))}
+              </div>
+            )}
+            {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
+            {currentView === 'ADMIN' && isAdminUnlocked && <Admin />}
+          </div>
         </div>
       </main>
 
-      {/* Account Switcher / Bottom Sheet Menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => {setIsMenuOpen(false); setIsAccountSwitcherOpen(false);}}></div>
-          <div className="relative w-full max-w-md bg-zinc-950 rounded-t-[2.5rem] p-6 pb-12 shadow-[0_-20px_100px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom duration-300 border-t border-zinc-900">
-             <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-8"></div>
-             
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => {setIsMenuOpen(false); setIsAccountSwitcherOpen(false);}}></div>
+          <div className="relative w-full max-w-md bg-zinc-950 rounded-t-[2.5rem] p-6 pb-12 shadow-[0_-20px_100px_rgba(255,0,128,0.15)] border-t border-zinc-900 animate-in slide-in-from-bottom duration-300">
+             <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-10"></div>
              {!isAccountSwitcherOpen ? (
-               <div className="space-y-3">
-                 <button onClick={() => setIsAccountSwitcherOpen(true)} className="w-full flex items-center justify-between p-4 hover:bg-zinc-900 rounded-2xl transition-all group border border-zinc-900/50">
-                    <div className="flex items-center gap-4">
-                       <Users className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" />
-                       <span className="font-bold text-sm">Switch Account</span>
-                    </div>
-                    <Check className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                 </button>
-                 <button onClick={handleDeleteAccount} className="w-full flex items-center gap-4 p-4 hover:bg-red-500/10 rounded-2xl transition-all text-red-400 border border-transparent hover:border-red-500/20 group">
-                    <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    <span className="font-bold text-sm">Delete Account from Device</span>
-                 </button>
-                 <button onClick={handleLogout} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-900 rounded-2xl transition-all text-white border border-transparent">
-                    <LogOut className="w-5 h-5 text-zinc-500" />
-                    <span className="font-bold text-sm">Log Out</span>
-                 </button>
-                 <button onClick={() => setIsMenuOpen(false)} className="w-full p-4 text-sm font-bold text-zinc-500 hover:text-white">Cancel</button>
+               <div className="space-y-4">
+                 <button onClick={() => setIsAccountSwitcherOpen(true)} className="w-full flex items-center justify-between p-5 hover:bg-zinc-900 rounded-3xl transition-all border border-zinc-900/50 group"><div className="flex items-center gap-4"><Users className="w-5 h-5 text-zinc-500 group-hover:text-white" /><span className="font-black uppercase tracking-widest text-xs">Presences</span></div></button>
+                 <button onClick={handleDeleteAccountFromDevice} className="w-full flex items-center gap-4 p-5 hover:bg-zinc-900 rounded-3xl transition-all text-white border border-transparent"><LogOut className="w-5 h-5 text-zinc-500" /><span className="font-black uppercase tracking-widest text-xs">Clear Presence</span></button>
+                 <button onClick={handlePermanentDeleteAccount} className="w-full flex items-center gap-4 p-5 hover:bg-red-500/10 rounded-3xl transition-all text-red-500 border border-transparent"><Trash2 className="w-5 h-5" /><span className="font-black uppercase tracking-widest text-xs">Terminate</span></button>
+                 <button onClick={() => setIsMenuOpen(false)} className="w-full p-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-700">Close</button>
                </div>
              ) : (
-               <div className="space-y-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Local Accounts</h3>
-                    <button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 hover:text-white p-2"><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="space-y-3 max-h-[45vh] overflow-y-auto no-scrollbar pr-1">
+               <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-2"><h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Active Presences</h3><button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 p-2"><X className="w-5 h-5" /></button></div>
+                  <div className="space-y-3 max-h-[45vh] overflow-y-auto no-scrollbar">
                     {savedAccounts.map(acc => (
-                      <div key={acc.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-zinc-900 transition-colors group border border-zinc-900/40">
-                        <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => handleSwitchAccount(acc)}>
-                          <div className={`w-12 h-12 rounded-full p-[2px] ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-zinc-800'}`}>
-                            <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-black" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm">{acc.username}</span>
-                            {acc.id === currentUser.id ? (
-                                <span className="text-[10px] text-pink-500 font-black uppercase tracking-widest mt-0.5">Logged In</span>
-                            ) : (
-                                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Switch Profile</span>
-                            )}
-                          </div>
-                        </div>
-                        {acc.id !== currentUser.id && (
-                            <button onClick={() => handleRemoveAccount(acc.id)} className="p-3 text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
+                      <div key={acc.id} onClick={() => handleSwitchAccount(acc)} className="flex items-center justify-between p-4 rounded-3xl hover:bg-zinc-900 transition-all cursor-pointer border border-zinc-900/40">
+                        <div className="flex items-center gap-4"><img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-12 h-12 rounded-full object-cover" /><div><span className="font-black text-sm uppercase">{acc.username}</span></div></div>
                       </div>
                     ))}
                   </div>
-                  <button onClick={handleAddAccount} className="w-full flex items-center justify-center gap-3 p-4 mt-2 border border-zinc-800 rounded-2xl hover:bg-zinc-900 transition-all text-pink-500 font-black uppercase tracking-widest text-[10px]">
-                    <UserPlus className="w-4 h-4" />
-                    Add Account
-                  </button>
+                  <button onClick={handleAddAccount} className="w-full p-5 mt-2 border border-zinc-900 rounded-3xl hover:bg-zinc-900 text-pink-500 font-black uppercase tracking-widest text-[10px]">New Identity</button>
                </div>
              )}
           </div>
