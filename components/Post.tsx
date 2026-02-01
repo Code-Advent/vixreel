@@ -60,8 +60,6 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       .eq('post_id', post.id);
     const total = (count || 0) + (post.boosted_likes || 0);
     setLikesCount(total);
-    // Local storage hack to help Profile tab sync faster if needed, 
-    // but standard state should handle it.
   };
 
   const fetchCommentsCount = async () => {
@@ -83,17 +81,19 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
 
   const handleLike = async () => {
     if (liked) {
-      await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', currentUserId);
-      setLiked(false);
-      setLikesCount(prev => Math.max(0, prev - 1));
+      const { error } = await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', currentUserId);
+      if (!error) {
+        setLiked(false);
+        setLikesCount(prev => Math.max(0, prev - 1));
+      }
     } else {
-      // UNIQUE constraint in DB ensures one like per user
       const { error } = await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
       if (!error) {
         setLiked(true);
         setLikesCount(prev => prev + 1);
       }
     }
+    // Global update callback to sync profile tab
     onUpdate?.();
   };
 
@@ -114,12 +114,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `VixReel_${post.user.username}_${post.id}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
+      link.download = `VixReel_${post.user.username}_${Date.now()}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Download failed. Please check your connection.");
+      alert("Download failed. The media may be protected or your connection is unstable.");
     }
   };
 
@@ -156,10 +157,15 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full vix-gradient p-[1.5px]">
-            <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-full h-full rounded-full object-cover bg-black" />
+            <img 
+              src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} 
+              className="w-full h-full rounded-full object-cover bg-black" 
+              alt={post.user.username}
+            />
           </div>
           <div className="flex items-center font-bold text-xs sm:text-sm text-white">
-            {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+            {post.user.username}
+            {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
           </div>
         </div>
         {post.user.id === currentUserId && (
@@ -181,29 +187,39 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
               onTimeUpdate={() => {
                 if (videoRef.current) {
                    const timeLeft = videoRef.current.duration - videoRef.current.currentTime;
-                   setShowWatermark(timeLeft < 2);
+                   // Show watermark in the last 1.5 seconds
+                   setShowWatermark(timeLeft < 1.5);
                 }
               }}
             />
             {/* Username Overlay (Persistent) */}
-            <div className="absolute top-4 left-4 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest pointer-events-none">
+            <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none text-white z-10">
                @{post.user.username}
             </div>
+            
             {/* App Watermark (Ending) */}
             {showWatermark && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center animate-in fade-in duration-500 pointer-events-none">
-                 <h1 className="logo-font text-5xl vix-text-gradient">VixReel</h1>
+              <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center animate-in fade-in duration-500 pointer-events-none z-20">
+                 <div className="w-16 h-16 rounded-[1.5rem] vix-gradient flex items-center justify-center mb-4 shadow-2xl">
+                    <span className="text-white font-black text-3xl logo-font">V</span>
+                 </div>
+                 <h1 className="logo-font text-4xl vix-text-gradient">VixReel</h1>
               </div>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-4 right-4 p-2.5 bg-black/60 rounded-full text-white backdrop-blur-xl border border-white/10">
+            
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} 
+              className="absolute bottom-4 right-4 p-2.5 bg-black/60 rounded-full text-white backdrop-blur-xl border border-white/10 z-10"
+            >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
           </>
         ) : (
           <img src={post.media_url} className="w-full h-full object-cover" alt="VixReel content" />
         )}
+        
         {showHeartOverlay && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
             <Heart className="w-24 h-24 text-white fill-white animate-heart-beat drop-shadow-2xl" />
           </div>
         )}
@@ -213,28 +229,41 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       <div className="p-3 pt-4 space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 sm:gap-6">
-            <Heart onClick={handleLike} className={`w-6 h-6 sm:w-7 sm:h-7 cursor-pointer transition-transform active:scale-125 ${liked ? 'fill-[#ff0080] text-[#ff0080]' : 'text-white'}`} />
+            <Heart 
+              onClick={handleLike} 
+              className={`w-6 h-6 sm:w-7 sm:h-7 cursor-pointer transition-transform active:scale-125 ${liked ? 'fill-[#ff0080] text-[#ff0080]' : 'text-white'}`} 
+            />
             <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setShowComments(true)}>
                <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
-               <span className="text-[10px] font-bold text-zinc-500">{formatNumber(commentsCount)}</span>
+               <span className="text-[10px] font-black text-zinc-500">{formatNumber(commentsCount)}</span>
             </div>
-            <Download onClick={handleDownload} className="w-6 h-6 sm:w-7 sm:h-7 cursor-pointer text-white hover:text-pink-500 transition-colors" />
+            {/* Download Icon replaces Send Icon */}
+            <Download 
+              onClick={handleDownload} 
+              className="w-6 h-6 sm:w-7 sm:h-7 cursor-pointer text-white hover:text-pink-500 transition-colors" 
+            />
           </div>
-          <Bookmark onClick={handleSave} className={`w-6 h-6 sm:w-7 sm:h-7 cursor-pointer transition-colors ${saved ? 'fill-white text-white' : 'text-white'}`} />
+          <Bookmark 
+            onClick={handleSave} 
+            className={`w-6 h-6 sm:w-7 sm:h-7 cursor-pointer transition-colors ${saved ? 'fill-white text-white' : 'text-white hover:text-zinc-400'}`} 
+          />
         </div>
 
         <div className="px-1 pb-2">
           <div className="font-bold text-xs sm:text-sm text-white mb-1">{formatNumber(likesCount)} likes</div>
           <div className="text-xs sm:text-sm text-zinc-200 leading-tight">
-            <span className="font-bold mr-2 text-white inline-flex items-center">{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}</span>
+            <span className="font-bold mr-2 text-white inline-flex items-center">
+              {post.user.username} 
+              {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+            </span>
             {post.caption}
           </div>
         </div>
       </div>
 
-      {/* Comments Overlay - simplified for brevity */}
+      {/* Comments Overlay */}
       {showComments && (
-        <div className="fixed inset-0 z-[1000] bg-black/95 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-[1000] bg-black/95 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
           <div className="bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-[2.5rem] sm:rounded-3xl w-full max-w-lg h-[85vh] sm:h-[80vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom shadow-2xl">
             <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-black/40 backdrop-blur-2xl">
               <h3 className="font-black uppercase tracking-[0.2em] text-[10px] text-zinc-500">Dialogue</h3>
@@ -243,14 +272,31 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
             <div className="flex-1 overflow-y-auto p-4 space-y-5 no-scrollbar">
               {comments.map(c => (
                 <div key={c.id} className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full vix-gradient p-[1px] shrink-0"><img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-full h-full rounded-full object-cover bg-black" /></div>
-                  <div className="text-xs sm:text-sm flex-1"><p className="text-zinc-300"><span className="font-bold text-white mr-2">{c.user.username}</span>{c.content}</p></div>
+                  <div className="w-8 h-8 rounded-full vix-gradient p-[1px] shrink-0">
+                    <img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-full h-full rounded-full object-cover bg-black" />
+                  </div>
+                  <div className="text-xs sm:text-sm flex-1">
+                    <p className="text-zinc-300">
+                      <span className="font-bold text-white mr-2">{c.user.username}</span>
+                      {c.content}
+                    </p>
+                  </div>
                 </div>
               ))}
+              {comments.length === 0 && (
+                <div className="text-center py-20 text-zinc-800 font-black uppercase tracking-widest text-[10px]">Silence in the terminal</div>
+              )}
             </div>
             <form onSubmit={handlePostComment} className="p-5 border-t border-zinc-900 bg-black flex gap-3">
-              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Say something..." className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-3.5 text-xs sm:text-sm outline-none" />
-              <button disabled={!newComment.trim() || isCommenting} className="text-pink-500 font-black uppercase tracking-widest text-[10px]">{isCommenting ? '...' : 'Echo'}</button>
+              <input 
+                value={newComment} 
+                onChange={e => setNewComment(e.target.value)} 
+                placeholder="Participate..." 
+                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-3.5 text-xs sm:text-sm outline-none text-white focus:border-zinc-700" 
+              />
+              <button disabled={!newComment.trim() || isCommenting} className="text-pink-500 font-black uppercase tracking-widest text-[10px]">
+                {isCommenting ? '...' : 'Echo'}
+              </button>
             </form>
           </div>
         </div>
