@@ -33,7 +33,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     try {
       if (isLogin) {
         const { data, error: loginError } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
         if (loginError) throw loginError;
@@ -65,7 +65,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
         // Step 3: Accept & Create
         const dobFormatted = `${dobYear}-${dobMonth.padStart(2, '0')}-${dobDay.padStart(2, '0')}`;
-        // Extra clean username for the backend
         const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
         
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -82,17 +81,26 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         
         if (signUpError) {
           if (signUpError.message.includes("Database error")) {
-             throw new Error("Sync failure. Please try a different username.");
+             throw new Error("Connection failed. Try a different username/handle.");
           }
           throw signUpError;
         }
         
         if (data.user) {
-          alert(`Success! @${cleanUsername} is now registered on the VixReel network. Please sign in.`);
-          setIsLogin(true);
-          setSignupStep(1);
-          setEmail('');
-          setPassword('');
+          // If a session exists (auto-confirm is on), immediately enter the app
+          if (data.session) {
+            onAuthSuccess({
+              id: data.user.id,
+              email: data.user.email || '',
+              username: cleanUsername,
+              full_name: fullName.trim(),
+            });
+          } else {
+            // If confirmation is required, we still proceed as if success but tell the user to check email
+            alert(`Account created! @${cleanUsername} is ready. Redirecting to sign in interface...`);
+            setIsLogin(true);
+            setSignupStep(1);
+          }
         }
       }
     } catch (err: any) {

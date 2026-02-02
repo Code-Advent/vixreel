@@ -41,17 +41,61 @@ const App: React.FC = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
+        // Try to fetch or create profile record
+        const profile = await ensureProfile(session.user);
         if (profile) {
+          setCurrentUser(profile);
           saveAccountToList(profile, session);
+          await fetchPosts();
         }
-        await fetchPosts();
       }
     } catch (err) {
       console.error("Initialization error:", err);
     } finally {
       setTimeout(() => setLoading(false), 800);
     }
+  };
+
+  /**
+   * Robustly ensures a profile exists for the user.
+   * If the trigger failed or is delayed, we create it here.
+   */
+  const ensureProfile = async (authUser: any): Promise<UserProfile | null> => {
+    // 1. Try to fetch
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profile) return profile as UserProfile;
+
+    // 2. If not found, create a record (Just-In-Time creation)
+    const metadata = authUser.user_metadata || {};
+    const defaultUsername = authUser.email?.split('@')[0] || `user_${authUser.id.slice(0, 5)}`;
+    
+    const newProfile = {
+      id: authUser.id,
+      username: metadata.username || defaultUsername,
+      full_name: metadata.full_name || defaultUsername,
+      email: authUser.email,
+      date_of_birth: metadata.date_of_birth || null,
+      avatar_url: metadata.avatar_url || null,
+    };
+
+    const { data: createdProfile, error: insertError } = await supabase
+      .from('profiles')
+      .upsert(newProfile)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Critical: Failed to create fallback profile", insertError);
+      // Return the local object so user can at least enter the app
+      return newProfile as UserProfile;
+    }
+
+    return createdProfile as UserProfile;
   };
 
   const saveAccountToList = (profile: UserProfile, session: any) => {
@@ -109,15 +153,6 @@ const App: React.FC = () => {
     setCurrentUser(null);
   };
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    if (data) {
-        setCurrentUser(data as UserProfile);
-        return data as UserProfile;
-    }
-    return null;
-  };
-
   const fetchPosts = async () => {
     const { data } = await supabase
       .from('posts')
@@ -147,7 +182,10 @@ const App: React.FC = () => {
           <span className="text-white font-black text-5xl logo-font">V</span>
         </div>
         <h1 className="logo-font text-4xl font-bold vix-text-gradient tracking-widest animate-vix-in">VixReel</h1>
-        <Loader2 className="w-6 h-6 text-zinc-800 animate-spin mt-4" />
+        <div className="flex flex-col items-center gap-2 mt-4">
+           <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
+           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">Initializing Presence...</span>
+        </div>
       </div>
     </div>
   );
@@ -173,7 +211,11 @@ const App: React.FC = () => {
               <div className="flex flex-col items-center pb-10">
                 <Stories currentUser={currentUser} />
                 <div className="w-full max-w-[470px] mt-4 sm:mt-8 space-y-6">
-                  {posts.map(p => <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={fetchPosts} onUpdate={fetchPosts} />)}
+                  {posts.length > 0 ? (
+                    posts.map(p => <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={fetchPosts} onUpdate={fetchPosts} />)
+                  ) : (
+                    <div className="text-center py-20 text-zinc-800 font-black uppercase tracking-widest text-[10px]">Transmission feed empty</div>
+                  )}
                 </div>
               </div>
             )}

@@ -166,29 +166,25 @@ DECLARE
   dob_date DATE;
   counter INTEGER := 0;
 BEGIN
-  -- 1. Extract and sanitize base username
+  -- Extract and sanitize base username
   base_username := COALESCE(
     NEW.raw_user_meta_data->>'username', 
     SPLIT_PART(NEW.email, '@', 1)
   );
   
-  -- Clean username: lower, alphanumeric + underscore only
+  -- Clean username
   base_username := lower(regexp_replace(base_username, '[^a-z0-9_]', '', 'g'));
-  
-  -- Fallback if empty
-  IF base_username = '' THEN
-    base_username := 'vix_' || floor(random() * 100000)::text;
-  END IF;
+  IF base_username = '' THEN base_username := 'vix_user'; END IF;
 
   final_username := base_username;
 
-  -- 2. Handle username collisions (loop up to 20 times)
-  WHILE counter < 20 AND EXISTS (SELECT 1 FROM public.profiles WHERE username = final_username) LOOP
+  -- Handle collisions
+  WHILE counter < 15 AND EXISTS (SELECT 1 FROM public.profiles WHERE username = final_username) LOOP
     counter := counter + 1;
     final_username := base_username || floor(random() * 9999)::text;
   END LOOP;
 
-  -- 3. Safe Date Conversion
+  -- Safe Date Conversion
   dob_str := NEW.raw_user_meta_data->>'date_of_birth';
   IF dob_str IS NOT NULL AND dob_str <> '' THEN
     BEGIN
@@ -200,16 +196,9 @@ BEGIN
     dob_date := NULL;
   END IF;
 
-  -- 4. Atomic Profile Creation
+  -- Profile creation in a nested sub-transaction to prevent blocking the Auth user creation
   BEGIN
-    INSERT INTO public.profiles (
-      id, 
-      username, 
-      full_name, 
-      avatar_url, 
-      email, 
-      date_of_birth
-    )
+    INSERT INTO public.profiles (id, username, full_name, avatar_url, email, date_of_birth)
     VALUES (
       NEW.id,
       final_username,
@@ -226,8 +215,7 @@ BEGIN
       date_of_birth = EXCLUDED.date_of_birth,
       updated_at = now();
   EXCEPTION WHEN OTHERS THEN
-    -- If profile creation fails, we still return NEW so the Auth user is created.
-    -- This avoids the "Database error saving new user" fatal crash for the user.
+    -- Fallback: Do not fail the entire user signup. Log the error.
     RAISE LOG 'VixReel profile creation failed for user %: %', NEW.id, SQLERRM;
   END;
     
