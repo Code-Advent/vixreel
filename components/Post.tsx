@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2 } from 'lucide-react';
-import { Post as PostType, Comment as CommentType } from '../types';
+import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX } from 'lucide-react';
+import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -25,8 +25,9 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   const [isCommenting, setIsCommenting] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showWatermark, setShowWatermark] = useState(false);
-  const [isLiking, setIsLiking] = useState(false); // Lock for anti-spam
-
+  const [isLiking, setIsLiking] = useState(false);
+  
+  const [postUser, setPostUser] = useState<UserProfile>(post.user);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastTap = useRef<number>(0);
 
@@ -35,7 +36,15 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     fetchLikesCount();
     fetchCommentsCount();
     if (showComments) fetchComments();
-  }, [post.id, post.boosted_likes, showComments]);
+    
+    const handleUpdate = (e: any) => {
+      if (e.detail.id === post.user.id) {
+        setPostUser(prev => ({ ...prev, is_verified: e.detail.is_verified }));
+      }
+    };
+    window.addEventListener('vixreel-user-updated', handleUpdate);
+    return () => window.removeEventListener('vixreel-user-updated', handleUpdate);
+  }, [post.id, post.boosted_likes, showComments, post.user.id]);
 
   const checkStatus = async () => {
     const { data: likeData } = await supabase
@@ -82,12 +91,12 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   const handleLike = async () => {
-    if (isLiking) return; // Prevent double trigger while request is active
+    if (isLiking) return;
     
     const wasLiked = liked;
-    const previousCount = likesCount;
+    const prevCount = likesCount;
 
-    // Optimistic Update
+    // Phase 1: Optimistic Update
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
     setIsLiking(true);
@@ -106,12 +115,14 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
           .insert({ post_id: post.id, user_id: currentUserId });
         if (error) throw error;
       }
-      onUpdate?.();
+      
+      // Phase 2: Mandatory Re-fetch after confirmation
+      await fetchLikesCount();
     } catch (err) {
-      // Revert on error
-      console.error("Liking failed:", err);
+      console.error("Engagement Error:", err);
+      // Revert if database rejected the action
       setLiked(wasLiked);
-      setLikesCount(previousCount);
+      setLikesCount(prevCount);
     } finally {
       setIsLiking(false);
     }
@@ -138,13 +149,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `VixReel_${post.user.username}_${Date.now()}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
+      link.download = `VixReel_${postUser.username}_${Date.now()}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Download failed. The media may be protected.");
+      alert("Download failed.");
     }
   };
 
@@ -182,17 +193,17 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full vix-gradient p-[1.5px]">
             <img 
-              src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} 
+              src={postUser.avatar_url || `https://ui-avatars.com/api/?name=${postUser.username}`} 
               className="w-full h-full rounded-full object-cover bg-black" 
-              alt={post.user.username}
+              alt={postUser.username}
             />
           </div>
           <div className="flex items-center font-bold text-xs sm:text-sm text-white">
-            {post.user.username}
-            {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+            {postUser.username}
+            {postUser.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
           </div>
         </div>
-        {post.user.id === currentUserId && (
+        {postUser.id === currentUserId && (
           <button onClick={() => onDelete?.(post.id)} className="p-1 text-zinc-600 hover:text-red-500 transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
@@ -212,28 +223,20 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                 if (videoRef.current) {
                    const duration = videoRef.current.duration;
                    const currentTime = videoRef.current.currentTime;
-                   // Show watermark in the last 1.5s or final 10% of video
                    const showAt = Math.max(duration - 1.5, duration * 0.9);
                    setShowWatermark(currentTime > showAt);
                 }
               }}
             />
-            {/* Username Overlay */}
-            <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none text-white z-10 opacity-70">
-               @{post.user.username}
-            </div>
-            
-            {/* Improved App Watermark */}
             {showWatermark && (
               <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 pointer-events-none z-20 backdrop-blur-sm">
-                 <div className="w-16 h-16 rounded-[1.5rem] vix-gradient flex items-center justify-center mb-4 shadow-[0_0_50px_rgba(255,0,128,0.3)] animate-pulse">
+                 <div className="w-16 h-16 rounded-[1.5rem] vix-gradient flex items-center justify-center mb-4 shadow-[0_0_50px_rgba(255,0,128,0.3)]">
                     <span className="text-white font-black text-3xl logo-font">V</span>
                  </div>
                  <h1 className="logo-font text-4xl vix-text-gradient tracking-tight">VixReel</h1>
                  <p className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.4em] mt-4">Visual Storytelling</p>
               </div>
             )}
-            
             <button 
               onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} 
               className="absolute bottom-4 right-4 p-2.5 bg-black/60 rounded-full text-white backdrop-blur-xl border border-white/10 z-10 hover:scale-110 active:scale-95 transition-all"
@@ -281,15 +284,14 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
           <div className="font-black text-xs sm:text-sm text-white mb-1 transition-all">{formatNumber(likesCount)} <span className="font-medium text-zinc-500 uppercase tracking-tighter text-[10px] ml-0.5">Appreciations</span></div>
           <div className="text-xs sm:text-sm text-zinc-200 leading-tight">
             <span className="font-bold mr-2 text-white inline-flex items-center">
-              {post.user.username} 
-              {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+              {postUser.username} 
+              {postUser.is_verified && <VerificationBadge size="w-3 h-3" />}
             </span>
             {post.caption}
           </div>
         </div>
       </div>
 
-      {/* Comments Drawer */}
       {showComments && (
         <div className="fixed inset-0 z-[1000] bg-black/95 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
           <div className="bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-[2.5rem] sm:rounded-3xl w-full max-w-lg h-[85vh] sm:h-[80vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom shadow-[0_-20px_100px_rgba(0,0,0,0.5)]">
@@ -331,7 +333,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                 value={newComment} 
                 onChange={e => setNewComment(e.target.value)} 
                 placeholder="Share your perspective..." 
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-xs sm:text-sm outline-none text-white focus:border-zinc-700 transition-all" 
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-xs sm:text-sm outline-none text-white focus:border-zinc-700 transition-all placeholder:text-zinc-600" 
               />
               <button disabled={!newComment.trim() || isCommenting} className="vix-gradient px-6 rounded-2xl text-white font-black uppercase tracking-widest text-[10px] shadow-lg disabled:opacity-30 active:scale-95 transition-all">
                 {isCommenting ? '...' : 'Send'}

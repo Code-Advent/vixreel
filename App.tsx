@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MoreHorizontal, Users, LogOut, UserPlus, Trash2, X, Check, Loader2, Heart, PlaySquare, Shield, Settings } from 'lucide-react';
+import { MoreHorizontal, Users, LogOut, Trash2, Loader2, Heart, PlaySquare, Shield } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
 import Sidebar from './components/Sidebar';
@@ -29,19 +29,23 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
-    return localStorage.getItem('vixreel_admin_unlocked') === 'true';
-  });
-
   useEffect(() => {
     init();
-  }, []);
+    
+    // Listen for global user updates (like verification)
+    const handleGlobalUpdate = (e: any) => {
+      if (currentUser && e.detail.id === currentUser.id) {
+        setCurrentUser(prev => prev ? { ...prev, ...e.detail } : null);
+      }
+    };
+    window.addEventListener('vixreel-user-updated', handleGlobalUpdate);
+    return () => window.removeEventListener('vixreel-user-updated', handleGlobalUpdate);
+  }, [currentUser?.id]);
 
   const init = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Try to fetch or create profile record
         const profile = await ensureProfile(session.user);
         if (profile) {
           setCurrentUser(profile);
@@ -56,21 +60,29 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * Robustly ensures a profile exists for the user.
-   * If the trigger failed or is delayed, we create it here.
-   */
   const ensureProfile = async (authUser: any): Promise<UserProfile | null> => {
-    // 1. Try to fetch
-    const { data: profile, error: fetchError } = await supabase
+    const { data: existingProfile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
       .single();
 
-    if (profile) return profile as UserProfile;
+    if (existingProfile) {
+      // If profile exists but we want to ensure first user admin status if not already set
+      if (!existingProfile.is_admin) {
+        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+        if (count === 1) { // This is the only user
+           const { data: updated } = await supabase.from('profiles').update({ is_admin: true }).eq('id', authUser.id).select().single();
+           return updated as UserProfile;
+        }
+      }
+      return existingProfile as UserProfile;
+    }
 
-    // 2. If not found, create a record (Just-In-Time creation)
+    // New profile logic
+    const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+    const isFirstUser = (count || 0) === 0;
+
     const metadata = authUser.user_metadata || {};
     const defaultUsername = authUser.email?.split('@')[0] || `user_${authUser.id.slice(0, 5)}`;
     
@@ -79,6 +91,7 @@ const App: React.FC = () => {
       username: metadata.username || defaultUsername,
       full_name: metadata.full_name || defaultUsername,
       email: authUser.email,
+      is_admin: isFirstUser,
       date_of_birth: metadata.date_of_birth || null,
       avatar_url: metadata.avatar_url || null,
     };
@@ -90,8 +103,7 @@ const App: React.FC = () => {
       .single();
 
     if (insertError) {
-      console.error("Critical: Failed to create fallback profile", insertError);
-      // Return the local object so user can at least enter the app
+      console.error("Profile creation failed", insertError);
       return newProfile as UserProfile;
     }
 
@@ -113,7 +125,6 @@ const App: React.FC = () => {
     if (!error) {
       window.location.reload(); 
     } else {
-      alert("Session expired. Signing out...");
       handleRemoveAccount(account.id);
       setLoading(false);
     }
@@ -137,7 +148,7 @@ const App: React.FC = () => {
 
   const handlePermanentDeleteAccount = async () => {
     if (!currentUser) return;
-    if (window.confirm("Permanently delete your VixReel presence? This cannot be undone.")) {
+    if (window.confirm("Permanently delete your VixReel presence?")) {
       const { error } = await supabase.from('profiles').delete().eq('id', currentUser.id);
       if (!error) {
         handleRemoveAccount(currentUser.id);
@@ -145,12 +156,6 @@ const App: React.FC = () => {
         window.location.reload();
       }
     }
-  };
-
-  const handleAddAccount = () => {
-    setIsMenuOpen(false);
-    setIsAccountSwitcherOpen(false);
-    setCurrentUser(null);
   };
 
   const fetchPosts = async () => {
@@ -161,13 +166,6 @@ const App: React.FC = () => {
     if (data) setPosts(data as any);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('vixreel_admin_unlocked');
-    setCurrentUser(null);
-    window.location.reload();
-  };
-
   const handleSidebarViewChange = (view: ViewType) => {
     if (view === 'PROFILE') setViewedUser(currentUser);
     setCurrentView(view);
@@ -175,17 +173,15 @@ const App: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center relative overflow-hidden text-white">
       <div className="absolute inset-0 bg-radial-gradient from-pink-500/10 to-transparent opacity-50 blur-[120px]" />
-      <div className="relative flex flex-col items-center">
-        <div className="w-24 h-24 rounded-[2rem] vix-gradient flex items-center justify-center mb-8 animate-pulse shadow-[0_0_50px_rgba(255,0,128,0.4)]">
-          <span className="text-white font-black text-5xl logo-font">V</span>
-        </div>
-        <h1 className="logo-font text-4xl font-bold vix-text-gradient tracking-widest animate-vix-in">VixReel</h1>
-        <div className="flex flex-col items-center gap-2 mt-4">
-           <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
-           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">Initializing Presence...</span>
-        </div>
+      <div className="w-24 h-24 rounded-[2rem] vix-gradient flex items-center justify-center mb-8 animate-pulse shadow-[0_0_50px_rgba(255,0,128,0.4)]">
+        <span className="text-white font-black text-5xl logo-font">V</span>
+      </div>
+      <h1 className="logo-font text-4xl font-bold vix-text-gradient tracking-widest animate-vix-in">VixReel</h1>
+      <div className="flex flex-col items-center gap-2 mt-4">
+         <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
+         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">Initializing Presence...</span>
       </div>
     </div>
   );
@@ -194,7 +190,13 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-black min-h-screen text-white flex relative overflow-x-hidden">
-      <Sidebar currentView={currentView} setView={handleSidebarViewChange} onLogout={() => setIsMenuOpen(true)} currentUser={currentUser} isAdminUnlocked={isAdminUnlocked} />
+      <Sidebar 
+        currentView={currentView} 
+        setView={handleSidebarViewChange} 
+        onLogout={() => setIsMenuOpen(true)} 
+        currentUser={currentUser} 
+        isAdminUnlocked={currentUser.is_admin} 
+      />
 
       <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen">
         <div className="container mx-auto max-w-[935px] pt-2 sm:pt-4 px-2 sm:px-4 relative min-h-full">
@@ -238,7 +240,8 @@ const App: React.FC = () => {
               </div>
             )}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
-            {currentView === 'ADMIN' && isAdminUnlocked && <Admin />}
+            {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
+            {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
           </div>
         </div>
       </main>
@@ -257,7 +260,7 @@ const App: React.FC = () => {
                </div>
              ) : (
                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-2"><h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Active Presences</h3><button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 p-2"><X className="w-5 h-5" /></button></div>
+                  <div className="flex items-center justify-between mb-2"><h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Active Presences</h3><button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 p-2"><Loader2 className="w-5 h-5" /></button></div>
                   <div className="space-y-3 max-h-[45vh] overflow-y-auto no-scrollbar">
                     {savedAccounts.map(acc => (
                       <div key={acc.id} onClick={() => handleSwitchAccount(acc)} className="flex items-center justify-between p-4 rounded-3xl hover:bg-zinc-900 transition-all cursor-pointer border border-zinc-900/40">
@@ -265,7 +268,7 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  <button onClick={handleAddAccount} className="w-full p-5 mt-2 border border-zinc-900 rounded-3xl hover:bg-zinc-900 text-pink-500 font-black uppercase tracking-widest text-[10px]">New Identity</button>
+                  <button onClick={() => { setIsMenuOpen(false); setCurrentUser(null); }} className="w-full p-5 mt-2 border border-zinc-900 rounded-3xl hover:bg-zinc-900 text-pink-500 font-black uppercase tracking-widest text-[10px]">New Identity</button>
                </div>
              )}
           </div>

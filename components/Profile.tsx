@@ -20,13 +20,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
-  // Edit Profile States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState(user.full_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Connections List Modal
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [listType, setListType] = useState<'Followers' | 'Following'>('Followers');
   const [listUsers, setListUsers] = useState<UserProfile[]>([]);
@@ -34,11 +32,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   useEffect(() => {
     fetchUserContent();
-    
-    // Reset edit fields when user changes
     setEditName(user.full_name || '');
     setEditBio(user.bio || '');
 
+    // Reactive verification updates from Admin
     const handleUpdate = (e: any) => {
       if (e.detail.id === user.id) {
         onUpdateProfile({ is_verified: e.detail.is_verified });
@@ -50,7 +47,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   const fetchUserContent = async () => {
     setIsUpdating(true);
-    // Fetch user's posts
     const { data: pData, count: pCount } = await supabase
       .from('posts')
       .select('*, user:profiles(*)', { count: 'exact' })
@@ -59,7 +55,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
     if (pData) setPosts(pData as any);
     
-    // Live counts for Followers/Following
     const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
     const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
     
@@ -76,14 +71,20 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const handleFollow = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    if (isFollowing) {
-      await supabase.from('follows').delete().eq('follower_id', session.user.id).eq('following_id', user.id);
-      setIsFollowing(false);
-      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
-    } else {
-      await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
-      setIsFollowing(true);
-      setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+    
+    const wasFollowing = isFollowing;
+    setIsFollowing(!wasFollowing);
+    setCounts(prev => ({ ...prev, followers: wasFollowing ? Math.max(0, prev.followers - 1) : prev.followers + 1 }));
+
+    try {
+      if (wasFollowing) {
+        await supabase.from('follows').delete().eq('follower_id', session.user.id).eq('following_id', user.id);
+      } else {
+        await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
+      }
+    } catch (err) {
+      setIsFollowing(wasFollowing);
+      setCounts(prev => ({ ...prev, followers: wasFollowing ? prev.followers + 1 : Math.max(0, prev.followers - 1) }));
     }
   };
 
@@ -97,8 +98,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     if (!error) {
       onUpdateProfile({ full_name: editName, bio: editBio });
       setIsEditModalOpen(false);
-    } else {
-      alert("Error saving profile: " + error.message);
     }
     setIsSaving(false);
   };
@@ -107,20 +106,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setListLoading(true);
     setListType(type);
     setIsListModalOpen(true);
-    
     let query;
     if (type === 'Followers') {
-      // Profiles that follow this user
       query = supabase.from('follows').select('profiles:follower_id(*)').eq('following_id', user.id);
     } else {
-      // Profiles that this user follows
       query = supabase.from('follows').select('profiles:following_id(*)').eq('follower_id', user.id);
     }
-
     const { data, error } = await query;
     if (!error && data) {
-      const users = data.map((item: any) => item.profiles);
-      setListUsers(users);
+      setListUsers(data.map((item: any) => item.profiles));
     }
     setListLoading(false);
   };
@@ -173,12 +167,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <div className="flex gap-2 w-full sm:w-auto">
               {isOwnProfile ? (
                 <>
-                  <button 
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all"
-                  >
-                    Edit Journey
-                  </button>
+                  <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Journey</button>
                   <button className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
                 </>
               ) : (
@@ -197,17 +186,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <span className="font-black text-lg">{formatNumber(counts.posts)}</span>
               <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Stories</span>
             </div>
-            <button 
-              onClick={() => fetchListUsers('Followers')}
-              className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity"
-            >
+            <button onClick={() => fetchListUsers('Followers')} className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity">
               <span className="font-black text-lg">{formatNumber(counts.followers)}</span>
               <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Audiences</span>
             </button>
-            <button 
-              onClick={() => fetchListUsers('Following')}
-              className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity"
-            >
+            <button onClick={() => fetchListUsers('Following')} className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity">
               <span className="font-black text-lg">{formatNumber(counts.following)}</span>
               <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Following</span>
             </button>
@@ -215,7 +198,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
           <div className="text-xs sm:text-sm">
             <div className="font-black text-white mb-1.5 uppercase tracking-wider">{user.full_name || user.username}</div>
-            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0 whitespace-pre-wrap">{user.bio || 'VixReel Digital Creator • Visual Storyteller'}</p>
+            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0 whitespace-pre-wrap">{user.bio || 'VixReel Digital Creator • Visual Storytelling'}</p>
           </div>
         </div>
       </div>
@@ -253,15 +236,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               </div>
             </div>
           )}
-          {isUpdating && (
-             <div className="col-span-3 py-20 flex justify-center">
-                <Loader2 className="w-8 h-8 text-zinc-800 animate-spin" />
-             </div>
-          )}
+          {isUpdating && <div className="col-span-3 py-20 flex justify-center"><Loader2 className="w-8 h-8 text-zinc-800 animate-spin" /></div>}
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-900 rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-300">
@@ -272,27 +250,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <div className="p-6 space-y-6">
               <div>
                 <label className="text-[10px] font-black uppercase text-zinc-600 block mb-2 tracking-widest">Full Presence Name</label>
-                <input 
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  className="w-full bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all"
-                  placeholder="e.g. Alex Rivera"
-                />
+                <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all text-white" placeholder="e.g. Alex Rivera" />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-zinc-600 block mb-2 tracking-widest">Creative Bio</label>
-                <textarea 
-                  value={editBio}
-                  onChange={e => setEditBio(e.target.value)}
-                  className="w-full h-32 bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all resize-none"
-                  placeholder="Tell your story..."
-                />
+                <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all resize-none text-white" placeholder="Tell your story..." />
               </div>
-              <button 
-                onClick={handleSaveProfile}
-                disabled={isSaving}
-                className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-pink-500/10 flex items-center justify-center gap-2"
-              >
+              <button onClick={handleSaveProfile} disabled={isSaving} className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-pink-500/10 flex items-center justify-center gap-2">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Sync Updates
               </button>
@@ -301,7 +265,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
-      {/* List Modal (Followers/Following) */}
       {isListModalOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-900 rounded-[2rem] w-full max-w-md h-[60vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in duration-300">
@@ -310,27 +273,18 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <button onClick={() => setIsListModalOpen(false)}><X className="w-5 h-5 text-zinc-500" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-              {listLoading ? (
-                <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-zinc-800" /></div>
-              ) : listUsers.length > 0 ? (
-                listUsers.map(u => (
+              {listLoading ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-zinc-800" /></div> : listUsers.length > 0 ? listUsers.map(u => (
                   <div key={u.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-zinc-900/40 transition-all cursor-pointer">
                     <div className="flex items-center gap-3">
                       <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-900" />
                       <div>
-                        <div className="font-bold text-sm flex items-center">{u.username} {u.is_verified && <VerificationBadge size="w-3 h-3" />}</div>
+                        <div className="font-bold text-sm flex items-center text-white">{u.username} {u.is_verified && <VerificationBadge size="w-3 h-3" />}</div>
                         <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{u.full_name || 'Individual Creator'}</div>
                       </div>
                     </div>
-                    <button onClick={() => { setIsListModalOpen(false); if(u.id !== user.id) onMessageUser?.(u); }} className="bg-zinc-800 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest">View</button>
+                    <button onClick={() => { setIsListModalOpen(false); if(u.id !== user.id) onMessageUser?.(u); }} className="bg-zinc-800 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white">View</button>
                   </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-zinc-800">
-                   <UserIcon className="w-10 h-10 mb-4" />
-                   <p className="font-black uppercase tracking-widest text-[10px]">No audience found</p>
-                </div>
-              )}
+                )) : <div className="flex flex-col items-center justify-center py-20 text-zinc-800"><UserIcon className="w-10 h-10 mb-4" /><p className="font-black uppercase tracking-widest text-[10px]">No audience found</p></div>}
             </div>
           </div>
         </div>
