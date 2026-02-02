@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MoreHorizontal, Users, LogOut, Trash2, Loader2, Heart, PlaySquare, Shield } from 'lucide-react';
+import { MoreHorizontal, Users, LogOut, Trash2, Loader2, Heart, PlaySquare, Shield, X } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
 import Sidebar from './components/Sidebar';
@@ -67,11 +67,16 @@ const App: React.FC = () => {
       .eq('id', authUser.id)
       .single();
 
+    // Specific Admin Email Check
+    const isAdminEmail = authUser.email === 'davidhen498@gmail.com';
+
     if (existingProfile) {
-      // If profile exists but we want to ensure first user admin status if not already set
+      // If profile exists, check if admin status needs to be synced
       if (!existingProfile.is_admin) {
         const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-        if (count === 1) { // This is the only user
+        
+        // Upgrade to admin if email matches OR if they are the only user in the system
+        if (isAdminEmail || count === 1) {
            const { data: updated } = await supabase.from('profiles').update({ is_admin: true }).eq('id', authUser.id).select().single();
            return updated as UserProfile;
         }
@@ -79,7 +84,7 @@ const App: React.FC = () => {
       return existingProfile as UserProfile;
     }
 
-    // New profile logic
+    // New profile logic for new signups
     const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
     const isFirstUser = (count || 0) === 0;
 
@@ -91,7 +96,7 @@ const App: React.FC = () => {
       username: metadata.username || defaultUsername,
       full_name: metadata.full_name || defaultUsername,
       email: authUser.email,
-      is_admin: isFirstUser,
+      is_admin: isFirstUser || isAdminEmail, // Admin if first user OR matching email
       date_of_birth: metadata.date_of_birth || null,
       avatar_url: metadata.avatar_url || null,
     };
@@ -260,7 +265,7 @@ const App: React.FC = () => {
                </div>
              ) : (
                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-2"><h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Active Presences</h3><button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 p-2"><Loader2 className="w-5 h-5" /></button></div>
+                  <div className="flex items-center justify-between mb-2"><h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Active Presences</h3><button onClick={() => setIsAccountSwitcherOpen(false)} className="text-zinc-500 p-2"><X className="w-5 h-5" /></button></div>
                   <div className="space-y-3 max-h-[45vh] overflow-y-auto no-scrollbar">
                     {savedAccounts.map(acc => (
                       <div key={acc.id} onClick={() => handleSwitchAccount(acc)} className="flex items-center justify-between p-4 rounded-3xl hover:bg-zinc-900 transition-all cursor-pointer border border-zinc-900/40">
