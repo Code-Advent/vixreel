@@ -44,7 +44,10 @@ const App: React.FC = () => {
 
   const init = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) throw error;
+
       if (session?.user) {
         const profile = await ensureProfile(session.user);
         if (profile) {
@@ -54,65 +57,74 @@ const App: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error("Initialization error:", err);
+      console.error("Critical Initialization Error:", err);
     } finally {
+      // Ensure we stop loading regardless of success/fail to show UI
       setTimeout(() => setLoading(false), 800);
     }
   };
 
   const ensureProfile = async (authUser: any): Promise<UserProfile | null> => {
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single();
-
-    // Specific Admin Email Check
+    // Priority: Specific Admin Email Check
     const isAdminEmail = authUser.email === 'davidhen498@gmail.com';
 
-    if (existingProfile) {
-      // If profile exists, check if admin status needs to be synced
-      if (!existingProfile.is_admin) {
-        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-        
-        // Upgrade to admin if email matches OR if they are the only user in the system
-        if (isAdminEmail || count === 1) {
+    try {
+      const { data: existingProfile, error: selectError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (!selectError && existingProfile) {
+        // Upgrade to admin if email matches and not already set
+        if (isAdminEmail && !existingProfile.is_admin) {
            const { data: updated } = await supabase.from('profiles').update({ is_admin: true }).eq('id', authUser.id).select().single();
-           return updated as UserProfile;
+           return (updated || existingProfile) as UserProfile;
         }
+        return existingProfile as UserProfile;
       }
-      return existingProfile as UserProfile;
+
+      // New profile setup logic (either record doesn't exist or table error)
+      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const isFirstUser = (count || 0) === 0;
+
+      const metadata = authUser.user_metadata || {};
+      const defaultUsername = authUser.email?.split('@')[0] || `user_${authUser.id.slice(0, 5)}`;
+      
+      const newProfile: UserProfile = {
+        id: authUser.id,
+        username: metadata.username || defaultUsername,
+        full_name: metadata.full_name || defaultUsername,
+        email: authUser.email,
+        is_admin: isFirstUser || isAdminEmail,
+        date_of_birth: metadata.date_of_birth || null,
+        avatar_url: metadata.avatar_url || null,
+        is_verified: isAdminEmail, // Auto-verify admin
+      };
+
+      // Attempt to save to DB, but return the object regardless to avoid "hanging" login
+      const { data: createdProfile, error: insertError } = await supabase
+        .from('profiles')
+        .upsert(newProfile)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.warn("DB Profile sync failed, using local profile state:", insertError);
+        return newProfile;
+      }
+
+      return (createdProfile || newProfile) as UserProfile;
+    } catch (err) {
+      console.error("Profile recovery error:", err);
+      // Failsafe return
+      return {
+        id: authUser.id,
+        username: authUser.email?.split('@')[0] || 'user',
+        email: authUser.email,
+        is_admin: isAdminEmail
+      };
     }
-
-    // New profile logic for new signups
-    const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-    const isFirstUser = (count || 0) === 0;
-
-    const metadata = authUser.user_metadata || {};
-    const defaultUsername = authUser.email?.split('@')[0] || `user_${authUser.id.slice(0, 5)}`;
-    
-    const newProfile = {
-      id: authUser.id,
-      username: metadata.username || defaultUsername,
-      full_name: metadata.full_name || defaultUsername,
-      email: authUser.email,
-      is_admin: isFirstUser || isAdminEmail, // Admin if first user OR matching email
-      date_of_birth: metadata.date_of_birth || null,
-      avatar_url: metadata.avatar_url || null,
-    };
-
-    const { data: createdProfile, error: insertError } = await supabase
-      .from('profiles')
-      .upsert(newProfile)
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Profile creation failed", insertError);
-      return newProfile as UserProfile;
-    }
-
-    return createdProfile as UserProfile;
   };
 
   const saveAccountToList = (profile: UserProfile, session: any) => {

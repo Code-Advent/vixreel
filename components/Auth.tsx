@@ -36,7 +36,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           email: email.trim(),
           password,
         });
-        if (loginError) throw loginError;
+
+        if (loginError) {
+           if (loginError.message === 'Email not confirmed') {
+             throw new Error("Activation pending. Please check your email inbox to confirm your identity.");
+           }
+           throw loginError;
+        }
+
         if (data.user) {
           onAuthSuccess({
             id: data.user.id,
@@ -80,14 +87,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         });
         
         if (signUpError) {
-          if (signUpError.message.includes("Database error")) {
-             throw new Error("Connection failed. Try a different username/handle.");
-          }
           throw signUpError;
         }
         
         if (data.user) {
-          // If a session exists (auto-confirm is on), immediately enter the app
           if (data.session) {
             onAuthSuccess({
               id: data.user.id,
@@ -96,15 +99,15 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               full_name: fullName.trim(),
             });
           } else {
-            // If confirmation is required, we still proceed as if success but tell the user to check email
-            alert(`Account created! @${cleanUsername} is ready. Redirecting to sign in interface...`);
+            alert(`Identity registered! @${cleanUsername} protocol established. Please confirm your email to finalize link.`);
             setIsLogin(true);
             setSignupStep(1);
           }
         }
       }
     } catch (err: any) {
-      setError(err.message || "Network protocol error.");
+      console.error("Auth Protocol Error:", err);
+      setError(err.message || "Network protocol error. Connection refused.");
     } finally {
       setLoading(false);
     }
@@ -209,19 +212,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   <li className="font-medium"> Harassment and cyber-bullying trigger immediate account termination.</li>
                   <li className="font-medium"> Intellectual property must be respected; attribution is the default.</li>
                 </ul>
-                
-                <div className="font-black text-white mb-3 uppercase tracking-widest mt-8 border-b border-zinc-800/50 pb-3">Violation Penalty</div>
-                <p>Confirmed violations will lead to a permanent blacklist of your hardware identifier across the VixReel network. There is no appeal protocol.</p>
               </div>
             )}
             
             <button type="submit" disabled={loading} className="w-full vix-gradient hover:opacity-95 active:scale-[0.98] transition-all text-white font-black uppercase tracking-[0.25em] py-5 rounded-2xl text-[10px] mt-8 shadow-2xl disabled:opacity-50">
               {loading ? (
-                <div className="flex items-center justify-center gap-3"><Loader2 className="w-4 h-4 animate-spin" /> ESTABLISHING LINK...</div>
+                <div className="flex items-center justify-center gap-3"><Loader2 className="w-4 h-4 animate-spin" /> LINKING...</div>
               ) : isLogin ? (
                 'Sync Interface'
               ) : signupStep === 3 ? (
-                'Accept Protocol & Create'
+                'Accept Protocol'
               ) : (
                 'Proceed'
               )}
@@ -233,8 +233,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           </form>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] mt-8 p-4 rounded-2xl w-full text-center font-black uppercase tracking-widest flex items-center justify-center gap-3 animate-in shake duration-500">
-               <AlertCircle className="w-4 h-4" /> {error}
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] mt-8 p-4 rounded-2xl w-full text-center font-black uppercase tracking-widest flex flex-col items-center justify-center gap-3 animate-in shake duration-500">
+               <div className="flex items-center gap-2"><AlertCircle className="w-4 h-4" /> AUTH ERROR</div>
+               <p className="font-medium lowercase tracking-normal text-red-500/80">{error}</p>
             </div>
           )}
         </div>
