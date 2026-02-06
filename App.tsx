@@ -69,7 +69,7 @@ const App: React.FC = () => {
         setCurrentUser(null);
       }
     } catch (err) {
-      console.error("VixReel Error:", err);
+      console.error("VixReel Core Error:", err);
     } finally {
       setLoading(false);
       setIsAddingAccount(false);
@@ -108,12 +108,11 @@ const App: React.FC = () => {
         throw error;
       }
     } catch (err) {
-      console.error("Session switch failed", err);
-      // If session failed, likely expired, remove it
+      console.error("Narrative switch failed", err);
       const updated = savedAccounts.filter(acc => acc.id !== account.id);
       setSavedAccounts(updated);
       localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
-      alert("Session expired. Please log in again.");
+      alert("Session expired. Identity re-authentication required.");
       setLoading(false);
     }
   };
@@ -144,7 +143,6 @@ const App: React.FC = () => {
     const isAdmin = authUser.email === 'davidhen498@gmail.com';
 
     if (!dbProfile) {
-      // One last check/retry to handle trigger delay if it happened
       const { data: retryProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
       if (!retryProfile) {
         await supabase.from('profiles').upsert({
@@ -177,8 +175,12 @@ const App: React.FC = () => {
     if (data) setPosts(data as any);
   };
 
-  const setView = (view: ViewType) => {
-    if (view === 'PROFILE') setViewedUser(currentUser);
+  const setView = (view: ViewType, explicitUser?: UserProfile) => {
+    if (explicitUser) {
+      setViewedUser(explicitUser);
+    } else if (view === 'PROFILE') {
+      setViewedUser(currentUser);
+    }
     setCurrentView(view);
   };
 
@@ -201,7 +203,7 @@ const App: React.FC = () => {
     <div className="bg-black min-h-screen text-white flex overflow-hidden">
       <Sidebar 
         currentView={currentView} 
-        setView={setView} 
+        setView={(v) => setView(v)} 
         onLogout={() => setIsAccountMenuOpen(true)} 
         currentUser={currentUser} 
         isAdminUnlocked={currentUser.is_admin} 
@@ -232,7 +234,7 @@ const App: React.FC = () => {
           {currentView === 'EXPLORE' && (
             <Explore 
               currentUserId={currentUser.id} 
-              onSelectUser={(u) => { setViewedUser(u); setView('PROFILE'); }} 
+              onSelectUser={(u) => setView('PROFILE', u)} 
             />
           )}
           {currentView === 'PROFILE' && viewedUser && (
@@ -241,11 +243,11 @@ const App: React.FC = () => {
               setViewedUser(prev => prev ? {...prev, ...u} : null);
             }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} />
           )}
-          {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setView('FEED')} onPostSuccess={fetchPosts} />}
-          {currentView === 'SEARCH' && <Search onSelectUser={(u) => { setViewedUser(u); setView('PROFILE'); }} />}
+          {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
+          {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
           {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
           {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
-          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
+          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
         </div>
       </main>
 

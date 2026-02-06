@@ -98,7 +98,6 @@ DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
 -- 6. FAULT-TOLERANT NEW USER TRIGGER
--- This function is crucial to prevent "Database error saving new user"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER 
 LANGUAGE plpgsql 
@@ -107,11 +106,14 @@ SET search_path = public
 AS $$
 DECLARE
   _username TEXT;
+  _base_username TEXT;
   _full_name TEXT;
   _dob DATE;
+  _counter INTEGER := 1;
 BEGIN
   -- Extract metadata or fallback
-  _username := COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1));
+  _base_username := COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1));
+  _username := _base_username;
   _full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', _username);
   
   -- Safe date conversion
@@ -120,6 +122,12 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     _dob := NULL;
   END;
+
+  -- Defensive Username Handling: Append digits if collision exists to prevent signup failure
+  WHILE EXISTS (SELECT 1 FROM public.profiles WHERE username = _username) LOOP
+    _username := _base_username || _counter;
+    _counter := _counter + 1;
+  END LOOP;
 
   INSERT INTO public.profiles (
     id, 
@@ -139,16 +147,11 @@ BEGIN
     (NEW.email = 'davidhen498@gmail.com'),
     (NEW.email = 'davidhen498@gmail.com')
   )
-  ON CONFLICT (id) DO UPDATE SET
-    username = EXCLUDED.username,
-    full_name = EXCLUDED.full_name,
-    email = EXCLUDED.email,
-    date_of_birth = EXCLUDED.date_of_birth,
-    updated_at = now();
+  ON CONFLICT (id) DO NOTHING;
   
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
-  -- Log error or handle silently to ensure auth creation succeeds
+  -- Last resort: ensure auth creation succeeds even if profile creation hits an edge case error
   RETURN NEW;
 END;
 $$;
