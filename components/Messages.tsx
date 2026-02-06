@@ -15,19 +15,18 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const [activeChat, setActiveChat] = useState<UserProfile | null>(initialChatUser || null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchChats();
-    const interval = setInterval(fetchChats, 10000); // Polling for new chats
+    const interval = setInterval(fetchChats, 10000); 
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (activeChat) {
       fetchMessages();
-      const interval = setInterval(fetchMessages, 3000); // More frequent polling for active chat
+      const interval = setInterval(fetchMessages, 3000); 
       return () => clearInterval(interval);
     }
   }, [activeChat]);
@@ -37,7 +36,6 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   }, [messages]);
 
   const fetchChats = async () => {
-    // Queries both sent and received messages to find unique conversation partners
     const { data: sent } = await supabase.from('messages').select('receiver:profiles(*)').eq('sender_id', currentUser.id);
     const { data: recv } = await supabase.from('messages').select('sender:profiles(*)').eq('receiver_id', currentUser.id);
     
@@ -84,7 +82,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             >
               <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full bg-zinc-800" />
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-sm truncate flex items-center">
+                <div className="font-bold text-sm truncate flex items-center gap-1">
                   {u.username} {u.is_verified && <VerificationBadge size="w-3 h-3" />}
                 </div>
                 <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Active Chat</div>
@@ -101,7 +99,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             <div className="p-4 border-b border-zinc-900 flex items-center gap-3 bg-black">
               <button onClick={() => setActiveChat(null)} className="md:hidden p-2"><ChevronLeft className="w-5 h-5" /></button>
               <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-8 h-8 rounded-full" />
-              <div className="font-bold text-sm flex items-center">{activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}</div>
+              <div className="font-bold text-sm flex items-center gap-1.5">
+                {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+              </div>
             </div>
             <div className="flex-1 p-6 overflow-y-auto space-y-4 no-scrollbar">
               {messages.map(m => (

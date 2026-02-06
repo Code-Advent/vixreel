@@ -50,7 +50,6 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
       const { data: { publicUrl } } = supabase.storage.from('stories').getPublicUrl(filePath);
       
-      // Explicitly providing media_type to match reinforced SQL schema
       const { error: dbError } = await supabase.from('stories').insert({
         user_id: currentUser.id,
         media_url: publicUrl,

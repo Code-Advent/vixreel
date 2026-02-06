@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Grid, Heart, Camera, Play, Video, Settings, User as UserIcon, Loader2, X, Check } from 'lucide-react';
-import { UserProfile, Post as PostType } from '../types';
+import { Grid, Heart, Camera, Video, Settings, User as UserIcon, Loader2, X, Check, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UserProfile, Post as PostType, Story } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber, sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -15,276 +15,334 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser }) => {
   const [posts, setPosts] = useState<PostType[]>([]);
-  const [counts, setCounts] = useState({ posts: 0, followers: 0, following: 0 });
+  const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
+  const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES'>('POSTS');
+  const [counts, setCounts] = useState({ followers: 0, following: 0, appreciation: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editUsername, setEditUsername] = useState(user.username || '');
   const [editName, setEditName] = useState(user.full_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  const [isListModalOpen, setIsListModalOpen] = useState(false);
-  const [listType, setListType] = useState<'Followers' | 'Following'>('Followers');
-  const [listUsers, setListUsers] = useState<UserProfile[]>([]);
-  const [listLoading, setListLoading] = useState(false);
+  // Stories Logic
+  const [userStories, setUserStories] = useState<Story[]>([]);
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchUserContent();
+    fetchUserStories();
+    setEditUsername(user.username || '');
     setEditName(user.full_name || '');
     setEditBio(user.bio || '');
 
-    // Reactive verification updates from Admin
-    const handleUpdate = (e: any) => {
-      if (e.detail.id === user.id) {
-        onUpdateProfile({ is_verified: e.detail.is_verified });
-      }
+    // Listen for global engagement updates to refresh counts
+    const handleEngagementUpdate = () => {
+      fetchUserContent();
     };
-    window.addEventListener('vixreel-user-updated', handleUpdate);
-    return () => window.removeEventListener('vixreel-user-updated', handleUpdate);
-  }, [user.id, user.full_name, user.bio]);
+    window.addEventListener('vixreel-engagement-updated', handleEngagementUpdate);
+    return () => window.removeEventListener('vixreel-engagement-updated', handleEngagementUpdate);
+  }, [user.id]);
+
+  const fetchUserStories = async () => {
+    const { data } = await supabase
+      .from('stories')
+      .select('*, user:profiles(*)')
+      .eq('user_id', user.id)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: true });
+    
+    if (data) setUserStories(data as any);
+  };
 
   const fetchUserContent = async () => {
     setIsUpdating(true);
-    const { data: pData, count: pCount } = await supabase
-      .from('posts')
-      .select('*, user:profiles(*)', { count: 'exact' })
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    try {
+      // Fetch user's own posts
+      const { data: pData } = await supabase
+        .from('posts')
+        .select('*, user:profiles(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (pData) setPosts(pData as any);
 
-    if (pData) setPosts(pData as any);
-    
-    const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
-    const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
-    
-    setCounts({ posts: pCount || 0, followers: fCount || 0, following: ingCount || 0 });
+      // Fetch posts the user has liked
+      const { data: lData } = await supabase
+        .from('likes')
+        .select('post:posts(*, user:profiles(*))')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (lData) {
+        const validLikedPosts = lData.map((l: any) => l.post).filter(p => p !== null);
+        setLikedPosts(validLikedPosts as any);
+      }
+      
+      // Fetch follower/following counts
+      const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
+      const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+      
+      // Calculate total appreciation (likes received on all posts + boosts)
+      let totalAppreciation = 0;
+      if (pData) {
+        for (const post of pData) {
+          const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
+          totalAppreciation += (count || 0) + (post.boosted_likes || 0);
+        }
+      }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session && !isOwnProfile) {
-      const { data } = await supabase.from('follows').select('*').eq('follower_id', session.user.id).eq('following_id', user.id).single();
-      setIsFollowing(!!data);
+      setCounts({ 
+        followers: fCount || 0, 
+        following: ingCount || 0,
+        appreciation: totalAppreciation
+      });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && !isOwnProfile) {
+        const { data } = await supabase.from('follows').select('*').eq('follower_id', session.user.id).eq('following_id', user.id).maybeSingle();
+        setIsFollowing(!!data);
+      }
+    } catch (error) {
+      console.error("Profile Fetch Error", error);
+    } finally {
+      setIsUpdating(false);
     }
-    setIsUpdating(false);
   };
 
   const handleFollow = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    
     const wasFollowing = isFollowing;
     setIsFollowing(!wasFollowing);
-    setCounts(prev => ({ ...prev, followers: wasFollowing ? Math.max(0, prev.followers - 1) : prev.followers + 1 }));
-
     try {
       if (wasFollowing) {
         await supabase.from('follows').delete().eq('follower_id', session.user.id).eq('following_id', user.id);
       } else {
         await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
       }
+      fetchUserContent();
     } catch (err) {
       setIsFollowing(wasFollowing);
-      setCounts(prev => ({ ...prev, followers: wasFollowing ? prev.followers + 1 : Math.max(0, prev.followers - 1) }));
+    }
+  };
+
+  const handleAvatarClick = () => {
+    if (userStories.length > 0) {
+      setActiveStoryIndex(0);
     }
   };
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: editName, bio: editBio })
-      .eq('id', user.id);
-    
-    if (!error) {
-      onUpdateProfile({ full_name: editName, bio: editBio });
-      setIsEditModalOpen(false);
+    setEditError(null);
+    const cleanUsername = editUsername.trim().toLowerCase().replace(/\s+/g, '');
+    if (!cleanUsername) {
+      setEditError("Handle cannot be empty.");
+      setIsSaving(false);
+      return;
     }
-    setIsSaving(false);
-  };
-
-  const fetchListUsers = async (type: 'Followers' | 'Following') => {
-    setListLoading(true);
-    setListType(type);
-    setIsListModalOpen(true);
-    let query;
-    if (type === 'Followers') {
-      query = supabase.from('follows').select('profiles:follower_id(*)').eq('following_id', user.id);
-    } else {
-      query = supabase.from('follows').select('profiles:following_id(*)').eq('follower_id', user.id);
-    }
-    const { data, error } = await query;
-    if (!error && data) {
-      setListUsers(data.map((item: any) => item.profiles));
-    }
-    setListLoading(false);
-  };
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploadingAvatar(true);
-    const fileName = `${user.id}-${Date.now()}-${sanitizeFilename(file.name)}`;
-    const filePath = `avatars/${fileName}`;
     try {
-      await supabase.storage.from('avatars').upload(filePath, file);
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
-      onUpdateProfile({ avatar_url: publicUrl });
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ username: cleanUsername, full_name: editName.trim(), bio: editBio.trim() })
+        .eq('id', user.id);
+      
+      if (profileError) {
+        if (profileError.code === '23505') throw new Error("Handle occupied by another core.");
+        throw profileError;
+      }
+
+      onUpdateProfile({ username: cleanUsername, full_name: editName.trim(), bio: editBio.trim() });
+      setIsEditModalOpen(false);
+    } catch (err: any) {
+      setEditError(err.message);
     } finally {
-      setIsUploadingAvatar(false);
+      setIsSaving(false);
     }
   };
+
+  const currentGridPosts = activeTab === 'POSTS' ? posts : likedPosts;
 
   return (
-    <div className="max-w-[935px] mx-auto py-6 sm:py-12 px-4 animate-vix-in pb-20">
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-20 mb-10 sm:mb-16">
-        <div className="relative w-28 h-28 sm:w-40 sm:h-40 shrink-0">
-          <div className={`w-full h-full rounded-full p-1 vix-gradient ${isUploadingAvatar ? 'animate-pulse' : ''} shadow-2xl shadow-pink-500/20`}>
-            <div className="w-full h-full rounded-full bg-black p-1.5 overflow-hidden">
+    <div className="max-w-[935px] mx-auto py-12 px-4 animate-vix-in pb-20">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-12 mb-16">
+        <div className="relative w-32 h-32 sm:w-40 sm:h-40 shrink-0">
+          <div 
+            onClick={handleAvatarClick}
+            className={`w-full h-full rounded-full p-1 cursor-pointer transition-transform active:scale-95 ${userStories.length > 0 ? 'vix-gradient shadow-[0_0_20px_rgba(255,0,128,0.3)]' : 'border border-zinc-800'}`}
+          >
+            <div className="w-full h-full rounded-full bg-black p-1 overflow-hidden relative group">
               {user.avatar_url ? (
                 <img src={user.avatar_url} className="w-full h-full rounded-full object-cover" alt={user.username} />
               ) : (
-                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-800 rounded-full">
-                  <UserIcon className="w-12 h-12" />
-                </div>
+                <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-800"><UserIcon className="w-12 h-12" /></div>
+              )}
+              {isOwnProfile && (
+                <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <Camera className="w-8 h-8 text-white" />
+                  <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsUploadingAvatar(true);
+                    const fileName = `${user.id}-${Date.now()}-${sanitizeFilename(file.name)}`;
+                    await supabase.storage.from('avatars').upload(`avatars/${fileName}`, file);
+                    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(`avatars/${fileName}`);
+                    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+                    onUpdateProfile({ avatar_url: publicUrl });
+                    setIsUploadingAvatar(false);
+                  }} />
+                </label>
               )}
             </div>
           </div>
-          {isOwnProfile && (
-            <label className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 hover:opacity-100 cursor-pointer transition-opacity border-2 border-white/20 backdrop-blur-sm">
-              <Camera className="w-8 h-8 text-white" />
-              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
-            </label>
+          {userStories.length > 0 && (
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-black animate-pulse shadow-[0_0_10px_#ff0080]">
+              Live
+            </div>
           )}
         </div>
 
-        <div className="flex-1 space-y-6 text-center md:text-left w-full">
-          <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8">
+        <div className="flex-1 space-y-6 text-center md:text-left">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
             <h2 className="text-2xl font-black flex items-center gap-1.5">
-              {user.username}
+              @{user.username}
               {user.is_verified && <VerificationBadge size="w-6 h-6" />}
             </h2>
             <div className="flex gap-2 w-full sm:w-auto">
               {isOwnProfile ? (
                 <>
-                  <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Journey</button>
-                  <button className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
+                  <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Profile</button>
+                  <button className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
                 </>
               ) : (
                 <>
-                  <button onClick={handleFollow} className={`flex-1 sm:flex-none px-8 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all shadow-xl ${isFollowing ? 'bg-zinc-900 border border-zinc-800 text-zinc-500' : 'vix-gradient text-white shadow-pink-500/20'}`}>
-                    {isFollowing ? 'Connected' : 'Connect'}
+                  <button onClick={handleFollow} className={`flex-1 sm:flex-none px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white'}`}>
+                    {isFollowing ? 'Following' : 'Follow'}
                   </button>
-                  <button onClick={() => onMessageUser?.(user)} className="flex-1 sm:flex-none bg-zinc-900 px-8 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Message</button>
+                  <button onClick={() => onMessageUser?.(user)} className="flex-1 sm:flex-none bg-zinc-900 px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Message</button>
                 </>
               )}
             </div>
           </div>
 
-          <div className="flex justify-center md:justify-start gap-10 border-y border-zinc-900/50 py-4 sm:border-none sm:py-0">
-            <div className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline">
-              <span className="font-black text-lg">{formatNumber(counts.posts)}</span>
-              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Stories</span>
+          <div className="flex justify-center md:justify-start gap-10">
+            <div className="flex flex-col items-center sm:items-baseline">
+              <span className="font-black text-lg">{formatNumber(posts.length)}</span>
+              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Artifacts</span>
             </div>
-            <button onClick={() => fetchListUsers('Followers')} className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity">
+            <div className="flex flex-col items-center sm:items-baseline">
               <span className="font-black text-lg">{formatNumber(counts.followers)}</span>
               <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Audiences</span>
-            </button>
-            <button onClick={() => fetchListUsers('Following')} className="flex flex-col sm:flex-row gap-1 items-center sm:items-baseline group hover:opacity-70 transition-opacity">
+            </div>
+            <div className="flex flex-col items-center sm:items-baseline">
               <span className="font-black text-lg">{formatNumber(counts.following)}</span>
               <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Following</span>
-            </button>
+            </div>
+            <div className="flex flex-col items-center sm:items-baseline">
+              <span className="font-black text-lg text-pink-500">{formatNumber(counts.appreciation)}</span>
+              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Appreciation</span>
+            </div>
           </div>
 
-          <div className="text-xs sm:text-sm">
-            <div className="font-black text-white mb-1.5 uppercase tracking-wider">{user.full_name || user.username}</div>
-            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0 whitespace-pre-wrap">{user.bio || 'VixReel Digital Creator • Visual Storytelling'}</p>
+          <div className="text-sm">
+            <div className="font-black text-white mb-1 uppercase tracking-wider">{user.full_name || user.username}</div>
+            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0">{user.bio || 'Digital Creator • VixReel Narrative'}</p>
           </div>
         </div>
       </div>
 
-      <div className="border-t border-zinc-900 pt-6 sm:pt-10">
+      <div className="border-t border-zinc-900 flex justify-center gap-12 sm:gap-16">
+        <button 
+          onClick={() => setActiveTab('POSTS')} 
+          className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black uppercase tracking-widest text-[10px] ${activeTab === 'POSTS' ? 'border-white text-white' : 'border-transparent text-zinc-600'}`}
+        >
+          <Grid className="w-4 h-4" /> Artifacts
+        </button>
+        <button 
+          onClick={() => setActiveTab('LIKES')} 
+          className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black uppercase tracking-widest text-[10px] ${activeTab === 'LIKES' ? 'border-white text-white' : 'border-transparent text-zinc-600'}`}
+        >
+          <Heart className="w-4 h-4" /> My Likes
+        </button>
+      </div>
+
+      <div className="pt-8">
         <div className="grid grid-cols-3 gap-1 sm:gap-4">
-          {posts.map((post) => (
-            <div key={post.id} className="aspect-square bg-zinc-950 relative group cursor-pointer overflow-hidden rounded-sm sm:rounded-xl border border-zinc-900/50 hover:border-zinc-700 transition-all shadow-xl">
+          {currentGridPosts.map((post) => (
+            <div key={post.id} className="aspect-square bg-zinc-950 relative group cursor-pointer overflow-hidden rounded-sm sm:rounded-2xl shadow-xl border border-zinc-900/50">
               {post.media_type === 'video' ? (
-                <div className="w-full h-full relative">
-                  <video src={post.media_url} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 p-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10">
-                    <Video className="w-3.5 h-3.5 text-white fill-white" />
-                  </div>
-                </div>
+                <video src={post.media_url} className="w-full h-full object-cover" />
               ) : (
-                <img src={post.media_url} className="w-full h-full object-cover" alt="VixReel Story" />
+                <img src={post.media_url} className="w-full h-full object-cover" alt="Artifact" />
               )}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-6 transition-all backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-1.5 font-black text-white text-sm sm:text-base">
-                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 fill-white text-white" /> 
-                  {formatNumber((post.likes_count || 0) + (post.boosted_likes || 0))}
-                </div>
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
+                <Heart className="w-5 h-5 fill-white" />
               </div>
             </div>
           ))}
-          {posts.length === 0 && !isUpdating && (
-            <div className="col-span-3 py-20 sm:py-32 text-center flex flex-col items-center gap-6">
-              <div className="w-20 h-20 rounded-[2rem] border-2 border-dashed border-zinc-800 flex items-center justify-center">
-                 <Camera className="w-8 h-8 text-zinc-800" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-zinc-500 font-black uppercase tracking-[0.3em] text-[10px] sm:text-xs">No Visual Artifacts</p>
-                <p className="text-zinc-700 text-[10px] font-bold">Start your VixReel narrative today.</p>
-              </div>
-            </div>
+          {currentGridPosts.length === 0 && !isUpdating && (
+            <div className="col-span-3 py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-[10px]">Empty Narrative</div>
           )}
-          {isUpdating && <div className="col-span-3 py-20 flex justify-center"><Loader2 className="w-8 h-8 text-zinc-800 animate-spin" /></div>}
         </div>
       </div>
 
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-            <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-widest text-xs">Modify Journey</h3>
-              <button onClick={() => setIsEditModalOpen(false)}><X className="w-5 h-5 text-zinc-500" /></button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="text-[10px] font-black uppercase text-zinc-600 block mb-2 tracking-widest">Full Presence Name</label>
-                <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all text-white" placeholder="e.g. Alex Rivera" />
+      {/* Story Viewer Modal */}
+      {activeStoryIndex !== null && (
+        <div className="fixed inset-0 z-[3000] bg-black/98 flex items-center justify-center animate-in fade-in duration-300">
+          <button onClick={() => setActiveStoryIndex(null)} className="absolute top-8 right-8 text-white/50 hover:text-white z-50 p-2 bg-black/40 rounded-full backdrop-blur-md">
+            <X className="w-8 h-8" />
+          </button>
+          
+          {activeStoryIndex > 0 && (
+            <button onClick={() => setActiveStoryIndex(activeStoryIndex - 1)} className="absolute left-4 md:left-20 text-white/30 hover:text-white z-10 p-4"><ChevronLeft className="w-12 h-12" /></button>
+          )}
+
+          <div className="w-full max-w-md aspect-[9/16] bg-zinc-950 relative rounded-2xl overflow-hidden shadow-[0_0_120px_rgba(255,0,128,0.2)]">
+            <div className="absolute top-0 left-0 right-0 p-5 z-20 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent">
+              <img src={user.avatar_url || ''} className="w-8 h-8 rounded-full border border-white/20" />
+              <div className="flex flex-col">
+                <span className="font-black text-xs text-white uppercase tracking-widest">@{user.username}</span>
+                <span className="text-[9px] text-white/40 font-bold">{new Date(userStories[activeStoryIndex].created_at).toLocaleString()}</span>
               </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-zinc-600 block mb-2 tracking-widest">Creative Bio</label>
-                <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-black border border-zinc-900 rounded-2xl px-5 py-4 text-sm outline-none focus:border-pink-500/40 transition-all resize-none text-white" placeholder="Tell your story..." />
-              </div>
-              <button onClick={handleSaveProfile} disabled={isSaving} className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-pink-500/10 flex items-center justify-center gap-2">
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Sync Updates
-              </button>
             </div>
+
+            {userStories[activeStoryIndex].media_type === 'video' ? (
+              <video src={userStories[activeStoryIndex].media_url} autoPlay className="w-full h-full object-contain" onEnded={() => {
+                if (activeStoryIndex < userStories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
+                else setActiveStoryIndex(null);
+              }} />
+            ) : (
+              <img src={userStories[activeStoryIndex].media_url} className="w-full h-full object-contain" />
+            )}
           </div>
+
+          {activeStoryIndex < userStories.length - 1 && (
+            <button onClick={() => setActiveStoryIndex(activeStoryIndex + 1)} className="absolute right-4 md:right-20 text-white/30 hover:text-white z-10 p-4"><ChevronRight className="w-12 h-12" /></button>
+          )}
         </div>
       )}
 
-      {isListModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-[2rem] w-full max-w-md h-[60vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-            <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-widest text-xs">{listType}</h3>
-              <button onClick={() => setIsListModalOpen(false)}><X className="w-5 h-5 text-zinc-500" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-              {listLoading ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-zinc-800" /></div> : listUsers.length > 0 ? listUsers.map(u => (
-                  <div key={u.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-zinc-900/40 transition-all cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-900" />
-                      <div>
-                        <div className="font-bold text-sm flex items-center text-white">{u.username} {u.is_verified && <VerificationBadge size="w-3 h-3" />}</div>
-                        <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{u.full_name || 'Individual Creator'}</div>
-                      </div>
-                    </div>
-                    <button onClick={() => { setIsListModalOpen(false); if(u.id !== user.id) onMessageUser?.(u); }} className="bg-zinc-800 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white">View</button>
-                  </div>
-                )) : <div className="flex flex-col items-center justify-center py-20 text-zinc-800"><UserIcon className="w-10 h-10 mb-4" /><p className="font-black uppercase tracking-widest text-[10px]">No audience found</p></div>}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8">
+            <h3 className="font-black uppercase text-[10px] tracking-widest text-zinc-500 mb-8">Protocol Update</h3>
+            <div className="space-y-5">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Handle</label>
+                <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Bio</label>
+                <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-24 bg-black border border-zinc-800 rounded-2xl px-4 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white resize-none" />
+              </div>
+              <button onClick={handleSaveProfile} disabled={isSaving} className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-pink-500/10">
+                {isSaving ? 'Syncing...' : 'Confirm Update'}
+              </button>
+              <button onClick={() => setIsEditModalOpen(false)} className="w-full text-[10px] font-black uppercase text-zinc-500 py-2">Abort</button>
             </div>
           </div>
         </div>
