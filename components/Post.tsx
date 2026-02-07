@@ -61,7 +61,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     const wasLiked = liked;
     setIsLiking(true);
     
-    // Optimistic Update: Immediate UI change
+    // Optimistic UI
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
 
@@ -70,16 +70,16 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         const { error } = await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('likes').upsert({ post_id: post.id, user_id: currentUserId }, { onConflict: 'post_id,user_id' });
+        // Use insert instead of upsert to avoid UPDATE policy triggers which often fail with 42501
+        const { error } = await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
         if (error) throw error;
       }
       
-      // Safety delay before syncing with server to avoid race conditions with Supabase RLS/Trigger latency
-      setTimeout(() => fetchLikesCount(), 800);
+      fetchLikesCount();
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err: any) {
       console.error("Engagement Protocol Error:", err);
-      // Revert if database fails
+      // Revert UI on error
       setLiked(wasLiked);
       setLikesCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
     } finally {
@@ -92,7 +92,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     setSaved(!wasSaved);
     try {
       if (wasSaved) await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
-      else await supabase.from('saves').upsert({ post_id: post.id, user_id: currentUserId });
+      else await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
     } catch (err) { setSaved(wasSaved); }
   };
 
@@ -224,3 +224,4 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
 };
 
 export default Post;
+
