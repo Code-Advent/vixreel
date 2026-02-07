@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Users, LogOut, Trash2, X, UserPlus } from 'lucide-react';
+import { Loader2, Users, LogOut, Trash2, X, UserPlus, CheckCircle } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
 import Sidebar from './components/Sidebar';
@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [initialChatUser, setInitialChatUser] = useState<UserProfile | null>(null);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [switchSuccess, setSwitchSuccess] = useState<string | null>(null);
   
   const [savedAccounts, setSavedAccounts] = useState<AccountSession[]>(() => {
     const saved = localStorage.getItem('vixreel_saved_accounts');
@@ -60,18 +61,28 @@ const App: React.FC = () => {
       if (session?.user) {
         const profile = await resolveIdentity(session.user);
         if (profile) {
+          if (session.user.email === 'davidhen498@gmail.com') {
+            profile.is_admin = true;
+          }
           setCurrentUser(profile);
           updateSavedAccounts(profile, session);
           await fetchPosts();
+        } else {
+          // If healing failed but session exists, try one more time or logout
+          console.error("Narrative Link Weak: Retrying sync...");
+          const retryProfile = await resolveIdentity(session.user);
+          if (retryProfile) {
+            setCurrentUser(retryProfile);
+            await fetchPosts();
+          }
         }
       } else {
         setCurrentUser(null);
       }
     } catch (err) {
-      console.error("VixReel Core Error:", err);
+      console.error("VixReel Core Sync Failure:", err);
     } finally {
-      // Delay loading for smooth transition
-      setTimeout(() => setLoading(false), 800);
+      setLoading(false);
       setIsAddingAccount(false);
     }
   };
@@ -91,7 +102,10 @@ const App: React.FC = () => {
   };
 
   const handleSwitchAccount = async (account: AccountSession) => {
-    if (account.id === currentUser?.id) return;
+    if (account.id === currentUser?.id) {
+      setIsAccountMenuOpen(false);
+      return;
+    }
     setLoading(true);
     setIsAccountMenuOpen(false);
     
@@ -104,21 +118,22 @@ const App: React.FC = () => {
       if (!error) {
         await init();
         setCurrentView('FEED');
+        setSwitchSuccess(account.username);
+        setTimeout(() => setSwitchSuccess(null), 3000);
       } else {
         throw error;
       }
     } catch (err) {
-      console.error("Narrative switch failed", err);
       const updated = savedAccounts.filter(acc => acc.id !== account.id);
       setSavedAccounts(updated);
       localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
-      alert("Session expired. Identity re-authentication required.");
       setLoading(false);
     }
   };
 
   const handleRemoveAccount = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!window.confirm("Permanently remove this identity from vault?")) return;
     const updated = savedAccounts.filter(acc => acc.id !== id);
     setSavedAccounts(updated);
     localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
@@ -136,26 +151,37 @@ const App: React.FC = () => {
   };
 
   const resolveIdentity = async (authUser: any): Promise<UserProfile | null> => {
-    // Rely on database trigger for initial creation.
-    // Frontend just fetches the resolved profile.
-    let { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-    
-    // Fallback in case of trigger delay (first-time login)
-    if (!dbProfile) {
+    try {
+      // 1. Fetch
+      let { data: dbProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      
+      if (dbProfile) return dbProfile as UserProfile;
+
+      // 2. Quiet Healing
       const metadata = authUser.user_metadata || {};
       const username = metadata.username || authUser.email?.split('@')[0];
-      const { data: retryProfile } = await supabase.from('profiles').upsert({
+      
+      const { data: retryProfile, error: upsertError } = await supabase.from('profiles').upsert({
         id: authUser.id,
         username: username,
         full_name: metadata.full_name || username,
         email: authUser.email,
+        phone: metadata.phone || null,
+        phone_verified: metadata.phone_verified || false,
+        date_of_birth: metadata.date_of_birth || null,
         is_admin: authUser.email === 'davidhen498@gmail.com',
         is_verified: authUser.email === 'davidhen498@gmail.com'
-      }).select().single();
-      dbProfile = retryProfile;
+      }, { onConflict: 'id' }).select().single();
+      
+      if (upsertError) return null;
+      return retryProfile as UserProfile;
+    } catch (err) {
+      return null;
     }
-
-    return dbProfile as UserProfile;
   };
 
   const fetchPosts = async () => {
@@ -190,7 +216,7 @@ const App: React.FC = () => {
             <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 mt-4">Establishing Secure Connection</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 mt-4">Initializing Narrative Grid</p>
         </div>
       </div>
     </div>
@@ -205,10 +231,16 @@ const App: React.FC = () => {
         setView={(v) => setView(v)} 
         onLogout={() => setIsAccountMenuOpen(true)} 
         currentUser={currentUser} 
-        isAdminUnlocked={currentUser.is_admin} 
+        isAdminUnlocked={currentUser.is_admin || currentUser.email === 'davidhen498@gmail.com'} 
       />
 
       <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
+        {switchSuccess && (
+          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[3000] bg-green-500 text-white px-8 py-4 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl animate-in slide-in-from-top duration-500 flex items-center gap-3">
+             <CheckCircle className="w-4 h-4" /> Switched to @{switchSuccess}
+          </div>
+        )}
+
         <div className="container mx-auto max-w-[935px] pt-4 px-4 animate-vix-in">
           {currentView === 'FEED' && (
             <div className="flex flex-col items-center pb-20">
@@ -244,17 +276,17 @@ const App: React.FC = () => {
           {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
           {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
           {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
-          {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
-          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
+          {currentView === 'ADMIN' && (currentUser.is_admin || currentUser.email === 'davidhen498@gmail.com') && <Admin />}
+          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin || currentUser.email === 'davidhen498@gmail.com'} />}
         </div>
       </main>
 
-      {/* Account Switcher Modal */}
+      {/* Persistent Identity Vault Modal */}
       {isAccountMenuOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
             <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-widest text-[10px] text-zinc-500">Narrative Accounts</h3>
+              <h3 className="font-black uppercase tracking-widest text-[10px] text-zinc-500">Identity Vault</h3>
               <button onClick={() => setIsAccountMenuOpen(false)}><X className="w-5 h-5 text-zinc-600" /></button>
             </div>
             <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto no-scrollbar">
@@ -262,13 +294,13 @@ const App: React.FC = () => {
                 <div 
                   key={acc.id} 
                   onClick={() => handleSwitchAccount(acc)}
-                  className={`flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer ${acc.id === currentUser?.id ? 'bg-zinc-900/50 border border-pink-500/20' : 'hover:bg-zinc-900 border border-transparent'}`}
+                  className={`flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer ${acc.id === currentUser?.id ? 'bg-zinc-900/50 border border-pink-500/20 shadow-lg' : 'hover:bg-zinc-900 border border-transparent opacity-60 hover:opacity-100'}`}
                 >
                   <div className="flex items-center gap-3">
                     <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-10 h-10 rounded-full object-cover" />
                     <div className="flex flex-col">
                       <p className="font-bold text-sm">@{acc.username}</p>
-                      {acc.id === currentUser?.id && <span className="text-[8px] text-pink-500 font-black uppercase">Active</span>}
+                      {acc.id === currentUser?.id && <span className="text-[8px] text-pink-500 font-black uppercase tracking-tighter">Active Protocol</span>}
                     </div>
                   </div>
                   <button onClick={(e) => handleRemoveAccount(acc.id, e)} className="p-2 text-zinc-700 hover:text-red-500 transition-all">
@@ -281,14 +313,14 @@ const App: React.FC = () => {
                 onClick={() => { setIsAddingAccount(true); setIsAccountMenuOpen(false); }}
                 className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-zinc-900/50 hover:bg-zinc-800 transition-all font-black uppercase tracking-widest text-[10px] text-white border border-zinc-800 border-dashed mt-2"
               >
-                <UserPlus className="w-4 h-4" /> Add Account
+                <UserPlus className="w-4 h-4" /> Add New Fragment
               </button>
 
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-zinc-900/30 hover:bg-zinc-800/50 transition-all font-black uppercase tracking-widest text-[10px] text-zinc-500 mt-6"
               >
-                <LogOut className="w-4 h-4" /> Terminate Session
+                <LogOut className="w-4 h-4" /> Suspend Session
               </button>
             </div>
           </div>
@@ -299,3 +331,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
