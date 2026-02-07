@@ -5,7 +5,6 @@ import { supabase } from './lib/supabase';
 import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
 import Sidebar from './components/Sidebar';
 import Post from './components/Post';
-import Stories from './components/Stories';
 import Profile from './components/Profile';
 import CreatePost from './components/CreatePost';
 import Search from './components/Search';
@@ -71,7 +70,8 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("VixReel Core Error:", err);
     } finally {
-      setLoading(false);
+      // Delay loading for smooth transition
+      setTimeout(() => setLoading(false), 800);
       setIsAddingAccount(false);
     }
   };
@@ -189,11 +189,22 @@ const App: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-white">
-      <div className="w-16 h-16 rounded-2xl vix-gradient flex items-center justify-center mb-6 animate-pulse">
-        <span className="text-white font-black text-3xl logo-font">V</span>
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-white relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#111_0%,_#000_100%)]"></div>
+      <div className="relative z-10 flex flex-col items-center">
+        <div className="w-24 h-24 rounded-[2rem] vix-gradient flex items-center justify-center mb-8 animate-pulse shadow-[0_0_50px_rgba(255,0,128,0.3)]">
+          <span className="text-white font-black text-4xl logo-font">V</span>
+        </div>
+        <div className="space-y-3 text-center">
+          <h2 className="logo-font text-3xl vix-text-gradient">VixReel</h2>
+          <div className="flex items-center gap-2 justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0s' }}></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 mt-4">Establishing Secure Connection</p>
+        </div>
       </div>
-      <Loader2 className="w-4 h-4 text-zinc-800 animate-spin" />
     </div>
   );
 
@@ -220,7 +231,6 @@ const App: React.FC = () => {
                 </button>
               </div>
               <div className="w-full max-w-[470px] mt-2 space-y-6">
-                <Stories currentUser={currentUser} />
                 {posts.length > 0 ? (
                   posts.map(p => (
                     <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={handlePostDeleted} onUpdate={fetchPosts} />

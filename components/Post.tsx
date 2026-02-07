@@ -23,6 +23,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   const [newComment, setNewComment] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -56,18 +57,36 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   const handleLike = async () => {
+    if (isLiking) return;
     const wasLiked = liked;
+    setIsLiking(true);
+    
+    // Optimistic Update
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
+
     try {
       if (wasLiked) {
-        await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
+        // Unliking: delete record
+        const { error } = await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
+        if (error) throw error;
       } else {
-        await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+        // Liking: Insert record. UNIQUE constraint in DB handles single-like protection.
+        const { error } = await supabase.from('likes').upsert({ post_id: post.id, user_id: currentUserId }, { onConflict: 'post_id,user_id' });
+        if (error) throw error;
       }
-      fetchLikesCount();
+      // Re-fetch to ensure sync with server state
+      await fetchLikesCount();
+      // Important: Dispatch event to notify Profile tab to refresh Karma
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
-    } catch (err) { setLiked(wasLiked); }
+    } catch (err: any) {
+      console.error("Like protocol failure:", err);
+      // Revert optimistic update on failure
+      setLiked(wasLiked);
+      setLikesCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
+    } finally {
+      setIsLiking(false);
+    }
   };
 
   const handleSave = async () => {
@@ -75,7 +94,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     setSaved(!wasSaved);
     try {
       if (wasSaved) await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
-      else await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
+      else await supabase.from('saves').upsert({ post_id: post.id, user_id: currentUserId });
     } catch (err) { setSaved(wasSaved); }
   };
 
@@ -139,7 +158,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       <div className="py-4 space-y-3 px-2">
         <div className="flex justify-between items-center">
           <div className="flex gap-4 items-center">
-            <button onClick={handleLike} className={`transition-all active:scale-125 ${liked ? 'text-pink-500' : 'text-zinc-400 hover:text-white'}`}>
+            <button onClick={handleLike} disabled={isLiking} className={`transition-all active:scale-125 ${liked ? 'text-pink-500' : 'text-zinc-400 hover:text-white'}`}>
               <Heart className={`w-6 h-6 ${liked ? 'fill-current' : ''}`} />
             </button>
             <button onClick={() => setShowComments(true)} className="text-zinc-400 hover:text-white flex items-center gap-1.5 active:scale-110">

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Grid, Heart, Camera, Video, Settings, User as UserIcon, Loader2, X, Check, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Grid, Heart, Camera, Video, Settings, User as UserIcon, Loader2, X, Check, AlertCircle, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { UserProfile, Post as PostType, Story } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber, sanitizeFilename } from '../lib/utils';
@@ -20,6 +20,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [counts, setCounts] = useState({ followers: 0, following: 0, appreciation: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingStory, setIsUploadingStory] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -40,7 +41,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setEditName(user.full_name || '');
     setEditBio(user.bio || '');
 
-    // Listen for global engagement updates to refresh counts
     const handleEngagementUpdate = () => {
       fetchUserContent();
     };
@@ -59,10 +59,43 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     if (data) setUserStories(data as any);
   };
 
+  const handleStoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingStory(true);
+    const safeFilename = sanitizeFilename(file.name);
+    const fileName = `${user.id}-${Date.now()}-${safeFilename}`;
+    const filePath = `active/${fileName}`;
+    const mType = file.type.startsWith('video') ? 'video' : 'image';
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('stories')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('stories').getPublicUrl(filePath);
+      
+      const { error: dbError } = await supabase.from('stories').insert({
+        user_id: user.id,
+        media_url: publicUrl,
+        media_type: mType
+      });
+
+      if (dbError) throw dbError;
+      await fetchUserStories();
+    } catch (err: any) {
+      alert("Story transmission failed: " + err.message);
+    } finally {
+      setIsUploadingStory(false);
+    }
+  };
+
   const fetchUserContent = async () => {
     setIsUpdating(true);
     try {
-      // Fetch user's own posts
       const { data: pData } = await supabase
         .from('posts')
         .select('*, user:profiles(*)')
@@ -70,7 +103,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         .order('created_at', { ascending: false });
       if (pData) setPosts(pData as any);
 
-      // Fetch posts the user has liked
       const { data: lData } = await supabase
         .from('likes')
         .select('post:posts(*, user:profiles(*))')
@@ -82,11 +114,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setLikedPosts(validLikedPosts as any);
       }
       
-      // Fetch follower/following counts
       const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
       
-      // Calculate total appreciation (likes received on all posts + boosts)
       let totalAppreciation = 0;
       if (pData) {
         for (const post of pData) {
@@ -102,12 +132,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       });
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && !isOwnProfile) {
+      if (session && user.id !== session.user.id) {
         const { data } = await supabase.from('follows').select('*').eq('follower_id', session.user.id).eq('following_id', user.id).maybeSingle();
         setIsFollowing(!!data);
       }
     } catch (error) {
-      console.error("Profile Fetch Error", error);
+      console.error("Profile Sync Error", error);
     } finally {
       setIsUpdating(false);
     }
@@ -141,7 +171,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setEditError(null);
     const cleanUsername = editUsername.trim().toLowerCase().replace(/\s+/g, '');
     if (!cleanUsername) {
-      setEditError("Handle cannot be empty.");
+      setEditError("Identity handle required.");
       setIsSaving(false);
       return;
     }
@@ -182,9 +212,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                 <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-800"><UserIcon className="w-12 h-12" /></div>
               )}
               {isOwnProfile && (
-                <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                   <Camera className="w-8 h-8 text-white" />
-                  <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     setIsUploadingAvatar(true);
@@ -195,13 +225,19 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                     onUpdateProfile({ avatar_url: publicUrl });
                     setIsUploadingAvatar(false);
                   }} />
-                </label>
+                </div>
               )}
             </div>
           </div>
-          {userStories.length > 0 && (
+          {isOwnProfile && (
+            <label className="absolute bottom-0 right-0 bg-blue-500 rounded-full p-2 border-4 border-black cursor-pointer hover:scale-110 transition-transform shadow-xl">
+              {isUploadingStory ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Plus className="w-4 h-4 text-white" />}
+              <input type="file" className="hidden" accept="image/*,video/*" onChange={handleStoryUpload} disabled={isUploadingStory} />
+            </label>
+          )}
+          {userStories.length > 0 && !isOwnProfile && (
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-black animate-pulse shadow-[0_0_10px_#ff0080]">
-              Live
+              Live Story
             </div>
           )}
         </div>
@@ -215,15 +251,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <div className="flex gap-2 w-full sm:w-auto">
               {isOwnProfile ? (
                 <>
-                  <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Profile</button>
+                  <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Protocol</button>
                   <button className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
                 </>
               ) : (
                 <>
-                  <button onClick={handleFollow} className={`flex-1 sm:flex-none px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white'}`}>
-                    {isFollowing ? 'Following' : 'Follow'}
+                  <button onClick={handleFollow} className={`flex-1 sm:flex-none px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white shadow-lg'}`}>
+                    {isFollowing ? 'Disconnecting' : 'Connect'}
                   </button>
-                  <button onClick={() => onMessageUser?.(user)} className="flex-1 sm:flex-none bg-zinc-900 px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Message</button>
+                  <button onClick={() => onMessageUser?.(user)} className="flex-1 sm:flex-none bg-zinc-900 px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Direct Signal</button>
                 </>
               )}
             </div>
@@ -240,17 +276,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             </div>
             <div className="flex flex-col items-center sm:items-baseline">
               <span className="font-black text-lg">{formatNumber(counts.following)}</span>
-              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Following</span>
+              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Signals</span>
             </div>
             <div className="flex flex-col items-center sm:items-baseline">
               <span className="font-black text-lg text-pink-500">{formatNumber(counts.appreciation)}</span>
-              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Appreciation</span>
+              <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Karma</span>
             </div>
           </div>
 
           <div className="text-sm">
             <div className="font-black text-white mb-1 uppercase tracking-wider">{user.full_name || user.username}</div>
-            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0">{user.bio || 'Digital Creator • VixReel Narrative'}</p>
+            <p className="text-zinc-400 font-medium leading-relaxed max-w-sm mx-auto md:mx-0">{user.bio || 'Digital Narrator • VixReel Core'}</p>
           </div>
         </div>
       </div>
@@ -260,13 +296,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           onClick={() => setActiveTab('POSTS')} 
           className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black uppercase tracking-widest text-[10px] ${activeTab === 'POSTS' ? 'border-white text-white' : 'border-transparent text-zinc-600'}`}
         >
-          <Grid className="w-4 h-4" /> Artifacts
+          <Grid className="w-4 h-4" /> Artifact Grid
         </button>
         <button 
           onClick={() => setActiveTab('LIKES')} 
           className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black uppercase tracking-widest text-[10px] ${activeTab === 'LIKES' ? 'border-white text-white' : 'border-transparent text-zinc-600'}`}
         >
-          <Heart className="w-4 h-4" /> My Likes
+          <Heart className="w-4 h-4" /> Liked Injections
         </button>
       </div>
 
@@ -285,12 +321,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             </div>
           ))}
           {currentGridPosts.length === 0 && !isUpdating && (
-            <div className="col-span-3 py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-[10px]">Empty Narrative</div>
+            <div className="col-span-3 py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-[10px]">No Artifacts Recorded</div>
           )}
         </div>
       </div>
 
-      {/* Story Viewer Modal */}
       {activeStoryIndex !== null && (
         <div className="fixed inset-0 z-[3000] bg-black/98 flex items-center justify-center animate-in fade-in duration-300">
           <button onClick={() => setActiveStoryIndex(null)} className="absolute top-8 right-8 text-white/50 hover:text-white z-50 p-2 bg-black/40 rounded-full backdrop-blur-md">
@@ -328,21 +363,21 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8">
-            <h3 className="font-black uppercase text-[10px] tracking-widest text-zinc-500 mb-8">Protocol Update</h3>
+          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8 shadow-2xl">
+            <h3 className="font-black uppercase text-[10px] tracking-widest text-zinc-500 mb-8">Override Protocol</h3>
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Handle</label>
+                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Identity Handle</label>
                 <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white" />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Bio</label>
+                <label className="text-[10px] font-black uppercase text-zinc-700 block mb-2 tracking-widest">Bio Manifesto</label>
                 <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-24 bg-black border border-zinc-800 rounded-2xl px-4 py-4 text-sm outline-none focus:border-pink-500/50 transition-all text-white resize-none" />
               </div>
-              <button onClick={handleSaveProfile} disabled={isSaving} className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-pink-500/10">
-                {isSaving ? 'Syncing...' : 'Confirm Update'}
+              <button onClick={handleSaveProfile} disabled={isSaving} className="w-full vix-gradient py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl">
+                {isSaving ? 'Synchronizing...' : 'Upload Protocol'}
               </button>
-              <button onClick={() => setIsEditModalOpen(false)} className="w-full text-[10px] font-black uppercase text-zinc-500 py-2">Abort</button>
+              <button onClick={() => setIsEditModalOpen(false)} className="w-full text-[10px] font-black uppercase text-zinc-500 py-2">Cancel Transmission</button>
             </div>
           </div>
         </div>
