@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Grid, Heart, Camera, Video, Settings, User as UserIcon, Loader2, X, Check, AlertCircle, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Grid, Heart, Camera, Video, Settings, User as UserIcon, Loader2, X, Check, AlertCircle, ChevronLeft, ChevronRight, Plus, ShieldCheck, Globe, Phone } from 'lucide-react';
 import { UserProfile, Post as PostType, Story } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber, sanitizeFilename } from '../lib/utils';
@@ -24,6 +24,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [isUpdating, setIsUpdating] = useState(false);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editUsername, setEditUsername] = useState(user.username || '');
   const [editName, setEditName] = useState(user.full_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
@@ -195,7 +196,32 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     }
   };
 
+  const getRegionFromPhone = (phone?: string) => {
+    if (!phone) return 'Unknown Void';
+    if (phone.startsWith('+1')) return 'North America';
+    if (phone.startsWith('+44')) return 'United Kingdom';
+    if (phone.startsWith('+91')) return 'India';
+    if (phone.startsWith('+234')) return 'Nigeria';
+    if (phone.startsWith('+61')) return 'Australia';
+    if (phone.startsWith('+81')) return 'Japan';
+    if (phone.startsWith('+49')) return 'Germany';
+    if (phone.startsWith('+33')) return 'France';
+    return 'International Grid';
+  };
+
   const currentGridPosts = activeTab === 'POSTS' ? posts : likedPosts;
+
+  // Detect login method from Supabase session if possible
+  const [loginMethod, setLoginMethod] = useState<string | null>(null);
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      setLoginMethod(authUser?.user_metadata?.login_method || 'EMAIL');
+    };
+    checkSession();
+  }, []);
+
+  const showPhoneDetails = isOwnProfile && loginMethod === 'PHONE';
 
   return (
     <div className="max-w-[935px] mx-auto py-12 px-4 animate-vix-in pb-20">
@@ -235,11 +261,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <input type="file" className="hidden" accept="image/*,video/*" onChange={handleStoryUpload} disabled={isUploadingStory} />
             </label>
           )}
-          {userStories.length > 0 && !isOwnProfile && (
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-black animate-pulse shadow-[0_0_10px_#ff0080]">
-              Live Story
-            </div>
-          )}
         </div>
 
         <div className="flex-1 space-y-6 text-center md:text-left">
@@ -252,7 +273,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               {isOwnProfile ? (
                 <>
                   <button onClick={() => setIsEditModalOpen(true)} className="flex-1 sm:flex-none bg-zinc-900 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all">Edit Protocol</button>
-                  <button className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
+                  <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all"><Settings className="w-4 h-4 text-zinc-500" /></button>
                 </>
               ) : (
                 <>
@@ -320,50 +341,91 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               </div>
             </div>
           ))}
-          {currentGridPosts.length === 0 && !isUpdating && (
-            <div className="col-span-3 py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-[10px]">No Artifacts Recorded</div>
-          )}
         </div>
       </div>
 
-      {activeStoryIndex !== null && (
-        <div className="fixed inset-0 z-[3000] bg-black/98 flex items-center justify-center animate-in fade-in duration-300">
-          <button onClick={() => setActiveStoryIndex(null)} className="absolute top-8 right-8 text-white/50 hover:text-white z-50 p-2 bg-black/40 rounded-full backdrop-blur-md">
-            <X className="w-8 h-8" />
-          </button>
-          
-          {activeStoryIndex > 0 && (
-            <button onClick={() => setActiveStoryIndex(activeStoryIndex - 1)} className="absolute left-4 md:left-20 text-white/30 hover:text-white z-10 p-4"><ChevronLeft className="w-12 h-12" /></button>
-          )}
-
-          <div className="w-full max-w-md aspect-[9/16] bg-zinc-950 relative rounded-2xl overflow-hidden shadow-[0_0_120px_rgba(255,0,128,0.2)]">
-            <div className="absolute top-0 left-0 right-0 p-5 z-20 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent">
-              <img src={user.avatar_url || ''} className="w-8 h-8 rounded-full border border-white/20" />
-              <div className="flex flex-col">
-                <span className="font-black text-xs text-white uppercase tracking-widest">@{user.username}</span>
-                <span className="text-[9px] text-white/40 font-bold">{new Date(userStories[activeStoryIndex].created_at).toLocaleString()}</span>
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-zinc-950 border border-white/5 rounded-[3rem] p-10 shadow-2xl animate-vix-in relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 blur-3xl -z-10"></div>
+            
+            <div className="flex justify-between items-center mb-10">
+              <div className="flex items-center gap-3">
+                 <ShieldCheck className="w-6 h-6 text-pink-500" />
+                 <h3 className="font-black uppercase text-[11px] tracking-[0.3em] text-white">Security Protocol</h3>
               </div>
+              <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 hover:bg-zinc-900 rounded-full transition-colors"><X className="w-5 h-5 text-zinc-500" /></button>
             </div>
 
-            {userStories[activeStoryIndex].media_type === 'video' ? (
-              <video src={userStories[activeStoryIndex].media_url} autoPlay className="w-full h-full object-contain" onEnded={() => {
-                if (activeStoryIndex < userStories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
-                else setActiveStoryIndex(null);
-              }} />
-            ) : (
-              <img src={userStories[activeStoryIndex].media_url} className="w-full h-full object-contain" />
-            )}
-          </div>
+            <div className="space-y-6">
+              <div className="p-6 bg-zinc-900/30 border border-zinc-900 rounded-[2rem] space-y-6">
+                 {showPhoneDetails ? (
+                   <>
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shadow-inner">
+                          <Globe className="w-5 h-5 text-zinc-500" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-1">Region Anchor</p>
+                          <p className="text-sm font-bold text-white">{getRegionFromPhone(user.phone)}</p>
+                        </div>
+                    </div>
 
-          {activeStoryIndex < userStories.length - 1 && (
-            <button onClick={() => setActiveStoryIndex(activeStoryIndex + 1)} className="absolute right-4 md:right-20 text-white/30 hover:text-white z-10 p-4"><ChevronRight className="w-12 h-12" /></button>
-          )}
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shadow-inner">
+                          <Phone className="w-5 h-5 text-zinc-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-1">Mobile Fragment</p>
+                          <p className="text-sm font-bold text-white flex items-center justify-between">
+                            {user.phone || 'No Fragment Linked'}
+                            {user.phone_verified && <Check className="w-4 h-4 text-green-500" />}
+                          </p>
+                        </div>
+                    </div>
+                   </>
+                 ) : (
+                   <div className="flex items-center gap-4 py-4">
+                      <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shadow-inner">
+                        <ShieldCheck className="w-5 h-5 text-zinc-700" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-1">Verification Status</p>
+                        <p className="text-sm font-bold text-white">Email Linked Protocol</p>
+                      </div>
+                   </div>
+                 )}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                 <div className="flex items-center justify-between px-2">
+                    <span className="text-[10px] font-black uppercase text-zinc-700 tracking-widest">Encryption Level</span>
+                    <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">Layer 4 AES</span>
+                 </div>
+                 {showPhoneDetails && (
+                   <div className="flex items-center justify-between px-2">
+                      <span className="text-[10px] font-black uppercase text-zinc-700 tracking-widest">Core Verification</span>
+                      <span className={`text-[9px] font-black uppercase tracking-widest ${user.phone_verified ? 'text-green-500' : 'text-yellow-500'}`}>
+                        {user.phone_verified ? 'Authenticated' : 'Pending Linkage'}
+                      </span>
+                   </div>
+                 )}
+              </div>
+              
+              <button 
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="w-full mt-6 py-4 bg-zinc-900 rounded-2xl font-black uppercase tracking-widest text-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
+              >
+                Close Protocol
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8 shadow-2xl">
+          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8 shadow-2xl animate-vix-in">
             <h3 className="font-black uppercase text-[10px] tracking-widest text-zinc-500 mb-8">Override Protocol</h3>
             <div className="space-y-5">
               <div>
@@ -387,3 +449,4 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 };
 
 export default Profile;
+
