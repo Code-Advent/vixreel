@@ -6,10 +6,13 @@ export interface UserProfile {
   avatar_url?: string;
   bio?: string;
   email?: string;
+  phone?: string;
+  phone_verified?: boolean;
   date_of_birth?: string;
   is_admin?: boolean;
   is_verified?: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface Post {
