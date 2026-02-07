@@ -13,6 +13,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked }) => {
+  const isActuallyAdmin = isAdminUnlocked || currentUser?.email === 'davidhen498@gmail.com';
+  
   const navItems = [
     { id: 'FEED' as ViewType, label: 'Home', icon: 'fa-solid fa-house' },
     { id: 'SEARCH' as ViewType, label: 'Search', icon: 'fa-solid fa-magnifying-glass' },
@@ -58,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             );
           })}
 
-          {isAdminUnlocked && (
+          {isActuallyAdmin && (
             <button
               onClick={() => setView('ADMIN')}
               className={`w-full flex items-center p-3 rounded-2xl mt-8 transition-all group ${
@@ -116,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             </button>
           );
         })}
-        {isAdminUnlocked && (
+        {isActuallyAdmin && (
           <button
             onClick={() => setView('ADMIN')}
             className={`p-3 transition-all ${currentView === 'ADMIN' ? 'text-pink-500 scale-125' : 'text-zinc-600 opacity-50'}`}
@@ -130,3 +132,4 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 };
 
 export default Sidebar;
+
