@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
@@ -46,9 +45,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [showCamera, setShowCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   const startCamera = async () => {
     try {
@@ -58,7 +57,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         setShowCamera(true);
       }
     } catch (err) {
-      setError("Visual sensor access denied.");
+      setError("Visual sensor access denied. Please check device permissions.");
     }
   };
 
@@ -99,21 +98,25 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[index === 0 ? 0 : value.length - 1];
-    if (!/^\d*$/.test(value)) return;
+    // Only allow numeric input
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    const lastDigit = cleanValue.slice(-1);
 
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = lastDigit;
     setOtp(newOtp);
 
-    if (value && index < 5) {
+    // Auto-focus next input if a digit was entered
+    if (lastDigit && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
   };
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!otp[index] && index > 0) {
+        otpRefs.current[index - 1]?.focus();
+      }
     }
   };
 
@@ -134,7 +137,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     if (isLogin) {
       await login();
     } else {
-      // Signup flow navigation
       if (step === 'CREDENTIALS') {
         if (!username.trim() || !password.trim()) {
           setError("Identify handle and signature required.");
@@ -176,14 +178,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       const { isValid, formattedNumber } = await validatePhoneNumber(phone);
       if (!isValid) throw new Error("Fragment recognition failure.");
       
-      const newOtp = generateOTP();
-      setGeneratedOtp(newOtp);
-      await sendTwilioOTP(formattedNumber, newOtp);
+      const newOtpCode = generateOTP();
+      setGeneratedOtp(newOtpCode);
+      await sendTwilioOTP(formattedNumber, newOtpCode);
       
       setPhone(formattedNumber);
       setStep('OTP');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to transmit verification signal.");
     } finally {
       setLoading(false);
     }
@@ -194,7 +196,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     if (enteredCode === generatedOtp || enteredCode === '000000') {
       setStep('AVATAR');
     } else {
-      setError("Identity signal mismatch.");
+      setError("Identity signal mismatch. Please re-enter.");
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
     }
@@ -213,14 +215,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       if (loginError) throw loginError;
       
       if (data.user) {
-        // Force update login method in metadata
         await supabase.auth.updateUser({
           data: { login_method: authMethod }
         });
         onAuthSuccess(data.user as any);
       }
     } catch (err: any) {
-      setError(err.message || "Identity linkage failure.");
+      setError(err.message || "Identity linkage failure. Verify your credentials.");
     } finally {
       setLoading(false);
     }
@@ -260,7 +261,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         }
 
         if (!data.session && authMethod === 'EMAIL') {
-          setError("Protocol initiated. Please verify your email core to finalize.");
+          setError("Protocol initiated. Check your email to verify your core.");
           setIsLogin(true);
           setStep('CREDENTIALS');
         } else {
@@ -285,14 +286,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             <p className="text-zinc-500 font-black uppercase tracking-[0.5em] text-[10px]">The Digital Social Narrative</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-4">
-            <button onClick={() => { setIsLogin(true); setStep('CREDENTIALS'); }} className="group relative p-[1px] rounded-3xl overflow-hidden transition-all hover:scale-105 active:scale-95">
+            <button type="button" onClick={() => { setIsLogin(true); setStep('CREDENTIALS'); }} className="group relative p-[1px] rounded-3xl overflow-hidden transition-all hover:scale-105 active:scale-95">
               <div className="absolute inset-0 bg-gradient-to-r from-zinc-800 to-zinc-900 group-hover:from-zinc-700 group-hover:to-zinc-800 transition-colors"></div>
               <div className="relative bg-black rounded-[1.45rem] p-10 flex flex-col items-center gap-5 border border-white/5">
                 <Zap className="w-10 h-10 text-zinc-400 group-hover:text-pink-500 transition-all duration-300" />
                 <span className="font-black uppercase tracking-widest text-xs text-white">Enter Narrative</span>
               </div>
             </button>
-            <button onClick={() => { setIsLogin(false); setStep('CREDENTIALS'); }} className="group relative p-[1px] rounded-3xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(255,0,128,0.2)]">
+            <button type="button" onClick={() => { setIsLogin(false); setStep('CREDENTIALS'); }} className="group relative p-[1px] rounded-3xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(255,0,128,0.2)]">
               <div className="absolute inset-0 vix-gradient animate-gradient-slow"></div>
               <div className="relative bg-black/90 backdrop-blur-3xl rounded-[1.45rem] p-10 flex flex-col items-center gap-5 border border-white/10">
                 <Flame className="w-10 h-10 text-white group-hover:scale-110 transition-transform duration-500" />
@@ -308,7 +309,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 sm:p-6 overflow-y-auto py-20 relative">
       <div className="w-full max-w-md animate-vix-in z-10">
-        <button onClick={handleBack} className="mb-10 flex items-center gap-2 text-zinc-600 hover:text-white transition-all group mx-auto">
+        <button type="button" onClick={handleBack} className="mb-10 flex items-center gap-2 text-zinc-600 hover:text-white transition-all group mx-auto">
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1" />
           <span className="text-[10px] font-black uppercase tracking-widest">
             {step === 'CREDENTIALS' ? 'Abort Transmission' : 'Revert Protocol'}
@@ -332,12 +333,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           {(step === 'CREDENTIALS' || isLogin) && (
             <div className="flex bg-black/40 p-1.5 rounded-2xl border border-zinc-900 gap-1 animate-vix-in">
               <button 
+                type="button"
                 onClick={() => setAuthMethod('EMAIL')} 
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMethod === 'EMAIL' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
               >
                 <Mail className="w-3 h-3" /> Email Protocol
               </button>
               <button 
+                type="button"
                 onClick={() => setAuthMethod('PHONE')} 
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMethod === 'PHONE' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
               >
@@ -386,7 +389,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Verify Signal Fragment: {phone}</p>
                     <div className="flex justify-between gap-2">
                       {otp.map((digit, idx) => (
-                        <input key={idx} ref={el => { otpRefs.current[idx] = el; }} type="text" value={digit} onChange={e => handleOtpChange(idx, e.target.value)} onKeyDown={e => handleOtpKeyDown(idx, e)} className="w-full aspect-square bg-black border border-zinc-800 rounded-2xl text-center text-lg font-black text-pink-500 outline-none focus:border-pink-500 transition-all" />
+                        <input key={idx} ref={el => { otpRefs.current[idx] = el; }} type="text" maxLength={1} value={digit} onChange={e => handleOtpChange(idx, e.target.value)} onKeyDown={e => handleOtpKeyDown(idx, e)} className="w-full aspect-square bg-black border border-zinc-800 rounded-2xl text-center text-lg font-black text-pink-500 outline-none focus:border-pink-500 transition-all" />
                       ))}
                     </div>
                   </div>
@@ -395,7 +398,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 {step === 'AVATAR' && (
                   <div className="space-y-6 animate-vix-in flex flex-col items-center">
                     <div className={`w-32 h-32 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center overflow-hidden transition-all ${avatarUrl ? 'border-pink-500 shadow-lg shadow-pink-500/10 scale-105' : ''}`}>
-                      {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <User className="w-8 h-8 text-zinc-800" />}
+                      {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="Profile" /> : <User className="w-8 h-8 text-zinc-800" />}
                     </div>
                     <div className="w-full grid grid-cols-2 gap-3">
                       <button type="button" onClick={startCamera} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all text-zinc-500 flex items-center justify-center"><Camera className="w-5 h-5" /></button>
