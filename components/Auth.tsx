@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
@@ -22,7 +23,7 @@ interface AuthProps {
   onAuthSuccess: (user: UserProfile) => void;
 }
 
-type AuthStep = 'LANDING' | 'CREDENTIALS' | 'IDENTITY' | 'PHONE_VERIFY' | 'OTP' | 'AVATAR' | 'POLICY';
+type AuthStep = 'LANDING' | 'CREDENTIALS' | 'IDENTITY' | 'OTP' | 'AVATAR' | 'POLICY';
 type AuthMethod = 'EMAIL' | 'PHONE';
 
 const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
@@ -98,7 +99,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[value.length - 1];
+    if (value.length > 1) value = value[index === 0 ? 0 : value.length - 1];
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
@@ -116,6 +117,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  const handleBack = () => {
+    setError(null);
+    if (step === 'CREDENTIALS') setStep('LANDING');
+    else if (step === 'IDENTITY') setStep('CREDENTIALS');
+    else if (step === 'OTP') setStep('IDENTITY');
+    else if (step === 'AVATAR') setStep(authMethod === 'PHONE' ? 'OTP' : 'IDENTITY');
+    else if (step === 'POLICY') setStep('AVATAR');
+    else setStep('LANDING');
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -123,7 +134,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     if (isLogin) {
       await login();
     } else {
-      // Signup flow
+      // Signup flow navigation
       if (step === 'CREDENTIALS') {
         if (!username.trim() || !password.trim()) {
           setError("Identify handle and signature required.");
@@ -141,13 +152,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       } else if (step === 'IDENTITY') {
         if (!dob) { setError("Creation date verification required."); return; }
         if (authMethod === 'PHONE') {
-          handlePhoneVerify();
+          await handlePhoneVerify();
         } else {
           setStep('AVATAR');
         }
-      } else if (step === 'PHONE_VERIFY') {
-        // This step is mostly to show errors if verification fails
-        handlePhoneVerify();
       } else if (step === 'OTP') {
         handleOtpVerify();
       } else if (step === 'AVATAR') {
@@ -205,6 +213,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       if (loginError) throw loginError;
       
       if (data.user) {
+        // Force update login method in metadata
         await supabase.auth.updateUser({
           data: { login_method: authMethod }
         });
@@ -299,20 +308,27 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 sm:p-6 overflow-y-auto py-20 relative">
       <div className="w-full max-w-md animate-vix-in z-10">
-        <button onClick={() => setStep('LANDING')} className="mb-10 flex items-center gap-2 text-zinc-600 hover:text-white transition-all group mx-auto">
+        <button onClick={handleBack} className="mb-10 flex items-center gap-2 text-zinc-600 hover:text-white transition-all group mx-auto">
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Abort Transmission</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            {step === 'CREDENTIALS' ? 'Abort Transmission' : 'Revert Protocol'}
+          </span>
         </button>
 
         <div className="bg-zinc-950/40 backdrop-blur-3xl border border-zinc-900/50 rounded-[3rem] p-8 sm:p-12 shadow-2xl space-y-8 relative overflow-hidden border-t-white/10">
           <div className="text-center space-y-3">
             <h1 className="logo-font text-5xl font-bold vix-text-gradient">VixReel</h1>
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">
-              {isLogin ? 'Identity Linkage' : `Protocol Generation ${step === 'CREDENTIALS' ? '1/5' : step === 'IDENTITY' ? '2/5' : step === 'AVATAR' ? '3/5' : step === 'POLICY' ? '4/5' : 'Finalizing'}`}
+              {isLogin ? 'Identity Linkage' : `Protocol Generation ${
+                step === 'CREDENTIALS' ? '1/5' : 
+                step === 'IDENTITY' ? '2/5' : 
+                step === 'OTP' ? '3/5 (Phone)' : 
+                step === 'AVATAR' ? '4/5' : 
+                'Finalizing'
+              }`}
             </p>
           </div>
 
-          {/* Method selector shown in initial step of both Login and Signup */}
           {(step === 'CREDENTIALS' || isLogin) && (
             <div className="flex bg-black/40 p-1.5 rounded-2xl border border-zinc-900 gap-1 animate-vix-in">
               <button 
@@ -433,3 +449,4 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 };
 
 export default Auth;
+
