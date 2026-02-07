@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, ArrowUpCircle, User as UserIcon, Loader2, Search as SearchIcon, CheckCircle2, XCircle, Lock, ChevronRight, Clock, Users } from 'lucide-react';
+import { Shield, ArrowUpCircle, User as UserIcon, Loader2, Search as SearchIcon, CheckCircle2, XCircle, Lock, ChevronRight, Clock, Users, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Post } from '../types';
 import VerificationBadge from './VerificationBadge';
@@ -32,7 +32,7 @@ const Admin: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetching all users from profiles table
+      // Direct pull from profiles table
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
@@ -42,6 +42,10 @@ const Admin: React.FC = () => {
       
       if (data) {
         setUsers(data as UserProfile[]);
+        // Auto-select first user if none selected
+        if (data.length > 0 && !viewingUser) {
+           // Optional: setViewingUser(data[0]);
+        }
       }
     } catch (err: any) {
       console.error("Admin Fetch Failure:", err);
@@ -155,6 +159,13 @@ const Admin: React.FC = () => {
               </div>
               <span className="text-[10px] font-black uppercase text-white">{users.length} Active Narrators</span>
            </div>
+           <button 
+             onClick={fetchUsers} 
+             className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all group"
+             title="Synchronize Registry"
+           >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+           </button>
            <button onClick={() => setIsUnlocked(false)} className="bg-red-500/10 border border-red-500/20 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500 hover:text-white transition-all">Relinquish Access</button>
         </div>
       </div>
@@ -207,8 +218,12 @@ const Admin: React.FC = () => {
                 </div>
               </div>
             )) : (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+              <div className="h-full flex flex-col items-center justify-center p-12 text-center gap-4">
+                <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-2">
+                   <Users className="w-8 h-8 text-zinc-800" />
+                </div>
                 <p className="text-[10px] font-black uppercase text-zinc-800 tracking-widest">No Narrators Found</p>
+                <button onClick={fetchUsers} className="text-pink-500 text-[9px] font-black uppercase tracking-widest hover:underline">Refresh Directory</button>
               </div>
             )}
           </div>

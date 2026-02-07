@@ -2,6 +2,7 @@
 import React from 'react';
 import { ViewType, UserProfile } from '../types';
 import VerificationBadge from './VerificationBadge';
+import { ShieldAlert } from 'lucide-react';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -60,14 +61,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
           {isAdminUnlocked && (
             <button
               onClick={() => setView('ADMIN')}
-              className={`w-full flex items-center p-3 rounded-2xl mt-8 ${
-                currentView === 'ADMIN' ? 'bg-purple-600/20 text-purple-500' : 'text-purple-600/50 hover:bg-purple-900/10 hover:text-purple-500'
+              className={`w-full flex items-center p-3 rounded-2xl mt-8 transition-all group ${
+                currentView === 'ADMIN' ? 'bg-pink-600/20 text-pink-500 border border-pink-500/20' : 'text-pink-600/50 hover:bg-pink-900/10 hover:text-pink-500'
               }`}
             >
-              <div className="w-6 h-6 flex items-center justify-center">
-                <i className="fa-solid fa-shield-halved text-lg"></i>
+              <div className="w-6 h-6 flex items-center justify-center relative">
+                <ShieldAlert className={`w-5 h-5 ${currentView === 'ADMIN' ? 'animate-pulse' : ''}`} />
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full animate-ping"></div>
               </div>
-              <span className="ml-4 hidden lg:block font-black uppercase text-[10px] tracking-widest">Protocol</span>
+              <span className="ml-4 hidden lg:block font-black uppercase text-[10px] tracking-widest">Admin Terminal</span>
             </button>
           )}
         </nav>
@@ -85,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
                </div>
                <div className="flex flex-col min-w-0">
                  <span className="font-bold text-xs truncate">@{currentUser.username}</span>
-                 <span className="text-[8px] text-zinc-600 font-black uppercase">Level 1 Creator</span>
+                 <span className="text-[8px] text-zinc-600 font-black uppercase">{currentUser.is_admin ? 'System Overseer' : 'Narrator'}</span>
                </div>
             </div>
           )}
@@ -114,6 +116,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             </button>
           );
         })}
+        {isAdminUnlocked && (
+          <button
+            onClick={() => setView('ADMIN')}
+            className={`p-3 transition-all ${currentView === 'ADMIN' ? 'text-pink-500 scale-125' : 'text-zinc-600 opacity-50'}`}
+          >
+            <ShieldAlert className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </>
   );
