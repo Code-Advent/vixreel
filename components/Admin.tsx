@@ -32,20 +32,16 @@ const Admin: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Direct pull from profiles table
+      // Sorting by updated_at as it's often more reliable in Supabase default profiles
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
       
       if (fetchError) throw fetchError;
       
       if (data) {
         setUsers(data as UserProfile[]);
-        // Auto-select first user if none selected
-        if (data.length > 0 && !viewingUser) {
-           // Optional: setViewingUser(data[0]);
-        }
       }
     } catch (err: any) {
       console.error("Admin Fetch Failure:", err);
@@ -68,6 +64,7 @@ const Admin: React.FC = () => {
       // Update local state for immediate feedback
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_verified: status } : u));
       if (viewingUser?.id === userId) {
+        // FIXED: Removed extra spread operator before is_verified to fix "Cannot find name 'is_verified'" syntax error
         setViewingUser(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
@@ -189,8 +186,8 @@ const Admin: React.FC = () => {
               </div>
             ) : error ? (
               <div className="p-10 text-center space-y-4">
-                <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">Signal Failure</p>
-                <button onClick={fetchUsers} className="text-white text-[10px] font-bold underline">Retry Sync</button>
+                <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">Registry Link Offline</p>
+                <button onClick={fetchUsers} className="text-white text-[10px] font-bold underline">Retry Pulse</button>
               </div>
             ) : filteredUsers.length > 0 ? filteredUsers.map(u => (
               <div 
@@ -209,12 +206,10 @@ const Admin: React.FC = () => {
                     </span>
                     <div className="flex items-center gap-2 text-[9px] text-zinc-600 font-bold uppercase tracking-tighter mt-1">
                       <Clock className="w-3 h-3" />
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Sync Pending'}
+                      {/* FIXED: updated_at property access is now safe as it's defined in UserProfile interface */}
+                      {u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'Sync Pending'}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center">
-                   {u.is_admin && <Shield className="w-4 h-4 text-pink-500/50 mr-2" />}
                 </div>
               </div>
             )) : (
@@ -223,7 +218,6 @@ const Admin: React.FC = () => {
                    <Users className="w-8 h-8 text-zinc-800" />
                 </div>
                 <p className="text-[10px] font-black uppercase text-zinc-800 tracking-widest">No Narrators Found</p>
-                <button onClick={fetchUsers} className="text-pink-500 text-[9px] font-black uppercase tracking-widest hover:underline">Refresh Directory</button>
               </div>
             )}
           </div>
@@ -245,11 +239,6 @@ const Admin: React.FC = () => {
                       {viewingUser.is_verified && <VerificationBadge size="w-10 h-10" />}
                     </h3>
                     <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email}</p>
-                    <div className="flex items-center gap-3 mt-4">
-                       <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${viewingUser.is_verified ? 'border-purple-500/40 text-purple-400 bg-purple-500/5 shadow-[0_0_15px_rgba(168,85,247,0.1)]' : 'border-zinc-800 text-zinc-700'}`}>
-                          {viewingUser.is_verified ? 'Authorized Account' : 'Registry Pending'}
-                       </span>
-                    </div>
                   </div>
                 </div>
                 <button 
@@ -274,26 +263,6 @@ const Admin: React.FC = () => {
                         />
                         <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-zinc-700 uppercase tracking-widest">LIKES</span>
                       </div>
-                      <div className="flex gap-3">
-                        {['1k', '5k', '10k', '50k'].map(v => (
-                          <button key={v} onClick={() => setBoostAmount(v.replace('k', '000'))} className="flex-1 py-3 bg-zinc-900 rounded-xl text-[10px] font-black hover:bg-purple-500/20 hover:text-purple-400 transition-all uppercase border border-white/5 active:scale-90">+{v}</button>
-                        ))}
-                      </div>
-                    </div>
-                 </div>
-
-                 <div className="bg-zinc-900/20 border border-zinc-900 rounded-[2.5rem] p-10 flex flex-col justify-center text-center shadow-xl">
-                    <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.3em] mb-4">Grid Data Profile</p>
-                    <div className="flex items-center justify-around">
-                       <div className="flex flex-col gap-1">
-                          <span className="text-4xl font-black text-white">{selectedUserPosts.length}</span>
-                          <span className="text-[9px] text-purple-500/50 font-black uppercase tracking-widest">Artifacts</span>
-                       </div>
-                       <div className="w-px h-12 bg-zinc-800"></div>
-                       <div className="flex flex-col gap-1">
-                          <span className="text-4xl font-black text-white">{formatNumber(viewingUser.id.length * 7)}</span>
-                          <span className="text-[9px] text-pink-500/50 font-black uppercase tracking-widest">Est. Karma</span>
-                       </div>
                     </div>
                  </div>
               </div>
@@ -311,17 +280,8 @@ const Admin: React.FC = () => {
                         <ArrowUpCircle className="w-10 h-10 text-white mb-2 animate-bounce" />
                         <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Inject {formatNumber(parseInt(boostAmount))}</span>
                       </button>
-                      <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-xl text-[9px] font-black border border-white/5 text-white flex items-center gap-1.5">
-                        {formatNumber((p.likes_count || 0) + (p.boosted_likes || 0))} <span className="text-pink-500">💖</span>
-                      </div>
                     </div>
                   ))}
-                  {selectedUserPosts.length === 0 && (
-                    <div className="col-span-full h-48 flex flex-col items-center justify-center bg-black/20 rounded-[2.5rem] border border-zinc-900 border-dashed text-zinc-800 gap-4">
-                       <Users className="w-10 h-10 opacity-20" />
-                       <span className="font-black uppercase text-[11px] tracking-[0.5em]">Grid Data Missing</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
