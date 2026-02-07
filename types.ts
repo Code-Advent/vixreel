@@ -9,6 +9,7 @@ export interface UserProfile {
   date_of_birth?: string;
   is_admin?: boolean;
   is_verified?: boolean;
+  created_at?: string;
 }
 
 export interface Post {

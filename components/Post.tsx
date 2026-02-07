@@ -61,27 +61,25 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     const wasLiked = liked;
     setIsLiking(true);
     
-    // Optimistic Update
+    // Optimistic Update: Immediate UI change
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
 
     try {
       if (wasLiked) {
-        // Unliking: delete record
         const { error } = await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
         if (error) throw error;
       } else {
-        // Liking: Insert record. UNIQUE constraint in DB handles single-like protection.
         const { error } = await supabase.from('likes').upsert({ post_id: post.id, user_id: currentUserId }, { onConflict: 'post_id,user_id' });
         if (error) throw error;
       }
-      // Re-fetch to ensure sync with server state
-      await fetchLikesCount();
-      // Important: Dispatch event to notify Profile tab to refresh Karma
+      
+      // Safety delay before syncing with server to avoid race conditions with Supabase RLS/Trigger latency
+      setTimeout(() => fetchLikesCount(), 800);
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err: any) {
-      console.error("Like protocol failure:", err);
-      // Revert optimistic update on failure
+      console.error("Engagement Protocol Error:", err);
+      // Revert if database fails
       setLiked(wasLiked);
       setLikesCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
     } finally {
@@ -99,16 +97,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Terminate this artifact forever?")) return;
+    if (!window.confirm("Terminate this artifact core?")) return;
     setIsDeleting(true);
     try {
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (error) throw error;
-      if (onDelete) {
-        onDelete(post.id);
-      } else if (onUpdate) {
-        onUpdate();
-      }
+      onDelete?.(post.id);
+      onUpdate?.();
     } catch (err: any) {
       alert("Termination Failure: " + err.message);
       setIsDeleting(false);
@@ -119,24 +114,24 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     <div className={`w-full max-w-[470px] mx-auto border-b border-zinc-900 pb-6 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between py-3 px-2 sm:px-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 p-0.5 overflow-hidden">
+          <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 p-0.5 overflow-hidden">
             <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-full h-full rounded-full object-cover" />
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-black flex items-center gap-1">
-              {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+            <span className="text-xs font-black flex items-center gap-1.5">
+              {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
             </span>
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Sponsored Artist</span>
+            <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">Active Narrator</span>
           </div>
         </div>
         {post.user.id === currentUserId && (
-          <button onClick={handleDelete} className="text-zinc-600 hover:text-red-500 transition-colors p-2">
+          <button onClick={handleDelete} className="text-zinc-700 hover:text-red-500 transition-colors p-2">
             {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
         )}
       </div>
 
-      <div className="bg-zinc-950 relative aspect-square rounded-[2rem] overflow-hidden group shadow-2xl border border-zinc-900/50">
+      <div className="bg-zinc-950 relative aspect-square rounded-[2.5rem] overflow-hidden group shadow-2xl border border-zinc-900/50">
         {post.media_type === 'video' ? (
           <video 
             ref={videoRef}
@@ -149,34 +144,34 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         )}
 
         {post.media_type === 'video' && (
-          <button onClick={() => setIsMuted(!isMuted)} className="absolute bottom-4 right-4 p-2 bg-black/40 rounded-full text-white backdrop-blur-md z-10 hover:bg-black/60 transition-all">
+          <button onClick={() => setIsMuted(!isMuted)} className="absolute bottom-6 right-6 p-2.5 bg-black/50 rounded-full text-white backdrop-blur-xl z-10 hover:bg-black/70 transition-all border border-white/5">
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
         )}
       </div>
 
-      <div className="py-4 space-y-3 px-2">
+      <div className="py-5 space-y-4 px-2">
         <div className="flex justify-between items-center">
-          <div className="flex gap-4 items-center">
-            <button onClick={handleLike} disabled={isLiking} className={`transition-all active:scale-125 ${liked ? 'text-pink-500' : 'text-zinc-400 hover:text-white'}`}>
-              <Heart className={`w-6 h-6 ${liked ? 'fill-current' : ''}`} />
+          <div className="flex gap-5 items-center">
+            <button onClick={handleLike} disabled={isLiking} className={`transition-all active:scale-125 ${liked ? 'text-pink-500' : 'text-zinc-500 hover:text-white'}`}>
+              <Heart className={`w-7 h-7 ${liked ? 'fill-current' : ''}`} />
             </button>
-            <button onClick={() => setShowComments(true)} className="text-zinc-400 hover:text-white flex items-center gap-1.5 active:scale-110">
-              <MessageCircle className="w-6 h-6" />
+            <button onClick={() => setShowComments(true)} className="text-zinc-500 hover:text-white flex items-center gap-2 active:scale-110">
+              <MessageCircle className="w-7 h-7" />
               <span className="text-xs font-black">{formatNumber(commentsCount)}</span>
             </button>
-            <button className="text-zinc-400 hover:text-white active:scale-110"><Download className="w-6 h-6" /></button>
+            <button className="text-zinc-500 hover:text-white active:scale-110"><Download className="w-7 h-7" /></button>
           </div>
-          <button onClick={handleSave} className={`transition-all active:scale-125 ${saved ? 'text-white' : 'text-zinc-400 hover:text-white'}`}>
-            <Bookmark className={`w-6 h-6 ${saved ? 'fill-current' : ''}`} />
+          <button onClick={handleSave} className={`transition-all active:scale-125 ${saved ? 'text-white' : 'text-zinc-500 hover:text-white'}`}>
+            <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
           </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-xs font-black text-white">{formatNumber(likesCount)} Appreciations</p>
-          <div className="text-xs leading-relaxed font-medium text-zinc-300">
+          <div className="text-[14px] leading-relaxed font-medium text-zinc-400">
             <span className="font-black text-white mr-2 inline-flex items-center gap-1">
-              @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+              @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
             </span>
             {post.caption}
           </div>
@@ -184,25 +179,28 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       </div>
 
       {showComments && (
-        <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 h-[70vh] rounded-[2.5rem] flex flex-col shadow-2xl overflow-hidden animate-vix-in">
-            <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-              <h3 className="font-black uppercase text-[10px] tracking-widest text-zinc-500">Narrative Feedback</h3>
-              <button onClick={() => setShowComments(false)}><X className="w-6 h-6 text-zinc-600" /></button>
+        <div className="fixed inset-0 z-[2000] bg-black/95 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 h-[80vh] rounded-[3rem] flex flex-col shadow-2xl overflow-hidden animate-vix-in">
+            <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/10">
+              <h3 className="font-black uppercase text-[11px] tracking-[0.4em] text-zinc-500">Narrative Log</h3>
+              <button onClick={() => setShowComments(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6 text-zinc-600" /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
               {comments.length > 0 ? comments.map(c => (
-                <div key={c.id} className="flex gap-3">
-                  <img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-8 h-8 rounded-full bg-zinc-800 object-cover" />
-                  <div className="space-y-1">
-                    <p className="font-black text-[10px] text-white flex items-center gap-1">
-                      @{c.user.username} {c.user.is_verified && <VerificationBadge size="w-2.5 h-2.5" />}
+                <div key={c.id} className="flex gap-4 group">
+                  <img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 object-cover" />
+                  <div className="space-y-1.5 flex-1">
+                    <p className="font-black text-[12px] text-white flex items-center gap-1.5">
+                      @{c.user.username} {c.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                     </p>
-                    <p className="text-zinc-400 text-xs">{c.content}</p>
+                    <p className="text-zinc-400 text-sm leading-relaxed font-medium">{c.content}</p>
                   </div>
                 </div>
               )) : (
-                <div className="h-full flex items-center justify-center text-[10px] font-black uppercase text-zinc-800 tracking-widest">No Feedback Logged</div>
+                <div className="h-full flex flex-col items-center justify-center gap-4 text-zinc-800">
+                  <MessageCircle className="w-12 h-12" />
+                  <span className="text-[11px] font-black uppercase tracking-[0.5em]">No Narrative Found</span>
+                </div>
               )}
             </div>
             <form onSubmit={async (e) => {
@@ -214,9 +212,9 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
               fetchComments();
               fetchCommentsCount();
               setIsCommenting(false);
-            }} className="p-4 border-t border-zinc-900 bg-black flex gap-3">
-              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-zinc-900 rounded-xl px-4 py-3 text-xs outline-none focus:border-zinc-700 border border-transparent transition-all text-white" />
-              <button disabled={isCommenting} className="font-black text-[10px] uppercase text-pink-500 px-4 disabled:opacity-20 active:scale-95 transition-all">Post</button>
+            }} className="p-6 border-t border-zinc-900 bg-black flex gap-4">
+              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Inscribe your thoughts..." className="flex-1 bg-zinc-900/50 rounded-2xl px-6 py-4 text-sm outline-none focus:border-zinc-700 border border-zinc-800/50 transition-all text-white" />
+              <button disabled={isCommenting} className="font-black text-[11px] uppercase text-pink-500 px-6 disabled:opacity-20 active:scale-95 transition-all">Share</button>
             </form>
           </div>
         </div>

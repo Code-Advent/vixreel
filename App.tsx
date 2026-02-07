@@ -136,38 +136,26 @@ const App: React.FC = () => {
   };
 
   const resolveIdentity = async (authUser: any): Promise<UserProfile | null> => {
-    const { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-    const metadata = authUser.user_metadata || {};
-    const emailPrefix = authUser.email?.split('@')[0];
-    const masterUsername = dbProfile?.username || metadata.username || emailPrefix;
-    const isAdmin = authUser.email === 'davidhen498@gmail.com';
-
+    // Rely on database trigger for initial creation.
+    // Frontend just fetches the resolved profile.
+    let { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+    
+    // Fallback in case of trigger delay (first-time login)
     if (!dbProfile) {
-      const { data: retryProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-      if (!retryProfile) {
-        await supabase.from('profiles').upsert({
-          id: authUser.id,
-          username: masterUsername,
-          full_name: metadata.full_name || masterUsername,
-          email: authUser.email,
-          date_of_birth: metadata.date_of_birth || null,
-          is_admin: isAdmin,
-          is_verified: isAdmin
-        });
-      }
+      const metadata = authUser.user_metadata || {};
+      const username = metadata.username || authUser.email?.split('@')[0];
+      const { data: retryProfile } = await supabase.from('profiles').upsert({
+        id: authUser.id,
+        username: username,
+        full_name: metadata.full_name || username,
+        email: authUser.email,
+        is_admin: authUser.email === 'davidhen498@gmail.com',
+        is_verified: authUser.email === 'davidhen498@gmail.com'
+      }).select().single();
+      dbProfile = retryProfile;
     }
 
-    return {
-      id: authUser.id,
-      username: masterUsername,
-      full_name: metadata.full_name || dbProfile?.full_name || masterUsername,
-      avatar_url: dbProfile?.avatar_url || metadata.avatar_url || null,
-      bio: dbProfile?.bio || null,
-      date_of_birth: dbProfile?.date_of_birth || metadata.date_of_birth || null,
-      is_admin: isAdmin || !!dbProfile?.is_admin,
-      is_verified: isAdmin || !!dbProfile?.is_verified, 
-      email: authUser.email
-    };
+    return dbProfile as UserProfile;
   };
 
   const fetchPosts = async () => {
