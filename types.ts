@@ -11,6 +11,9 @@ export interface UserProfile {
   date_of_birth?: string;
   is_admin?: boolean;
   is_verified?: boolean;
+  // Added properties for privacy and comment controls
+  is_private?: boolean;
+  allow_comments?: boolean;
   created_at?: string;
   updated_at?: string;
 }
