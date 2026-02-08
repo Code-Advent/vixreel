@@ -132,4 +132,3 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 };
 
 export default Sidebar;
-

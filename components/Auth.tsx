@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
@@ -16,7 +17,7 @@ import {
   Mail
 } from 'lucide-react';
 import { sanitizeFilename } from '../lib/utils';
-import { validatePhoneNumber, sendTwilioOTP, generateOTP } from '../services/verificationService';
+import { validatePhoneNumber } from '../services/verificationService';
 
 interface AuthProps {
   onAuthSuccess: (user: UserProfile) => void;
@@ -24,8 +25,6 @@ interface AuthProps {
 
 type AuthStep = 'LANDING' | 'CREDENTIALS' | 'IDENTITY' | 'OTP' | 'AVATAR' | 'POLICY';
 type AuthMethod = 'EMAIL' | 'PHONE';
-
-const VIX_SIGNAL_KEY = 'vix_otp_protocol_2025_bypass';
 
 const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -42,7 +41,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [dob, setDob] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [generatedOtp, setGeneratedOtp] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
@@ -122,110 +120,136 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     e.preventDefault();
     setError(null);
     
-    if (isLogin) {
-      if (authMethod === 'PHONE') {
-        if (step === 'CREDENTIALS') {
-          await handlePhoneVerify();
-        } else if (step === 'OTP') {
-          handleOtpVerify();
-        }
-      } else {
-        await login();
-      }
-    } else {
+    if (authMethod === 'PHONE') {
       if (step === 'CREDENTIALS') {
-        if (!username.trim()) { setError("Identify handle required."); return; }
-        if (authMethod === 'EMAIL') {
-          if (!email.trim() || !password.trim()) { setError("Email core and signature required."); return; }
-        } else {
-          if (!phone.trim()) { setError("Phone signal identifier required."); return; }
-        }
-        setStep('IDENTITY');
-      } else if (step === 'IDENTITY') {
-        if (!dob) { setError("Creation date verification required."); return; }
-        if (authMethod === 'PHONE') {
-          await handlePhoneVerify();
-        } else {
-          setStep('AVATAR');
-        }
+        await initiatePhoneOtp();
       } else if (step === 'OTP') {
-        handleOtpVerify();
+        await verifyPhoneOtp();
+      } else if (step === 'IDENTITY') {
+        if (!dob || !username.trim()) { setError("All identity markers required."); return; }
+        setStep('AVATAR');
       } else if (step === 'AVATAR') {
         setStep('POLICY');
       } else if (step === 'POLICY') {
-        await signup();
+        await finalizeNewPhoneNarrator();
+      }
+    } else {
+      // Email Flow
+      if (isLogin) {
+        await login();
+      } else {
+        if (step === 'CREDENTIALS') {
+          if (!username.trim() || !email.trim() || !password.trim()) { setError("All signatures required."); return; }
+          setStep('IDENTITY');
+        } else if (step === 'IDENTITY') {
+          if (!dob) { setError("Creation date required."); return; }
+          setStep('AVATAR');
+        } else if (step === 'AVATAR') {
+          setStep('POLICY');
+        } else if (step === 'POLICY') {
+          await signup();
+        }
       }
     }
   };
 
-  const handlePhoneVerify = async () => {
-    if (!phone.trim()) {
-      setError("Valid fragment number required.");
-      return;
-    }
+  const initiatePhoneOtp = async () => {
+    if (!phone.trim()) { setError("Signal fragment required."); return; }
     setLoading(true);
     try {
       const { isValid, formattedNumber } = await validatePhoneNumber(phone);
-      if (!isValid) throw new Error("Fragment recognition failure.");
+      if (!isValid) throw new Error("Invalid signal format.");
       
-      const newOtp = generateOTP();
-      setGeneratedOtp(newOtp);
-      await sendTwilioOTP(formattedNumber, newOtp);
-      
-      // Crucial: Update state with the clean, formatted number for backend consistency
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone: formattedNumber,
+      });
+
+      if (otpError) throw otpError;
+
       setPhone(formattedNumber);
       setStep('OTP');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to initiate signal dispatch.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOtpVerify = async () => {
+  const verifyPhoneOtp = async () => {
     const enteredCode = otp.join('');
-    // Master bypass '000000' for demo purposes
-    if (enteredCode === generatedOtp || enteredCode === '000000') {
-      if (isLogin) {
-        await finalizePhoneLogin();
-      } else {
-        setStep('AVATAR');
+    if (enteredCode.length < 6) { setError("Incomplete verification fragment."); return; }
+    
+    setLoading(true);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: phone,
+        token: enteredCode,
+        type: 'sms'
+      });
+
+      if (verifyError) throw verifyError;
+
+      if (data.user) {
+        // Check if profile exists for this user
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+        
+        if (profile) {
+          onAuthSuccess(data.user as any);
+        } else {
+          // New user confirmed phone but needs to fill profile
+          setStep('IDENTITY');
+        }
       }
-    } else {
-      setError("Identity signal mismatch.");
-      setOtp(['', '', '', '', '', '']);
-      otpRefs.current[0]?.focus();
+    } catch (err: any) {
+      setError(err.message || "Verification mismatch.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const finalizePhoneLogin = async () => {
+  const finalizeNewPhoneNarrator = async () => {
     setLoading(true);
     try {
-      const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
-        phone: phone.trim(),
-        password: VIX_SIGNAL_KEY
-      });
-      
-      if (loginError) {
-        // If login fails, check if the profile exists
-        const { data: profile } = await supabase.from('profiles').select('*').eq('phone', phone).maybeSingle();
-        
-        if (!profile) {
-          setError("Signal core not found. Establishing new protocol...");
-          setIsLogin(false);
-          setStep('CREDENTIALS');
-        } else if (loginError.message === 'Invalid login credentials') {
-          // Recovery path: If credentials fail but profile exists, re-sync via signup (upsert behavior)
-          setError("Protocol sync required. Re-authenticating identity...");
-          await signup(true); // Attempt a silent "recovery" signup
-        } else {
-          throw loginError;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Narrative core loss.");
+
+      const updates = {
+        username: username.trim().toLowerCase(),
+        full_name: fullName.trim() || username.trim(),
+        date_of_birth: dob,
+        phone_verified: true,
+      };
+
+      // Update auth metadata
+      await supabase.auth.updateUser({ data: updates });
+
+      // Handle Avatar
+      let finalAvatarUrl = avatarUrl;
+      if (avatarFile) {
+        const fileName = `${user.id}-${Date.now()}-${sanitizeFilename(avatarFile.name)}`;
+        const { error: upErr } = await supabase.storage.from('avatars').upload(`avatars/${fileName}`, avatarFile);
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(`avatars/${fileName}`);
+          finalAvatarUrl = publicUrl;
         }
-      } else if (authData.user) {
-        onAuthSuccess(authData.user as any);
       }
+
+      // Upsert profile (Trigger might have already created it, but we refine it)
+      const { data: profile, error: upsertError } = await supabase.from('profiles').upsert({
+        id: user.id,
+        username: updates.username,
+        full_name: updates.full_name,
+        date_of_birth: updates.date_of_birth,
+        avatar_url: finalAvatarUrl,
+        phone: user.phone,
+        phone_verified: true
+      }).select().single();
+
+      if (upsertError) throw upsertError;
+
+      onAuthSuccess(profile as any);
     } catch (err: any) {
-      setError("Identity linkage failure: " + err.message);
+      setError(err.message || "Narrative synchronization failure.");
     } finally {
       setLoading(false);
     }
@@ -248,31 +272,27 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  const signup = async (isRecovery = false) => {
-    if (!isRecovery) setLoading(true);
+  const signup = async () => {
+    setLoading(true);
     setError(null);
     try {
-      const signupOptions = {
-        data: {
-          username: username.trim().toLowerCase() || `user_${phone.slice(-4)}`,
-          full_name: fullName.trim() || username.trim() || `User ${phone.slice(-4)}`,
-          date_of_birth: dob || new Date().toISOString().split('T')[0],
-          phone: authMethod === 'PHONE' ? phone : null,
-          phone_verified: authMethod === 'PHONE',
-          login_method: authMethod
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            username: username.trim().toLowerCase(),
+            full_name: fullName.trim() || username.trim(),
+            date_of_birth: dob,
+            login_method: 'EMAIL'
+          }
         }
-      };
-
-      const signupPayload: any = authMethod === 'EMAIL'
-        ? { email: email.trim(), password, options: signupOptions }
-        : { phone: phone.trim(), password: VIX_SIGNAL_KEY, options: signupOptions };
-
-      const { data, error: signupError } = await supabase.auth.signUp(signupPayload);
+      });
       
       if (signupError) throw signupError;
       
       if (data.user) {
-        if (avatarFile && !isRecovery) {
+        if (avatarFile) {
           const fileName = `${data.user.id}-${Date.now()}-${sanitizeFilename(avatarFile.name)}`;
           const { error: upErr } = await supabase.storage.from('avatars').upload(`avatars/${fileName}`, avatarFile);
           if (!upErr) {
@@ -283,10 +303,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         onAuthSuccess(data.user as any);
       }
     } catch (err: any) {
-      if (!isRecovery) setError(err.message || "Protocol establishment failure.");
-      else throw err;
+      setError(err.message || "Protocol establishment failure.");
     } finally {
-      if (!isRecovery) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -341,11 +360,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           <div className="text-center space-y-3">
             <h1 className="logo-font text-5xl font-bold vix-text-gradient">VixReel</h1>
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.4em]">
-              {isLogin ? 'Identity Linkage' : `Protocol Generation ${step === 'CREDENTIALS' ? '1/5' : step === 'IDENTITY' ? '2/5' : step === 'AVATAR' ? '3/5' : step === 'POLICY' ? '4/5' : 'Finalizing'}`}
+              {authMethod === 'PHONE' 
+                ? `Signal Auth ${step === 'CREDENTIALS' ? 'Phase 1' : step === 'OTP' ? 'Verification' : 'Profile Sync'}`
+                : isLogin ? 'Identity Linkage' : `Protocol Generation ${step === 'CREDENTIALS' ? '1/5' : step === 'IDENTITY' ? '2/5' : step === 'AVATAR' ? '3/5' : step === 'POLICY' ? '4/5' : 'Finalizing'}`}
             </p>
           </div>
 
-          {step === 'CREDENTIALS' && (
+          {(step === 'CREDENTIALS') && (
             <div className="flex bg-black/40 p-1.5 rounded-2xl border border-zinc-900 gap-1 animate-vix-in">
               <button 
                 onClick={() => setAuthMethod('EMAIL')} 
@@ -363,59 +384,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           )}
 
           <form onSubmit={handleAuth} className="space-y-5">
-            {isLogin ? (
-              <div className="space-y-4 animate-vix-in">
+            {authMethod === 'PHONE' ? (
+              <div className="animate-vix-in">
                 {step === 'CREDENTIALS' && (
-                  authMethod === 'EMAIL' ? (
-                    <>
-                      <input type="email" placeholder="Email Core" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black/60 border border-zinc-800/80 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/50 transition-all" required />
-                      <input type="password" placeholder="Access Signature" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/60 border border-zinc-800/80 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/50 transition-all" required />
-                    </>
-                  ) : (
-                    <input type="tel" placeholder="+1 234 567 8900" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-black/60 border border-zinc-800/80 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/50 transition-all" required />
-                  )
+                  <input type="tel" placeholder="+1 234 567 8900" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
                 )}
-
                 {step === 'OTP' && (
-                  <div className="space-y-6 animate-vix-in text-center">
-                    <ShieldEllipsis className="w-12 h-12 text-pink-500 mx-auto" />
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Verify Signal: {phone}</p>
-                    <div className="flex justify-between gap-2">
-                      {otp.map((digit, idx) => (
-                        <input key={idx} ref={el => { otpRefs.current[idx] = el; }} type="text" value={digit} onChange={e => handleOtpChange(idx, e.target.value)} onKeyDown={e => handleOtpKeyDown(idx, e)} className="w-full aspect-square bg-black border border-zinc-800 rounded-2xl text-center text-lg font-black text-pink-500 outline-none focus:border-pink-500 transition-all" />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                {step === 'CREDENTIALS' && (
-                  <div className="space-y-4 animate-vix-in">
-                    <input type="text" placeholder="@handle identity" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
-                    {authMethod === 'EMAIL' ? (
-                      <>
-                        <input type="email" placeholder="Email Core" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
-                        <input type="password" placeholder="Unique Signature" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
-                      </>
-                    ) : (
-                      <input type="tel" placeholder="Phone Signal (+1...)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
-                    )}
-                  </div>
-                )}
-
-                {step === 'IDENTITY' && (
-                  <div className="space-y-5 animate-vix-in">
-                    <input type="text" placeholder="Full Narrative Name" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" />
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-zinc-600 ml-2">Creation Date</label>
-                      <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-zinc-400 outline-none focus:border-pink-500/30 transition-all" required />
-                    </div>
-                  </div>
-                )}
-
-                {step === 'OTP' && (
-                  <div className="space-y-6 animate-vix-in text-center">
+                  <div className="space-y-6 text-center">
                     <ShieldEllipsis className="w-12 h-12 text-pink-500 mx-auto" />
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Verify Signal Fragment: {phone}</p>
                     <div className="flex justify-between gap-2">
@@ -425,42 +400,79 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     </div>
                   </div>
                 )}
-
-                {step === 'AVATAR' && (
-                  <div className="space-y-6 animate-vix-in flex flex-col items-center">
-                    <div className={`w-32 h-32 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center overflow-hidden transition-all ${avatarUrl ? 'border-pink-500 shadow-lg shadow-pink-500/10 scale-105' : ''}`}>
-                      {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <User className="w-8 h-8 text-zinc-800" />}
+                {(step === 'IDENTITY') && (
+                  <div className="space-y-5">
+                    <input type="text" placeholder="@handle identity" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
+                    <input type="text" placeholder="Full Narrative Name" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" />
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-zinc-600 ml-2">Creation Date</label>
+                      <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-zinc-400 outline-none focus:border-pink-500/30 transition-all" required />
                     </div>
-                    <div className="w-full grid grid-cols-2 gap-3">
-                      <button type="button" onClick={startCamera} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all text-zinc-500 flex items-center justify-center"><Camera className="w-5 h-5" /></button>
-                      <label className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all cursor-pointer text-zinc-500 flex items-center justify-center"><Upload className="w-5 h-5" /><input type="file" className="hidden" accept="image/*" onChange={handleFileSelect} /></label>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // EMAIL METHOD UI
+              isLogin ? (
+                <div className="space-y-4 animate-vix-in">
+                  <input type="email" placeholder="Email Core" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
+                  <input type="password" placeholder="Access Signature" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
+                </div>
+              ) : (
+                <div className="animate-vix-in">
+                  {step === 'CREDENTIALS' && (
+                    <div className="space-y-4">
+                      <input type="text" placeholder="@handle identity" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
+                      <input type="email" placeholder="Email Core" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
+                      <input type="password" placeholder="Unique Signature" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" required />
                     </div>
-                    {showCamera && (
-                      <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-6 animate-vix-in backdrop-blur-3xl">
-                        <video ref={videoRef} autoPlay playsInline className="w-full max-w-sm aspect-square rounded-full object-cover border-4 border-zinc-900 shadow-2xl" />
-                        <div className="mt-8 flex gap-4">
-                          <button type="button" onClick={stopCamera} className="px-6 py-2 bg-zinc-900 rounded-xl text-[10px] uppercase font-black">Cancel</button>
-                          <button type="button" onClick={capturePhoto} className="px-6 py-2 vix-gradient rounded-xl text-[10px] uppercase font-black">Capture Artifact</button>
-                        </div>
-                        <canvas ref={canvasRef} className="hidden" />
+                  )}
+                  {step === 'IDENTITY' && (
+                    <div className="space-y-5">
+                      <input type="text" placeholder="Full Narrative Name" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-white outline-none focus:border-pink-500/30 transition-all" />
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-600 ml-2">Creation Date</label>
+                        <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl px-6 py-5 text-sm text-zinc-400 outline-none focus:border-pink-500/30 transition-all" required />
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {step === 'POLICY' && (
-                  <div className="space-y-4 animate-vix-in">
-                    <div className="bg-black/60 border border-zinc-900 rounded-[2rem] p-6 h-48 overflow-y-auto no-scrollbar text-[10px] text-zinc-500 leading-relaxed font-medium">
-                      <p className="text-white font-black uppercase mb-4 tracking-widest">Narrative Policy</p>
-                      <p>By establishing this signal core, you agree to become a permanent fragment of the VixReel social narrative grid. You consent to encrypted identity verification and cinematic data standards.</p>
                     </div>
+                  )}
+                </div>
+              )
+            )}
+
+            {step === 'AVATAR' && (
+              <div className="space-y-6 animate-vix-in flex flex-col items-center">
+                <div className={`w-32 h-32 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center overflow-hidden transition-all ${avatarUrl ? 'border-pink-500 shadow-lg shadow-pink-500/10 scale-105' : ''}`}>
+                  {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <User className="w-8 h-8 text-zinc-800" />}
+                </div>
+                <div className="w-full grid grid-cols-2 gap-3">
+                  <button type="button" onClick={startCamera} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all text-zinc-500 flex items-center justify-center"><Camera className="w-5 h-5" /></button>
+                  <label className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800 transition-all cursor-pointer text-zinc-500 flex items-center justify-center"><Upload className="w-5 h-5" /><input type="file" className="hidden" accept="image/*" onChange={handleFileSelect} /></label>
+                </div>
+                {showCamera && (
+                  <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-6 animate-vix-in backdrop-blur-3xl">
+                    <video ref={videoRef} autoPlay playsInline className="w-full max-w-sm aspect-square rounded-full object-cover border-4 border-zinc-900 shadow-2xl" />
+                    <div className="mt-8 flex gap-4">
+                      <button type="button" onClick={stopCamera} className="px-6 py-2 bg-zinc-900 rounded-xl text-[10px] uppercase font-black">Cancel</button>
+                      <button type="button" onClick={capturePhoto} className="px-6 py-2 vix-gradient rounded-xl text-[10px] uppercase font-black">Capture Artifact</button>
+                    </div>
+                    <canvas ref={canvasRef} className="hidden" />
                   </div>
                 )}
-              </>
+              </div>
+            )}
+
+            {step === 'POLICY' && (
+              <div className="space-y-4 animate-vix-in">
+                <div className="bg-black/60 border border-zinc-900 rounded-[2rem] p-6 h-48 overflow-y-auto no-scrollbar text-[10px] text-zinc-500 leading-relaxed font-medium">
+                  <p className="text-white font-black uppercase mb-4 tracking-widest">Narrative Policy</p>
+                  <p>By establishing this signal core, you agree to become a permanent fragment of the VixReel social narrative grid. You consent to encrypted identity verification and cinematic data standards.</p>
+                </div>
+              </div>
             )}
 
             <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[10px] shadow-2xl disabled:opacity-30 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isLogin && authMethod === 'PHONE' && step === 'CREDENTIALS') ? 'Transmit Signal' : (step === 'POLICY') ? 'Finalize Protocol' : 'Next Phase'}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (authMethod === 'PHONE' && step === 'CREDENTIALS') ? 'Transmit OTP' : (step === 'POLICY') ? 'Finalize Protocol' : 'Next Phase'}
               {!loading && <ChevronRight className="w-4 h-4" />}
             </button>
           </form>
@@ -483,5 +495,3 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 };
 
 export default Auth;
-
-

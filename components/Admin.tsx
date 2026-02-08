@@ -1,6 +1,20 @@
-
-import React, { useState, useEffect } from 'react';
-import { Shield, ArrowUpCircle, User as UserIcon, Loader2, Search as SearchIcon, CheckCircle2, XCircle, Lock, ChevronRight, Clock, Users, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Shield, 
+  ArrowUpCircle, 
+  User as UserIcon, 
+  Loader2, 
+  Search as SearchIcon, 
+  CheckCircle2, 
+  XCircle, 
+  Lock, 
+  ChevronRight, 
+  Clock, 
+  Users, 
+  RefreshCw,
+  Film,
+  AlertTriangle
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Post } from '../types';
 import VerificationBadge from './VerificationBadge';
@@ -13,6 +27,7 @@ const Admin: React.FC = () => {
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
   const [boostAmount, setBoostAmount] = useState<string>('500');
   const [loading, setLoading] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Auth state for Admin
@@ -22,17 +37,10 @@ const Admin: React.FC = () => {
 
   const ADMIN_CODE = "VIX-2025";
 
-  useEffect(() => {
-    if (isUnlocked) {
-      fetchUsers();
-    }
-  }, [isUnlocked]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Sorting by updated_at as it's often more reliable in Supabase default profiles
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
@@ -40,51 +48,96 @@ const Admin: React.FC = () => {
       
       if (fetchError) throw fetchError;
       
-      if (data) {
-        setUsers(data as UserProfile[]);
-      }
+      setUsers((data as UserProfile[]) || []);
     } catch (err: any) {
       console.error("Admin Fetch Failure:", err);
-      setError(err.message);
+      setError(err.message || "Narrative registry access failed.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isUnlocked) {
+      fetchUsers();
+    }
+  }, [isUnlocked, fetchUsers]);
 
   const fetchUserPosts = async (userId: string) => {
-    const { data } = await supabase.from('posts').select('*, user:profiles(*)').eq('user_id', userId).order('created_at', { ascending: false });
-    if (data) setSelectedUserPosts(data as any);
+    setPostsLoading(true);
+    try {
+      const { data, error: postsErr } = await supabase
+        .from('posts')
+        .select('*, user:profiles(*)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (postsErr) throw postsErr;
+      setSelectedUserPosts((data as Post[]) || []);
+    } catch (err) {
+      console.error("Failed to fetch user artifacts:", err);
+    } finally {
+      setPostsLoading(false);
+    }
   };
 
   const handleVerify = async (userId: string, status: boolean) => {
     try {
-      const { error: updateError } = await supabase.from('profiles').update({ is_verified: status }).eq('id', userId);
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_verified: status })
+        .eq('id', userId);
+      
       if (updateError) throw updateError;
 
       // Update local state for immediate feedback
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_verified: status } : u));
       if (viewingUser?.id === userId) {
-        // FIXED: Removed extra spread operator before is_verified to fix "Cannot find name 'is_verified'" syntax error
         setViewingUser(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
-      // Broadcast to components
+      // Broadcast to components globally
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
         detail: { id: userId, is_verified: status } 
       }));
     } catch (err: any) {
-      alert("Status Update Failed: " + err.message);
+      alert("Status Update Failed: " + (err.message || "Sync failure"));
     }
   };
 
   const handleBoost = async (postId: string) => {
     const amount = parseInt(boostAmount);
-    if (isNaN(amount) || amount <= 0) return;
-    const { data: post } = await supabase.from('posts').select('boosted_likes').eq('id', postId).single();
-    const newBoost = (post?.boosted_likes || 0) + amount;
-    const { error } = await supabase.from('posts').update({ boosted_likes: newBoost }).eq('id', postId);
-    if (!error) {
+    if (isNaN(amount) || amount <= 0) {
+      alert("Invalid injection quantity. Must be a positive integer.");
+      return;
+    }
+
+    try {
+      // First get current boosted_likes to ensure accuracy
+      const { data: post, error: getErr } = await supabase
+        .from('posts')
+        .select('boosted_likes')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (getErr) throw getErr;
+      
+      const currentBoost = post?.boosted_likes || 0;
+      const newBoost = currentBoost + amount;
+      
+      const { error: updateErr } = await supabase
+        .from('posts')
+        .update({ boosted_likes: newBoost })
+        .eq('id', postId);
+      
+      if (updateErr) throw updateErr;
+
       setSelectedUserPosts(prev => prev.map(p => p.id === postId ? { ...p, boosted_likes: newBoost } : p));
+      
+      // Notify other components (like Explore grid) that engagement changed
+      window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
+    } catch (err: any) {
+      alert("Boost Injection Failed: " + (err.message || "Sync mismatch"));
     }
   };
 
@@ -95,6 +148,7 @@ const Admin: React.FC = () => {
       setPassError(false);
     } else {
       setPassError(true);
+      setPassword('');
       setTimeout(() => setPassError(false), 2000);
     }
   };
@@ -102,7 +156,7 @@ const Admin: React.FC = () => {
   if (!isUnlocked) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[3rem] p-12 shadow-2xl text-center space-y-10 animate-in zoom-in duration-500">
+        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[3rem] p-12 shadow-2xl text-center space-y-10 animate-vix-in">
           <div className="w-24 h-24 mx-auto rounded-[2rem] vix-gradient flex items-center justify-center shadow-[0_0_60px_rgba(255,0,128,0.3)] border border-white/10">
             <Lock className="w-10 h-10 text-white" />
           </div>
@@ -115,9 +169,10 @@ const Admin: React.FC = () => {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`w-full bg-black border ${passError ? 'border-red-500 animate-shake' : 'border-zinc-800'} rounded-2xl px-6 py-5 text-center text-sm outline-none focus:border-pink-500/50 transition-all font-black tracking-[0.6em] text-white shadow-inner`}
+              className={`w-full bg-black border ${passError ? 'border-red-500 animate-pulse' : 'border-zinc-800'} rounded-2xl px-6 py-5 text-center text-sm outline-none focus:border-pink-500/50 transition-all font-black tracking-[0.6em] text-white shadow-inner`}
               placeholder="••••••••"
               autoFocus
+              required
             />
             <button type="submit" className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
               Unlock Terminal <ChevronRight className="w-5 h-5" />
@@ -158,7 +213,8 @@ const Admin: React.FC = () => {
            </div>
            <button 
              onClick={fetchUsers} 
-             className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all group"
+             disabled={loading}
+             className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all group disabled:opacity-20"
              title="Synchronize Registry"
            >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
@@ -186,8 +242,9 @@ const Admin: React.FC = () => {
               </div>
             ) : error ? (
               <div className="p-10 text-center space-y-4">
+                <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2 opacity-50" />
                 <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">Registry Link Offline</p>
-                <button onClick={fetchUsers} className="text-white text-[10px] font-bold underline">Retry Pulse</button>
+                <button onClick={fetchUsers} className="text-white text-[10px] font-bold underline px-4 py-2 bg-zinc-900 rounded-xl">Retry Pulse</button>
               </div>
             ) : filteredUsers.length > 0 ? filteredUsers.map(u => (
               <div 
@@ -206,7 +263,6 @@ const Admin: React.FC = () => {
                     </span>
                     <div className="flex items-center gap-2 text-[9px] text-zinc-600 font-bold uppercase tracking-tighter mt-1">
                       <Clock className="w-3 h-3" />
-                      {/* FIXED: updated_at property access is now safe as it's defined in UserProfile interface */}
                       {u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'Sync Pending'}
                     </div>
                   </div>
@@ -225,7 +281,7 @@ const Admin: React.FC = () => {
 
         <div className="lg:col-span-7 xl:col-span-8">
           {viewingUser ? (
-            <div className="bg-zinc-950 rounded-[3.5rem] border border-zinc-900 p-8 sm:p-16 shadow-2xl animate-in slide-in-from-right duration-500 relative overflow-hidden ring-1 ring-white/5">
+            <div className="bg-zinc-950 rounded-[3.5rem] border border-zinc-900 p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5">
               <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full"></div>
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-10 mb-16 relative z-10">
@@ -238,7 +294,7 @@ const Admin: React.FC = () => {
                       {viewingUser.username} 
                       {viewingUser.is_verified && <VerificationBadge size="w-10 h-10" />}
                     </h3>
-                    <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email}</p>
+                    <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email || (viewingUser.phone ? `Phone: ${viewingUser.phone}` : 'Identity Anonymous')}</p>
                   </div>
                 </div>
                 <button 
@@ -256,23 +312,42 @@ const Admin: React.FC = () => {
                       <div className="relative">
                         <input 
                           type="number" 
+                          min="1"
+                          max="100000"
                           value={boostAmount} 
                           onChange={e => setBoostAmount(e.target.value)}
                           className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-8 py-5 outline-none focus:border-purple-500/40 text-lg font-black text-white shadow-inner"
                           placeholder="00"
                         />
-                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-zinc-700 uppercase tracking-widest">LIKES</span>
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-zinc-700 uppercase tracking-widest">QUANTITY</span>
                       </div>
+                      <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest text-center">Click an artifact below to inject {boostAmount} appreciations.</p>
                     </div>
                  </div>
               </div>
 
               <div className="space-y-6 relative z-10">
-                <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2">Managed Visual Artifacts</h4>
+                <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2 flex items-center justify-between">
+                  Managed Visual Artifacts
+                  {postsLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
-                  {selectedUserPosts.map(p => (
+                  {selectedUserPosts.length > 0 ? selectedUserPosts.map(p => (
                     <div key={p.id} className="relative aspect-square rounded-[2rem] overflow-hidden group border border-zinc-900 shadow-2xl bg-black transition-transform hover:scale-105 duration-500">
-                      {p.media_type === 'video' ? <video src={p.media_url} className="w-full h-full object-cover opacity-60" /> : <img src={p.media_url} className="w-full h-full object-cover opacity-60" />}
+                      {p.media_type === 'video' ? (
+                        <>
+                          <video src={p.media_url} className="w-full h-full object-cover opacity-60" />
+                          <div className="absolute top-4 right-4 text-white/50"><Film className="w-4 h-4" /></div>
+                        </>
+                      ) : (
+                        <img src={p.media_url} className="w-full h-full object-cover opacity-60" />
+                      )}
+                      
+                      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/5">
+                        <ArrowUpCircle className="w-3 h-3 text-pink-500" />
+                        <span className="text-[9px] font-black text-white">{formatNumber(p.boosted_likes || 0)}</span>
+                      </div>
+
                       <button 
                         onClick={() => handleBoost(p.id)}
                         className="absolute inset-0 bg-purple-500/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all backdrop-blur-md"
@@ -281,7 +356,11 @@ const Admin: React.FC = () => {
                         <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Inject {formatNumber(parseInt(boostAmount))}</span>
                       </button>
                     </div>
-                  ))}
+                  )) : !postsLoading && (
+                    <div className="col-span-full py-12 text-center border-2 border-zinc-900 border-dashed rounded-[2rem]">
+                       <p className="text-zinc-800 text-[10px] font-black uppercase tracking-widest">No Artifacts Registered</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

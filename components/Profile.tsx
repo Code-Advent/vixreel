@@ -449,4 +449,3 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 };
 
 export default Profile;
-

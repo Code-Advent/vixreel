@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, Users, LogOut, Trash2, X, UserPlus, CheckCircle } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -68,8 +67,8 @@ const App: React.FC = () => {
           updateSavedAccounts(profile, session);
           await fetchPosts();
         } else {
-          // If healing failed but session exists, try one more time or logout
-          console.error("Narrative Link Weak: Retrying sync...");
+          // Fallback if trigger was slow
+          await new Promise(r => setTimeout(r, 1000));
           const retryProfile = await resolveIdentity(session.user);
           if (retryProfile) {
             setCurrentUser(retryProfile);
@@ -152,8 +151,8 @@ const App: React.FC = () => {
 
   const resolveIdentity = async (authUser: any): Promise<UserProfile | null> => {
     try {
-      // 1. Fetch
-      let { data: dbProfile, error: fetchError } = await supabase
+      // First attempt to find existing profile
+      let { data: dbProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
@@ -161,25 +160,26 @@ const App: React.FC = () => {
       
       if (dbProfile) return dbProfile as UserProfile;
 
-      // 2. Quiet Healing
+      // If missing (common on first phone login), perform a manual sync/upsert
       const metadata = authUser.user_metadata || {};
-      const username = metadata.username || authUser.email?.split('@')[0];
+      const username = metadata.username || (authUser.phone ? `user_${authUser.phone.slice(-4)}` : `user_${authUser.id.slice(0, 5)}`);
       
       const { data: retryProfile, error: upsertError } = await supabase.from('profiles').upsert({
         id: authUser.id,
         username: username,
         full_name: metadata.full_name || username,
-        email: authUser.email,
-        phone: metadata.phone || null,
-        phone_verified: metadata.phone_verified || false,
+        email: authUser.email || metadata.email,
+        phone: authUser.phone || metadata.phone || null,
+        phone_verified: !!(authUser.phone_confirmed_at || metadata.phone_verified),
         date_of_birth: metadata.date_of_birth || null,
         is_admin: authUser.email === 'davidhen498@gmail.com',
         is_verified: authUser.email === 'davidhen498@gmail.com'
       }, { onConflict: 'id' }).select().single();
       
-      if (upsertError) return null;
+      if (upsertError) throw upsertError;
       return retryProfile as UserProfile;
     } catch (err) {
+      console.error("Identity Resolution Exception:", err);
       return null;
     }
   };
@@ -216,7 +216,7 @@ const App: React.FC = () => {
             <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 mt-4">Initializing Narrative Grid</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 mt-4">Synchronizing Narrative Cores</p>
         </div>
       </div>
     </div>
@@ -237,7 +237,7 @@ const App: React.FC = () => {
       <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
         {switchSuccess && (
           <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[3000] bg-green-500 text-white px-8 py-4 rounded-[2rem] font-black uppercase tracking-widest text-[10px] shadow-2xl animate-in slide-in-from-top duration-500 flex items-center gap-3">
-             <CheckCircle className="w-4 h-4" /> Switched to @{switchSuccess}
+             <CheckCircle className="w-4 h-4" /> Signal Switched: @{switchSuccess}
           </div>
         )}
 
@@ -256,23 +256,16 @@ const App: React.FC = () => {
                     <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={handlePostDeleted} onUpdate={fetchPosts} />
                   ))
                 ) : (
-                  <div className="py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-xs">Awaiting Narrative Injections...</div>
+                  <div className="py-20 text-center text-zinc-700 font-black uppercase tracking-widest text-xs">Waiting for Signal Injections...</div>
                 )}
               </div>
             </div>
           )}
-          {currentView === 'EXPLORE' && (
-            <Explore 
-              currentUserId={currentUser.id} 
-              onSelectUser={(u) => setView('PROFILE', u)} 
-            />
-          )}
-          {currentView === 'PROFILE' && viewedUser && (
-            <Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
+          {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
+          {currentView === 'PROFILE' && viewedUser && <Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
               if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
               setViewedUser(prev => prev ? {...prev, ...u} : null);
-            }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} />
-          )}
+            }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} />}
           {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
           {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
           {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
@@ -331,4 +324,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

@@ -224,4 +224,3 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
 };
 
 export default Post;
-
