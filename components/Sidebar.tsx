@@ -2,7 +2,7 @@
 import React from 'react';
 import { ViewType, UserProfile } from '../types';
 import VerificationBadge from './VerificationBadge';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, LogOut } from 'lucide-react';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -68,10 +68,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
               }`}
             >
               <div className="w-6 h-6 flex items-center justify-center relative">
-                <ShieldAlert className={`w-5 h-5 ${currentView === 'ADMIN' ? 'animate-pulse' : ''}`} />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full animate-ping"></div>
+                <ShieldAlert className="w-5 h-5" />
               </div>
-              <span className="ml-4 hidden lg:block font-black uppercase text-[10px] tracking-widest">Admin Terminal</span>
+              <span className="ml-4 hidden lg:block font-bold uppercase text-[10px] tracking-widest">Admin Panel</span>
             </button>
           )}
         </nav>
@@ -79,17 +78,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
         <div className="mt-auto pt-6 border-t border-zinc-900 space-y-4">
           {currentUser && (
             <div className="hidden lg:flex items-center gap-3 p-3 rounded-2xl bg-zinc-950/50 border border-zinc-900">
-               <div className="relative">
-                 <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
-                 {currentUser.is_verified && (
-                   <div className="absolute -bottom-1 -right-1 scale-50">
-                     <VerificationBadge size="w-4 h-4" />
-                   </div>
-                 )}
-               </div>
+               <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
                <div className="flex flex-col min-w-0">
                  <span className="font-bold text-xs truncate">@{currentUser.username}</span>
-                 <span className="text-[8px] text-zinc-600 font-black uppercase">{currentUser.is_admin ? 'System Overseer' : 'Narrator'}</span>
+                 <span className="text-[8px] text-zinc-600 font-bold uppercase">{currentUser.is_admin ? 'Admin' : 'Member'}</span>
                </div>
             </div>
           )}
@@ -100,7 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <div className="w-6 h-6 flex items-center justify-center">
               <i className="fa-solid fa-bars text-lg"></i>
             </div>
-            <span className="ml-4 hidden lg:block font-bold text-sm">More</span>
+            <span className="ml-4 hidden lg:block font-bold text-sm">Settings</span>
           </button>
         </div>
       </div>
@@ -118,14 +110,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             </button>
           );
         })}
-        {isActuallyAdmin && (
-          <button
-            onClick={() => setView('ADMIN')}
-            className={`p-3 transition-all ${currentView === 'ADMIN' ? 'text-pink-500 scale-125' : 'text-zinc-600 opacity-50'}`}
-          >
-            <ShieldAlert className="w-6 h-6" />
-          </button>
-        )}
       </div>
     </>
   );
