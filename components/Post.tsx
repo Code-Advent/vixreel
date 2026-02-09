@@ -89,14 +89,33 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     if (!window.confirm("Delete this post?")) return;
     setIsDeleting(true);
     try {
+      // 1. Storage Cleanup: extract path from media_url
+      // Example: .../public/posts/feed/filename.jpg
+      const pathParts = post.media_url.split('/public/posts/');
+      if (pathParts.length > 1) {
+        const mediaPath = pathParts[1];
+        await supabase.storage.from('posts').remove([mediaPath]);
+      }
+
+      // 2. Database Deletion
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (error) throw error;
+      
+      // 3. Local view cleanup (if in feed)
       onDelete?.(post.id);
-    } catch (err: any) { alert("Delete failed: " + err.message); setIsDeleting(false); }
+      
+      // 4. Global synchronization event
+      window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
+      
+    } catch (err: any) { 
+      console.error("Deletion error:", err);
+      alert("Delete failed: " + err.message); 
+      setIsDeleting(false); 
+    }
   };
 
   return (
-    <div className={`w-full max-w-[470px] mx-auto border-b border-zinc-900 pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30' : ''}`}>
+    <div className={`w-full max-w-[470px] mx-auto border-b border-zinc-900 pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
           <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-800" />
@@ -109,7 +128,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         </div>
         {post.user.id === currentUserId && (
           <button onClick={handleDelete} className="text-zinc-700 hover:text-red-500 transition-colors p-2">
-            <Trash2 className="w-4 h-4" />
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
         )}
       </div>

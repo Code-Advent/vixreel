@@ -13,8 +13,8 @@ export interface UserProfile {
   is_verified?: boolean;
   is_private?: boolean;
   allow_comments?: boolean;
-  // Added missing is_following_public property used in Profile component
   is_following_public?: boolean;
+  boosted_followers?: number; // Added for administrative follower injection
   created_at?: string;
   updated_at?: string;
 }

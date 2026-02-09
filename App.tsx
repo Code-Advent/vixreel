@@ -31,7 +31,38 @@ const App: React.FC = () => {
 
   useEffect(() => {
     init();
-  }, []);
+
+    // Global listener for post deletions
+    const handleGlobalPostDelete = (e: any) => {
+      const deletedId = e.detail?.id;
+      if (deletedId) {
+        setPosts(prev => prev.filter(p => p.id !== deletedId));
+      }
+    };
+
+    // Global listener for identity updates (Verification, Boosts)
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      
+      // Update current user if applicable
+      if (currentUser?.id === id) {
+        setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
+      }
+      
+      // Update viewed user if applicable (crucial for Profile view persistence)
+      if (viewedUser?.id === id) {
+        setViewedUser(prev => prev ? { ...prev, ...updates } : null);
+      }
+    };
+
+    window.addEventListener('vixreel-post-deleted', handleGlobalPostDelete);
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    
+    return () => {
+      window.removeEventListener('vixreel-post-deleted', handleGlobalPostDelete);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+    };
+  }, [currentUser?.id, viewedUser?.id]);
 
   const init = async () => {
     try {
@@ -177,9 +208,22 @@ const App: React.FC = () => {
                 </button>
               </div>
               <div className="w-full max-w-[470px] space-y-6">
-                {posts.map(p => (
-                  <Post key={p.id} post={p} currentUserId={currentUser.id} onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} onUpdate={fetchPosts} />
-                ))}
+                {posts.length > 0 ? (
+                  posts.map(p => (
+                    <Post 
+                      key={p.id} 
+                      post={p} 
+                      currentUserId={currentUser.id} 
+                      onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
+                      onUpdate={fetchPosts} 
+                    />
+                  ))
+                ) : (
+                  <div className="py-32 text-center opacity-20 flex flex-col items-center">
+                    <Trash2 className="w-16 h-16 mb-4" />
+                    <p className="font-bold uppercase tracking-[0.3em] text-xs">No artifacts in grid</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -189,9 +233,7 @@ const App: React.FC = () => {
               setViewedUser(prev => prev ? {...prev, ...u} : null);
             }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} onLogout={() => setIsAccountMenuOpen(true)} /></div>}
           
-          {/* Create view renders independently of container animation to prevent clipping */}
           {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
-          
           {currentView === 'SEARCH' && <div className="animate-vix-in"><Search onSelectUser={(u) => setView('PROFILE', u)} /></div>}
           {currentView === 'MESSAGES' && <div className="animate-vix-in"><Messages currentUser={currentUser} initialChatUser={initialChatUser} /></div>}
           {currentView === 'ADMIN' && currentUser.is_admin && <div className="animate-vix-in"><Admin /></div>}
@@ -202,7 +244,7 @@ const App: React.FC = () => {
       {/* Account Switching Modal */}
       {isAccountMenuOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
+          <div className="w-full max-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
             <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/20">
               <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">Switch Account</h3>
               <button onClick={() => setIsAccountMenuOpen(false)} className="p-2 text-zinc-700 hover:text-white transition-colors"><X className="w-6 h-6" /></button>

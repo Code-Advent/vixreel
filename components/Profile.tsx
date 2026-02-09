@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Grid, Heart, Camera, Settings, User as UserIcon, Loader2, X,
-  ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2
+  ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2,
+  MessageSquare, UserCheck
 } from 'lucide-react';
 import { UserProfile, Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -38,6 +40,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // Individual privacy states
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
@@ -46,7 +49,34 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   useEffect(() => {
     fetchUserContent();
-  }, [user.id]);
+    // Sync local states if user prop changes
+    setIsPrivate(user.is_private || false);
+    setIsFollowingPublic(user.is_following_public !== false);
+    setAllowComments(user.allow_comments !== false);
+
+    // Global listener to remove posts deleted from other tabs (e.g. Feed)
+    const handleGlobalDelete = (e: any) => {
+      const deletedId = e.detail?.id;
+      if (deletedId) {
+        setPosts(prev => prev.filter(p => p.id !== deletedId));
+        setLikedPosts(prev => prev.filter(p => p.id !== deletedId));
+      }
+    };
+
+    // Global listener for user profile updates (like verification or follower boost)
+    const handleIdentityUpdate = (e: any) => {
+      if (e.detail?.id === user.id) {
+        fetchUserContent(); // Simple refresh for profile stats
+      }
+    };
+
+    window.addEventListener('vixreel-post-deleted', handleGlobalDelete);
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    return () => {
+      window.removeEventListener('vixreel-post-deleted', handleGlobalDelete);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+    };
+  }, [user.id, user.is_private, user.is_following_public, user.allow_comments]);
 
   const fetchUserContent = async () => {
     setIsUpdating(true);
@@ -60,10 +90,18 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
       
+      // Get the latest profile data for boosted followers
+      const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
+      const boostedFollowers = freshProfile?.boosted_followers || 0;
+
       let totalLikes = 0;
       pData?.forEach(post => totalLikes += (post.likes_count || 0) + (post.boosted_likes || 0));
 
-      setCounts({ followers: fCount || 0, following: ingCount || 0, likes: totalLikes });
+      setCounts({ 
+        followers: (fCount || 0) + boostedFollowers, 
+        following: ingCount || 0, 
+        likes: totalLikes 
+      });
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session && user.id !== session.user.id) {
@@ -75,11 +113,29 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     }
   };
 
-  const handleOpenSocial = async (type: 'FOLLOWERS' | 'FOLLOWING') => {
-    if (!isOwnProfile && type === 'FOLLOWING' && !user.is_following_public) {
-      alert("This account's following list is private.");
-      return;
+  const handleToggleSetting = async (key: keyof UserProfile, value: boolean) => {
+    if (key === 'is_private') setIsPrivate(value);
+    if (key === 'is_following_public') setIsFollowingPublic(value);
+    if (key === 'allow_comments') setAllowComments(value);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ [key]: value })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      onUpdateProfile({ [key]: value });
+    } catch (err: any) {
+      console.error("Failed to sync setting:", err);
+      if (key === 'is_private') setIsPrivate(!value);
+      if (key === 'is_following_public') setIsFollowingPublic(!value);
+      if (key === 'allow_comments') setAllowComments(!value);
     }
+  };
+
+  const handleOpenSocial = async (type: 'FOLLOWERS' | 'FOLLOWING') => {
+    if (!isOwnProfile && type === 'FOLLOWING' && !user.is_following_public) return;
 
     setSocialModalType(type);
     setIsSocialModalOpen(true);
@@ -87,7 +143,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setSocialUsers([]);
     
     try {
-      // Explicit join query with aliases for follower and following
       const { data, error } = await supabase
         .from('follows')
         .select(`
@@ -97,7 +152,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         .eq(type === 'FOLLOWERS' ? 'following_id' : 'follower_id', user.id);
 
       if (error) throw error;
-
       if (data) {
         const list = data.map((item: any) => type === 'FOLLOWERS' ? item.follower : item.following);
         setSocialUsers(list.filter(u => u !== null) as UserProfile[]);
@@ -111,12 +165,32 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm("Permanently delete this artifact from the grid?")) return;
+    
+    const postToDelete = posts.find(p => p.id === postId);
+    if (!postToDelete) return;
+
     try {
-      const { error } = await supabase.from('posts').delete().eq('id', postId).eq('user_id', user.id);
+      const pathParts = postToDelete.media_url.split('/public/posts/');
+      if (pathParts.length > 1) {
+        const mediaPath = pathParts[1];
+        await supabase.storage.from('posts').remove([mediaPath]);
+      }
+
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id);
+
       if (error) throw error;
+
       setPosts(prev => prev.filter(p => p.id !== postId));
-      fetchUserContent();
+      setLikedPosts(prev => prev.filter(p => p.id !== postId));
+      setCounts(prev => ({ ...prev, likes: prev.likes - (postToDelete.likes_count || 0) }));
+      window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: postId } }));
+      
     } catch (err: any) {
+      console.error("Deletion error:", err);
       alert("System failure during deletion: " + err.message);
     }
   };
@@ -157,15 +231,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       <div className="flex justify-between items-center mb-12">
         <h2 className="text-xl font-bold uppercase tracking-widest text-white">Profile</h2>
         {isOwnProfile && (
-          <button onClick={() => setIsSettingsOpen(true)} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white">
-            <Settings className="w-5 h-5" />
+          <button onClick={() => setIsSettingsOpen(true)} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white transition-all hover:border-pink-500/30 group">
+            <Settings className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
           </button>
         )}
       </div>
 
       <div className="flex flex-col md:flex-row items-center md:items-start gap-12 mb-20">
         <div className="relative w-36 h-36 sm:w-44 sm:h-44 shrink-0">
-          <div className="w-full h-full rounded-full p-1 border border-zinc-800">
+          <div className="w-full h-full rounded-full p-1 border border-zinc-800 ring-2 ring-pink-500/10">
             <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-zinc-900 shadow-2xl" />
           </div>
         </div>
@@ -194,8 +268,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <span className="font-bold text-xl text-white group-hover:text-pink-500 transition-colors">{counts.followers}</span>
               <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">Followers</span>
             </div>
-            <div onClick={() => handleOpenSocial('FOLLOWING')} className="flex flex-col items-center sm:items-baseline cursor-pointer group hover:opacity-70 transition-opacity">
-              <span className="font-bold text-xl text-white group-hover:text-pink-500 transition-colors">{counts.following}</span>
+            <div onClick={() => handleOpenSocial('FOLLOWING')} className={`flex flex-col items-center sm:items-baseline cursor-pointer group hover:opacity-70 transition-opacity ${(!isOwnProfile && !user.is_following_public) ? 'cursor-not-allowed opacity-30' : ''}`}>
+              <span className="font-bold text-xl text-white group-hover:text-pink-500 transition-colors">
+                {(!isOwnProfile && !user.is_following_public) ? <Lock className="w-4 h-4 inline" /> : counts.following}
+              </span>
               <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">Following</span>
             </div>
           </div>
@@ -214,7 +290,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
             
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all gap-5 backdrop-blur-[2px]">
-              {/* AS REQUESTED: Only heart icon, no numbers */}
               <div className="text-white drop-shadow-[0_0_15px_rgba(255,0,128,0.5)]">
                 <Heart className="w-10 h-10 fill-white animate-pulse" />
               </div>
@@ -236,7 +311,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       {/* Social Modal */}
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
+          <div className="w-full max-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
             <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/10">
               <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-zinc-500">{socialModalType} Registry</h3>
               <button onClick={() => setIsSocialModalOpen(false)}><X className="w-6 h-6 text-zinc-700 hover:text-white transition-colors" /></button>
@@ -265,22 +340,78 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
-      {/* Settings & Edit Modals */}
+      {/* Settings Modal (Privacy Node) */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8 space-y-10 animate-vix-in">
-            <div className="flex justify-between items-center"><h3 className="font-bold text-lg text-white">Privacy Node</h3><button onClick={() => setIsSettingsOpen(false)}><X className="w-6 h-6 text-zinc-500" /></button></div>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between p-5 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-                <div><div className="text-sm font-bold text-white">Encrypted Profile</div><div className="text-[10px] text-zinc-500">Only authorized narrators see posts</div></div>
-                <button onClick={() => setIsPrivate(!isPrivate)} className={`w-12 h-6 rounded-full p-1 transition-all ${isPrivate ? 'bg-pink-500' : 'bg-zinc-700'}`}><div className={`w-4 h-4 bg-white rounded-full transition-all ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} /></button>
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-lg text-white">Privacy Node</h3>
+              <button onClick={() => setIsSettingsOpen(false)}><X className="w-6 h-6 text-zinc-500 hover:text-white transition-colors" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-5 bg-zinc-900/50 rounded-2xl border border-zinc-800 group transition-all hover:border-pink-500/20">
+                <div className="flex items-start gap-4">
+                  <Lock className="w-5 h-5 text-zinc-600 mt-1 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Encrypted Profile</div>
+                    <div className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">Only followers see artifacts</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleToggleSetting('is_private', !isPrivate)} 
+                  className={`w-12 h-6 rounded-full p-1 transition-all ${isPrivate ? 'bg-pink-500' : 'bg-zinc-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-all ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
               </div>
-              <button onClick={() => { setIsSettingsOpen(false); onLogout?.(); }} className="w-full py-5 border border-red-500/20 text-red-500 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-500 hover:text-white transition-all">Relinquish Primary Session</button>
+
+              <div className="flex items-center justify-between p-5 bg-zinc-900/50 rounded-2xl border border-zinc-800 group transition-all hover:border-pink-500/20">
+                <div className="flex items-start gap-4">
+                  <UserCheck className="w-5 h-5 text-zinc-600 mt-1 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Public Connections</div>
+                    <div className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">Anyone can see following list</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleToggleSetting('is_following_public', !isFollowingPublic)} 
+                  className={`w-12 h-6 rounded-full p-1 transition-all ${isFollowingPublic ? 'bg-pink-500' : 'bg-zinc-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-all ${isFollowingPublic ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-5 bg-zinc-900/50 rounded-2xl border border-zinc-800 group transition-all hover:border-pink-500/20">
+                <div className="flex items-start gap-4">
+                  <MessageSquare className="w-5 h-5 text-zinc-600 mt-1 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Allow Interactions</div>
+                    <div className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1">Enable global comment portal</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleToggleSetting('allow_comments', !allowComments)} 
+                  className={`w-12 h-6 rounded-full p-1 transition-all ${allowComments ? 'bg-pink-500' : 'bg-zinc-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-all ${allowComments ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="pt-6">
+                <button 
+                  onClick={() => { setIsSettingsOpen(false); onLogout?.(); }} 
+                  className="w-full py-5 border border-red-500/20 text-red-500 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/5"
+                >
+                  Relinquish Primary Session
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Edit Profile Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-10 space-y-8 animate-vix-in">

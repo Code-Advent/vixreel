@@ -1,5 +1,6 @@
--- VIXREEL MASTER SCHEMA (v2.6)
--- Robust and clean schema for social connectivity and media management.
+
+-- VIXREEL MASTER SCHEMA (v2.8)
+-- Optimized for administrative injections and persistent identity verification.
 
 -- 1. PROFILES
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   is_private BOOLEAN DEFAULT false,
   is_following_public BOOLEAN DEFAULT true, 
   allow_comments BOOLEAN DEFAULT true,
+  boosted_followers INTEGER DEFAULT 0, -- Administrative follower count injection
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -85,7 +87,7 @@ ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 
--- CLEANUP EXISTING POLICIES TO PREVENT 42710 ERRORS
+-- POLICIES
 DO $$ 
 BEGIN
     -- Profiles
@@ -111,24 +113,17 @@ BEGIN
     DROP POLICY IF EXISTS "Users manage own stories" ON public.stories;
 END $$;
 
--- REDEFINE POLICIES
 CREATE POLICY "Profiles are public" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users manage own profile" ON public.profiles FOR ALL USING (auth.uid() = id);
-
 CREATE POLICY "Posts are public" ON public.posts FOR SELECT USING (true);
 CREATE POLICY "Users manage own posts" ON public.posts FOR ALL USING (auth.uid() = user_id);
-
 CREATE POLICY "Follows are public" ON public.follows FOR SELECT USING (true);
 CREATE POLICY "Users manage own follows" ON public.follows FOR ALL USING (auth.uid() = follower_id);
-
 CREATE POLICY "Likes are public" ON public.likes FOR SELECT USING (true);
 CREATE POLICY "Users toggle own likes" ON public.likes FOR ALL USING (auth.uid() = user_id);
-
 CREATE POLICY "Comments are public" ON public.comments FOR SELECT USING (true);
 CREATE POLICY "Users manage own comments" ON public.comments FOR ALL USING (auth.uid() = user_id);
-
 CREATE POLICY "Messages are private" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 CREATE POLICY "Users send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
-
 CREATE POLICY "Stories are public" ON public.stories FOR SELECT USING (expires_at > NOW());
 CREATE POLICY "Users manage own stories" ON public.stories FOR ALL USING (auth.uid() = user_id);
