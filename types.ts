@@ -11,9 +11,10 @@ export interface UserProfile {
   date_of_birth?: string;
   is_admin?: boolean;
   is_verified?: boolean;
-  // Added properties for privacy and comment controls
   is_private?: boolean;
   allow_comments?: boolean;
+  // Added missing is_following_public property used in Profile component
+  is_following_public?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -62,7 +63,7 @@ export interface AccountSession {
   id: string;
   username: string;
   avatar_url?: string;
-  session: any;
+  session_data: any; // Storing the Supabase session tokens
 }
 
 export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN';

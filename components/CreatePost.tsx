@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Wand2, Loader2, Send, Film, ShieldCheck, Upload, Sparkles, Image as ImageIcon } from 'lucide-react';
+// Added ChevronRight to imports
+import { X, Wand2, Loader2, Image as ImageIcon, Video, UploadCloud, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
@@ -18,14 +19,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
   const [isPosting, setIsPosting] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
-  const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.size > 50 * 1024 * 1024) {
-         alert("File is too large (max 50MB).");
+         alert("Max 50MB allowed.");
          return;
       }
       setFile(selectedFile);
@@ -38,7 +38,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
     if (isGeneratingCaption) return;
     setIsGeneratingCaption(true);
     try {
-      const prompt = caption ? `Make this caption better: ${caption}` : "Write a cool caption for a new photo.";
+      const prompt = caption ? `Enhance: ${caption}` : "Write a cool short Instagram caption.";
       const aiCaption = await generateAIText(prompt);
       setCaption(aiCaption);
     } finally { setIsGeneratingCaption(false); }
@@ -47,129 +47,104 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
   const handlePost = async () => {
     if (!file || isPosting) return;
     setIsPosting(true);
-    setProgress(10);
-    
     const safeFilename = sanitizeFilename(file.name);
     const fileName = `${userId}-${Date.now()}-${safeFilename}`;
     const filePath = `feed/${fileName}`;
-    
     try {
-      const { error: upErr } = await supabase.storage.from('posts').upload(filePath, file);
-      if (upErr) throw upErr;
-      setProgress(70);
-
+      await supabase.storage.from('posts').upload(filePath, file);
       const { data: { publicUrl } } = supabase.storage.from('posts').getPublicUrl(filePath);
-      const { error: dbErr } = await supabase.from('posts').insert({
+      await supabase.from('posts').insert({
         user_id: userId, media_url: publicUrl, media_type: mediaType, caption: caption
       });
-      if (dbErr) throw dbErr;
-
-      setProgress(100);
       onPostSuccess();
       onClose();
     } catch (err: any) {
-      alert("Error sharing post: " + err.message);
+      alert(err.message);
     } finally { setIsPosting(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center animate-vix-in">
+    <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center animate-vix-in overflow-y-auto no-scrollbar">
       {/* Header */}
-      <div className="w-full flex items-center justify-between p-6 bg-black border-b border-zinc-900">
-        <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white">
-          <X className="w-6 h-6" />
-        </button>
-        <span className="font-bold text-sm uppercase tracking-widest text-white">New Post</span>
-        <button 
-          onClick={handlePost} 
-          disabled={!file || isPosting} 
-          className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20"
-        >
+      <div className="w-full flex items-center justify-between p-6 bg-black border-b border-zinc-900 sticky top-0 z-50">
+        <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
+        <span className="font-bold text-sm uppercase tracking-widest text-white">New Creation</span>
+        <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
           {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
         </button>
       </div>
 
-      <div className="w-full max-w-4xl flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Upload/Preview Zone */}
-        <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center p-6 border-b md:border-b-0 md:border-r border-zinc-900 relative">
+      <div className="w-full max-w-5xl flex-1 flex flex-col md:flex-row overflow-visible p-6 sm:p-12 gap-12">
+        {/* Upload Area */}
+        <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center rounded-[3rem] border border-zinc-900 min-h-[400px] relative p-8 shadow-2xl">
           {preview ? (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-               <div className="relative w-full max-h-[60vh] flex items-center justify-center">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-8">
+               <div className="relative max-h-[60vh] flex items-center justify-center w-full">
                   {mediaType === 'video' ? (
-                    <video src={preview} controls className="max-w-full max-h-full rounded-2xl shadow-2xl" />
+                    <video src={preview} controls className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl border border-zinc-800" />
                   ) : (
-                    <img src={preview} className="max-w-full max-h-full rounded-2xl shadow-2xl object-contain" alt="Preview" />
+                    <img src={preview} className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl object-contain border border-zinc-800" alt="Preview" />
                   )}
-                  <button onClick={() => {setFile(null); setPreview(null);}} className="absolute top-2 right-2 bg-black/70 p-2 rounded-full text-white">
+                  <button onClick={() => {setFile(null); setPreview(null);}} className="absolute -top-4 -right-4 bg-zinc-900 p-3 rounded-full text-white border border-zinc-800 shadow-xl hover:bg-red-500 transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                </div>
-               <button 
-                 onClick={() => fileInputRef.current?.click()}
-                 className="text-xs font-bold text-zinc-500 hover:text-white transition-colors"
-               >
-                 Change Photo/Video
-               </button>
+               <button onClick={() => fileInputRef.current?.click()} className="px-6 py-2 rounded-full border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all">Replace Media</button>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center space-y-8 py-12">
-               <div className="w-40 h-40 rounded-[3rem] bg-zinc-900 flex items-center justify-center border border-zinc-800">
-                  <ImageIcon className="w-16 h-16 text-zinc-800" />
+            <div className="text-center space-y-10 flex flex-col items-center animate-vix-in">
+               <div className="w-40 h-40 rounded-[4rem] bg-zinc-900/50 flex items-center justify-center border border-zinc-800 shadow-2xl group transition-all hover:scale-105 duration-500">
+                  <UploadCloud className="w-16 h-16 text-zinc-800 group-hover:text-pink-500 transition-colors" />
                </div>
-               <div className="space-y-4">
-                  <h2 className="text-2xl font-bold text-white">Upload Your Post</h2>
-                  <p className="text-xs text-zinc-500 max-w-xs mx-auto">Share your best photos or videos with your followers.</p>
+               <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Select Artifact</h2>
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-black max-w-xs">High Resolution Photo or Video (max 50MB)</p>
+                  </div>
                   <button 
                     onClick={() => fileInputRef.current?.click()} 
-                    className="vix-gradient px-10 py-4 rounded-2xl text-white font-bold text-sm shadow-xl active:scale-95 transition-all"
+                    className="vix-gradient px-14 py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest text-white shadow-2xl shadow-pink-500/30 active:scale-95 transition-all hover:scale-105"
                   >
-                    Select Photo or Video
+                    CHOOSE FROM DEVICE
                   </button>
                </div>
-               <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
             </div>
           )}
+          <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         </div>
 
-        {/* Caption Zone */}
-        <div className={`w-full md:w-[400px] bg-black p-8 space-y-8 ${!file ? 'opacity-20 pointer-events-none' : ''}`}>
-           <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Write a caption</label>
-              <div className="relative group">
-                 <textarea 
-                    value={caption} 
-                    onChange={e => setCaption(e.target.value)}
-                    className="w-full h-40 bg-zinc-900/50 border border-zinc-900 rounded-2xl p-6 text-sm outline-none focus:border-pink-500/30 text-white resize-none"
-                    placeholder="Write something interesting..."
-                 />
-                 <button 
-                    onClick={handleGenerateAICaption} 
-                    disabled={isGeneratingCaption || !file}
-                    className="absolute bottom-4 right-4 p-3 bg-zinc-800 rounded-xl text-pink-500 hover:scale-110 active:scale-90 transition-all shadow-lg"
-                    title="AI Magic"
-                 >
-                    {isGeneratingCaption ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                 </button>
-              </div>
-           </div>
+        {/* Sidebar Controls */}
+        <div className="w-full md:w-96 flex flex-col gap-8">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-10 space-y-8 shadow-2xl">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600">Narrative Details</h3>
+            <textarea 
+              value={caption} 
+              onChange={e => setCaption(e.target.value)} 
+              className="w-full h-48 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-sm text-white outline-none resize-none focus:border-pink-500/30 transition-all shadow-inner placeholder:text-zinc-700" 
+              placeholder="What's the story behind this artifact?" 
+            />
+            <button 
+              onClick={handleGenerateAICaption} 
+              disabled={isGeneratingCaption} 
+              className="w-full py-5 border border-zinc-800 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:bg-zinc-900 hover:text-white transition-all group"
+            >
+              {isGeneratingCaption ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> AI Caption Engine</>
+              )}
+            </button>
+          </div>
 
-           <div className="p-5 bg-zinc-900/30 border border-zinc-900 rounded-2xl flex items-center gap-4">
-              <ShieldCheck className="w-5 h-5 text-zinc-600" />
-              <div className="text-[10px] text-zinc-500 font-bold uppercase">Safe for sharing</div>
-           </div>
+          <div className="bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl">
+             <div className="flex items-center gap-4">
+                <div className="p-3 bg-zinc-900 rounded-2xl"><ImageIcon className="w-4 h-4 text-zinc-600" /></div>
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Post Settings</span>
+             </div>
+             <ChevronRight className="w-4 h-4 text-zinc-800" />
+          </div>
         </div>
       </div>
-      
-      {/* Upload Progress Overlay */}
-      {isPosting && (
-        <div className="absolute inset-0 z-[10000] bg-black/90 flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm">
-           <Loader2 className="w-12 h-12 text-pink-500 animate-spin mb-6" />
-           <h3 className="text-xl font-bold text-white mb-2">Posting...</h3>
-           <div className="w-full max-w-xs h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div className="h-full vix-gradient transition-all duration-300" style={{ width: `${progress}%` }}></div>
-           </div>
-        </div>
-      )}
     </div>
   );
 };
