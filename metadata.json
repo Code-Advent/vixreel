@@ -1,6 +1,6 @@
 {
   "name": "VixReel",
-  "description": "A premium social media platform for sharing short reels and photos, inspired by Instagram's sleek dark aesthetic.",
+  "description": "A premium social media platform for sharing short reels and photos, featuring secure phone-based authentication and a sleek dark aesthetic.",
   "requestFramePermissions": [
     "camera",
     "microphone"
