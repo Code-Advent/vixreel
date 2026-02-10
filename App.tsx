@@ -40,6 +40,12 @@ const App: React.FC = () => {
       }
     };
 
+    // Global listener for specific post updates (e.g. Boosting)
+    const handlePostUpdate = (e: any) => {
+      const { id, boosted_likes } = e.detail;
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, boosted_likes } : p));
+    };
+
     // Global listener for identity updates (Verification, Boosts)
     const handleIdentityUpdate = (e: any) => {
       const { id, ...updates } = e.detail;
@@ -53,13 +59,23 @@ const App: React.FC = () => {
       if (viewedUser?.id === id) {
         setViewedUser(prev => prev ? { ...prev, ...updates } : null);
       }
+
+      // Update all posts belonging to this user (e.g. update verification badge)
+      setPosts(prev => prev.map(p => {
+        if (p.user_id === id) {
+          return { ...p, user: { ...p.user, ...updates } };
+        }
+        return p;
+      }));
     };
 
     window.addEventListener('vixreel-post-deleted', handleGlobalPostDelete);
+    window.addEventListener('vixreel-post-updated', handlePostUpdate);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     
     return () => {
       window.removeEventListener('vixreel-post-deleted', handleGlobalPostDelete);
+      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
   }, [currentUser?.id, viewedUser?.id]);

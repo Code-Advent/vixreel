@@ -17,6 +17,30 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
 
   useEffect(() => {
     fetchExploreData();
+
+    // Listen for global identity updates (Verification, Followers)
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setSuggestedUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+      setExplorePosts(prev => prev.map(p => p.user_id === id ? { ...p, user: { ...p.user, ...updates } } : p));
+    };
+
+    // Listen for post updates (Boosted Likes)
+    const handlePostUpdate = (e: any) => {
+      const { id, boosted_likes } = e.detail;
+      setExplorePosts(prev => {
+        const updated = prev.map(p => p.id === id ? { ...p, boosted_likes } : p);
+        // If sorting by boosted likes is important, we could re-sort here, but let's keep it stable for UX
+        return updated;
+      });
+    };
+
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    window.addEventListener('vixreel-post-updated', handlePostUpdate);
+    return () => {
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
+    };
   }, []);
 
   const fetchExploreData = async () => {
@@ -63,7 +87,9 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
               className="min-w-[180px] bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-6 flex flex-col items-center text-center group cursor-pointer hover:border-pink-500/30 transition-all hover:scale-105"
             >
               <div className={`w-20 h-20 rounded-full mb-4 p-1 ${user.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-zinc-800'}`}>
-                <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full border-2 border-black object-cover bg-black" />
+                <div className="w-full h-full rounded-full border-2 border-black overflow-hidden bg-black">
+                  <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full object-cover" />
+                </div>
               </div>
               <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors">
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
@@ -99,7 +125,14 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
               )}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm gap-4">
                 <div className="flex items-center gap-1.5 text-white font-black text-xs">
-                  <Heart className="w-4 h-4 fill-white" /> {post.boosted_likes}
+                  <Heart className="w-4 h-4 fill-white" /> {(post.likes_count || 0) + (post.boosted_likes || 0)}
+                </div>
+              </div>
+              {/* Badge Overlay for Explore Posts */}
+              <div className="absolute top-4 left-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                   <span className="text-[10px] font-black text-white">@{post.user.username}</span>
+                   {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
                 </div>
               </div>
             </div>

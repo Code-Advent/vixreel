@@ -5,6 +5,7 @@ import { Post as PostType, Comment as CommentType, UserProfile } from '../types'
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
+import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 
 interface PostProps {
   post: PostType;
@@ -16,7 +17,8 @@ interface PostProps {
 const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [likesCount, setLikesCount] = useState((post.likes_count || 0) + (post.boosted_likes || 0));
+  const [realLikesCount, setRealLikesCount] = useState(0);
+  const [likesOffset, setLikesOffset] = useState(0); 
   const [commentsCount, setCommentsCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<CommentType[]>([]);
@@ -24,17 +26,28 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   const [isCommenting, setIsCommenting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const canComment = post.user.allow_comments !== false;
+  
+  // THE FIX: Summing real database likes + Admin boosted likes + local interaction offset
+  // This ensures your 120k likes remain visible and accurate.
+  const currentTotalLikes = realLikesCount + (post.boosted_likes || 0) + likesOffset;
 
   useEffect(() => {
     checkStatus();
     fetchLikesCount();
     fetchCommentsCount();
     if (showComments && canComment) fetchComments();
-  }, [post.id, showComments]);
+
+    // Listen for engagement updates (likes happening elsewhere)
+    const handleEngagement = () => fetchLikesCount();
+    window.addEventListener('vixreel-engagement-updated', handleEngagement);
+    return () => window.removeEventListener('vixreel-engagement-updated', handleEngagement);
+  }, [post.id, showComments, post.boosted_likes]);
 
   const checkStatus = async () => {
     const { data: likeData } = await supabase.from('likes').select('id').eq('post_id', post.id).eq('user_id', currentUserId).maybeSingle();
@@ -44,8 +57,11 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   const fetchLikesCount = async () => {
-    const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
-    setLikesCount((count || 0) + (post.boosted_likes || 0));
+    const { count } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', post.id);
+    setRealLikesCount(count || 0);
   };
 
   const fetchCommentsCount = async () => {
@@ -63,50 +79,74 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     const wasLiked = liked;
     setIsLiking(true);
     setLiked(!wasLiked);
-    setLikesCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
+    setLikesOffset(prev => wasLiked ? prev - 1 : prev + 1);
 
     try {
-      if (wasLiked) await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
-      else await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
-      fetchLikesCount();
+      if (wasLiked) {
+        await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
+      } else {
+        await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+      }
+      // Notify other components (like Feed or Profile) to refresh if needed
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err) {
+      // Rollback on error
       setLiked(wasLiked);
-      setLikesCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
-    } finally { setIsLiking(false); }
+      setLikesOffset(prev => wasLiked ? prev + 1 : prev - 1);
+    } finally {
+      setIsLiking(false);
+    }
   };
 
   const handleSave = async () => {
     const wasSaved = saved;
     setSaved(!wasSaved);
     try {
-      if (wasSaved) await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
-      else await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
-    } catch (err) { setSaved(wasSaved); }
+      if (wasSaved) {
+        await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
+      } else {
+        await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
+      }
+    } catch (err) {
+      setSaved(wasSaved);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (post.media_type !== 'video') {
+      const a = document.createElement('a');
+      a.href = post.media_url;
+      a.download = `VixReel_${post.user.username}.jpg`;
+      a.click();
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    try {
+      await downloadVideoWithWatermark(post.media_url, post.user.username, (p) => {
+        setDownloadProgress(Math.floor(p * 100));
+      });
+    } catch (err: any) {
+      alert("Watermark synthesis failed: " + err.message);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!window.confirm("Delete this post?")) return;
     setIsDeleting(true);
     try {
-      // 1. Storage Cleanup: extract path from media_url
-      // Example: .../public/posts/feed/filename.jpg
       const pathParts = post.media_url.split('/public/posts/');
       if (pathParts.length > 1) {
         const mediaPath = pathParts[1];
         await supabase.storage.from('posts').remove([mediaPath]);
       }
-
-      // 2. Database Deletion
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (error) throw error;
-      
-      // 3. Local view cleanup (if in feed)
       onDelete?.(post.id);
-      
-      // 4. Global synchronization event
       window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
-      
     } catch (err: any) { 
       console.error("Deletion error:", err);
       alert("Delete failed: " + err.message); 
@@ -118,7 +158,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     <div className={`w-full max-w-[470px] mx-auto border-b border-zinc-900 pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
-          <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-800" />
+          <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-800 shadow-sm" />
           <div className="flex flex-col">
             <span className="text-sm font-bold flex items-center gap-1.5 text-white">
               {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
@@ -133,17 +173,33 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         )}
       </div>
 
-      <div className="bg-zinc-950 aspect-square rounded-3xl overflow-hidden shadow-2xl border border-zinc-900/50 relative">
+      <div className="bg-zinc-950 aspect-square rounded-3xl overflow-hidden shadow-2xl border border-zinc-900/50 relative group">
         {post.media_type === 'video' ? (
           <video ref={videoRef} src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
         ) : (
           <img src={post.media_url} className="w-full h-full object-cover" alt="Post Content" />
         )}
-        {post.media_type === 'video' && (
-          <button onClick={() => setIsMuted(!isMuted)} className="absolute bottom-4 right-4 p-2 bg-black/60 rounded-full text-white backdrop-blur-md border border-white/5">
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
+        
+        {isDownloading && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
+            <div className="w-20 h-20 relative mb-4">
+               <svg className="w-full h-full transform -rotate-90">
+                 <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-zinc-800" />
+                 <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={226} strokeDashoffset={226 - (226 * downloadProgress) / 100} className="text-pink-500 transition-all duration-300" />
+               </svg>
+               <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{downloadProgress}%</div>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">Synthesizing Watermark</p>
+          </div>
         )}
+
+        <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {post.media_type === 'video' && (
+            <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-black/60 rounded-full text-white backdrop-blur-md border border-white/5">
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="py-4 space-y-3">
@@ -159,10 +215,17 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                </button>
             ) : (
                <div className="text-zinc-800 flex items-center gap-2" title="Comments Off">
-                  <MessageSquareOff className="w-5 h-5" />
+                  <MessageSquareOff className="w-6 h-6" />
                </div>
             )}
-            <button className="text-zinc-500 hover:text-white"><Download className="w-7 h-7" /></button>
+            <button 
+              onClick={handleDownload} 
+              disabled={isDownloading}
+              className="text-zinc-500 hover:text-white transition-all disabled:opacity-30"
+              title="Download with VixReel Watermark"
+            >
+              <Download className="w-7 h-7" />
+            </button>
           </div>
           <button onClick={handleSave} className={`${saved ? 'text-white' : 'text-zinc-500 hover:text-white'} transition-all`}>
             <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
@@ -170,9 +233,11 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-bold text-white">{formatNumber(likesCount)} likes</p>
+          <p className="text-xs font-bold text-white">{formatNumber(currentTotalLikes)} likes</p>
           <div className="text-sm text-zinc-400">
-            <span className="font-bold text-white mr-2">@{post.user.username}</span>
+            <span className="font-bold text-white mr-2 flex items-center gap-1 inline-flex">
+              @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+            </span>
             {post.caption}
           </div>
         </div>
@@ -186,15 +251,21 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
               <button onClick={() => setShowComments(false)} className="p-2"><X className="w-6 h-6 text-zinc-500" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
-              {comments.map(c => (
+              {comments.length > 0 ? comments.map(c => (
                 <div key={c.id} className="flex gap-4">
                   <img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-8 h-8 rounded-full object-cover" />
                   <div className="space-y-1 flex-1">
-                    <p className="font-bold text-xs text-white">@{c.user.username}</p>
+                    <p className="font-bold text-xs text-white flex items-center gap-1">
+                      @{c.user.username} {c.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+                    </p>
                     <p className="text-zinc-400 text-sm leading-relaxed">{c.content}</p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="h-full flex items-center justify-center opacity-20">
+                  <span className="text-xs font-black uppercase tracking-widest">No signals detected</span>
+                </div>
+              )}
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();

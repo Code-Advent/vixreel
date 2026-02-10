@@ -18,6 +18,20 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
   useEffect(() => {
     fetchStories();
+
+    // Listen for global identity updates (Verification)
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setStories(prev => prev.map(story => {
+        if (story.user_id === id) {
+          return { ...story, user: { ...story.user, ...updates } };
+        }
+        return story;
+      }));
+    };
+
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    return () => window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
   }, []);
 
   const fetchStories = async () => {

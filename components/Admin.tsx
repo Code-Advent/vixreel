@@ -135,6 +135,11 @@ const Admin: React.FC = () => {
       if (updateErr) throw updateErr;
 
       setSelectedUserPosts(prev => prev.map(p => p.id === postId ? { ...p, boosted_likes: newBoost } : p));
+      
+      // Notify the app about the specific post update so the Home tab reflects it
+      window.dispatchEvent(new CustomEvent('vixreel-post-updated', { 
+        detail: { id: postId, boosted_likes: newBoost } 
+      }));
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err: any) {
       alert("Boost Injection Failed: " + (err.message || "Sync mismatch"));

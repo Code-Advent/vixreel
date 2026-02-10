@@ -80,7 +80,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <div className="hidden lg:flex items-center gap-3 p-3 rounded-2xl bg-zinc-950/50 border border-zinc-900">
                <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
                <div className="flex flex-col min-w-0">
-                 <span className="font-bold text-xs truncate">@{currentUser.username}</span>
+                 <span className="font-bold text-xs truncate flex items-center gap-1">
+                   @{currentUser.username}
+                   {currentUser.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+                 </span>
                  <span className="text-[8px] text-zinc-600 font-bold uppercase">{currentUser.is_admin ? 'Admin' : 'Member'}</span>
                </div>
             </div>

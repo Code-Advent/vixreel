@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -40,8 +41,19 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       )
       .subscribe();
 
+    // Listen for global identity updates (Verification)
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setChats(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+      if (activeChat?.id === id) {
+        setActiveChat(prev => prev ? { ...prev, ...updates } : null);
+      }
+    };
+
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
   }, [activeChat, currentUser.id]);
 
