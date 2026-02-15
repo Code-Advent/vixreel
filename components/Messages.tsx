@@ -129,7 +129,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       {/* Sidebar - Chat List */}
       <div className={`w-full md:w-80 border-r border-zinc-900 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/20">
-          <span className="font-black uppercase text-[11px] tracking-[0.4em] text-zinc-500">Narrative Grid</span>
+          <span className="font-black uppercase text-[11px] tracking-[0.4em] text-zinc-500">Messages</span>
           <MessageCircle className="w-5 h-5 text-zinc-800" />
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar bg-black">
@@ -147,7 +147,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 <div className="font-black text-[14px] truncate flex items-center gap-1.5 text-zinc-200">
                   {u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                 </div>
-                <div className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1">Established Signal</div>
+                <div className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1">Active Now</div>
               </div>
             </div>
           ))}
@@ -156,7 +156,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center mb-6 border border-zinc-800 border-dashed">
                 <MessageCircle className="w-8 h-8 text-zinc-700" />
               </div>
-              <p className="text-zinc-700 text-[10px] font-black uppercase tracking-[0.4em]">Empty Grid</p>
+              <p className="text-zinc-700 text-[10px] font-black uppercase tracking-[0.4em]">No messages yet</p>
             </div>
           )}
         </div>
@@ -178,7 +178,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   </div>
                   <span className="text-[9px] text-green-500 font-black uppercase tracking-widest flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    Secure Signal
+                    Online
                   </span>
                 </div>
               </div>
@@ -210,7 +210,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <input 
                 value={text} 
                 onChange={e => setText(e.target.value)} 
-                placeholder="Synchronize signal..." 
+                placeholder="Type a message..." 
                 className="flex-1 bg-black/60 border border-zinc-800 rounded-[2.5rem] px-10 py-5 text-sm focus:border-pink-500/30 outline-none transition-all text-white placeholder:text-zinc-800 font-medium shadow-inner" 
               />
               <button 
@@ -228,9 +228,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <MessageCircle className="w-14 h-14 text-zinc-800" />
             </div>
             <div className="space-y-4">
-              <h3 className="text-3xl font-black uppercase tracking-[0.5em] text-zinc-400">CORE STANDBY</h3>
+              <h3 className="text-3xl font-black uppercase tracking-[0.5em] text-zinc-400">Select a Chat</h3>
               <p className="text-zinc-700 text-[11px] font-black uppercase tracking-[0.2em] max-w-sm mx-auto leading-loose opacity-60">
-                Establish direct narrative synchronization with creators across the encrypted grid. Select a fragment to initialize terminal.
+                Start a conversation with other creators on VixReel. Pick a person to start chatting.
               </p>
             </div>
           </div>

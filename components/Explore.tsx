@@ -18,21 +18,15 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
   useEffect(() => {
     fetchExploreData();
 
-    // Listen for global identity updates (Verification, Followers)
     const handleIdentityUpdate = (e: any) => {
       const { id, ...updates } = e.detail;
       setSuggestedUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
       setExplorePosts(prev => prev.map(p => p.user_id === id ? { ...p, user: { ...p.user, ...updates } } : p));
     };
 
-    // Listen for post updates (Boosted Likes)
     const handlePostUpdate = (e: any) => {
       const { id, boosted_likes } = e.detail;
-      setExplorePosts(prev => {
-        const updated = prev.map(p => p.id === id ? { ...p, boosted_likes } : p);
-        // If sorting by boosted likes is important, we could re-sort here, but let's keep it stable for UX
-        return updated;
-      });
+      setExplorePosts(prev => prev.map(p => p.id === id ? { ...p, boosted_likes } : p));
     };
 
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
@@ -46,7 +40,6 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
   const fetchExploreData = async () => {
     setLoading(true);
     try {
-      // Fetch suggested accounts (excluding current user)
       const { data: users } = await supabase
         .from('profiles')
         .select('*')
@@ -56,7 +49,6 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
       
       if (users) setSuggestedUsers(users as UserProfile[]);
 
-      // Fetch trending posts
       const { data: posts } = await supabase
         .from('posts')
         .select('*, user:profiles(*)')
@@ -74,9 +66,9 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
       <div className="mb-12">
         <div className="flex items-center justify-between mb-8 px-2">
           <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-pink-500" /> Suggested Narrators
+            <UserPlus className="w-5 h-5 text-pink-500" /> Suggested for you
           </h2>
-          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Global Network</span>
+          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Explore Creators</span>
         </div>
         
         <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -94,8 +86,8 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
               <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors">
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
               </h3>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || 'Individual Creator'}</p>
-              <button className="w-full py-2 bg-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">Connect</button>
+              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || 'Creator'}</p>
+              <button className="w-full py-2 bg-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">Follow</button>
             </div>
           ))}
         </div>
@@ -104,7 +96,7 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
       <div>
         <div className="flex items-center justify-between mb-8 px-2">
           <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2">
-            <Compass className="w-5 h-5 text-purple-500" /> Trending Artifacts
+            <Compass className="w-5 h-5 text-purple-500" /> Trending Now
           </h2>
         </div>
 
@@ -121,14 +113,13 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
               {post.media_type === 'video' ? (
                 <video src={post.media_url} className="w-full h-full object-cover" muted />
               ) : (
-                <img src={post.media_url} className="w-full h-full object-cover" alt="Artifact" />
+                <img src={post.media_url} className="w-full h-full object-cover" alt="Trending" />
               )}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm gap-4">
                 <div className="flex items-center gap-1.5 text-white font-black text-xs">
                   <Heart className="w-4 h-4 fill-white" /> {(post.likes_count || 0) + (post.boosted_likes || 0)}
                 </div>
               </div>
-              {/* Badge Overlay for Explore Posts */}
               <div className="absolute top-4 left-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
                    <span className="text-[10px] font-black text-white">@{post.user.username}</span>

@@ -4,6 +4,7 @@ export interface UserProfile {
   username: string;
   full_name?: string;
   avatar_url?: string;
+  cover_url?: string;
   bio?: string;
   email?: string;
   phone?: string;
@@ -14,7 +15,7 @@ export interface UserProfile {
   is_private?: boolean;
   allow_comments?: boolean;
   is_following_public?: boolean;
-  boosted_followers?: number; // Added for administrative follower injection
+  boosted_followers?: number; 
   created_at?: string;
   updated_at?: string;
 }
@@ -63,7 +64,7 @@ export interface AccountSession {
   id: string;
   username: string;
   avatar_url?: string;
-  session_data: any; // Storing the Supabase session tokens
+  session_data: any; 
 }
 
 export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN';

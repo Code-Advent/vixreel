@@ -1,6 +1,5 @@
 
 import React, { useState, useRef } from 'react';
-// Added ChevronRight to imports
 import { X, Wand2, Loader2, Image as ImageIcon, Video, UploadCloud, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText } from '../services/geminiService';
@@ -68,7 +67,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
       {/* Header */}
       <div className="w-full flex items-center justify-between p-6 bg-black border-b border-zinc-900 sticky top-0 z-50">
         <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
-        <span className="font-bold text-sm uppercase tracking-widest text-white">New Creation</span>
+        <span className="font-bold text-sm uppercase tracking-widest text-white">New Post</span>
         <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
           {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
         </button>
@@ -98,14 +97,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
                </div>
                <div className="space-y-6">
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Select Artifact</h2>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Select Media</h2>
                     <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-black max-w-xs">High Resolution Photo or Video (max 50MB)</p>
                   </div>
                   <button 
                     onClick={() => fileInputRef.current?.click()} 
                     className="vix-gradient px-14 py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest text-white shadow-2xl shadow-pink-500/30 active:scale-95 transition-all hover:scale-105"
                   >
-                    CHOOSE FROM DEVICE
+                    CHOOSE FILE
                   </button>
                </div>
             </div>
@@ -116,12 +115,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
         {/* Sidebar Controls */}
         <div className="w-full md:w-96 flex flex-col gap-8">
           <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-10 space-y-8 shadow-2xl">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600">Narrative Details</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600">Post Details</h3>
             <textarea 
               value={caption} 
               onChange={e => setCaption(e.target.value)} 
               className="w-full h-48 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-sm text-white outline-none resize-none focus:border-pink-500/30 transition-all shadow-inner placeholder:text-zinc-700" 
-              placeholder="What's the story behind this artifact?" 
+              placeholder="Write a caption..." 
             />
             <button 
               onClick={handleGenerateAICaption} 
@@ -131,7 +130,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
               {isGeneratingCaption ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> AI Caption Engine</>
+                <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> AI Caption Helper</>
               )}
             </button>
           </div>

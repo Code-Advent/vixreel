@@ -1,15 +1,32 @@
 
 import React from 'react';
 
-const VerificationBadge: React.FC<{ size?: string }> = ({ size = 'w-[14px] h-[14px]' }) => (
-  <span className="inline-flex items-center ml-1 shrink-0">
+const VerificationBadge: React.FC<{ size?: string }> = ({ size = 'w-4 h-4' }) => (
+  <span className="inline-flex items-center ml-1 shrink-0 relative group">
+    <div className={`absolute inset-0 bg-pink-500/40 blur-sm rounded-full ${size} opacity-0 group-hover:opacity-100 transition-opacity animate-pulse`}></div>
     <svg 
       viewBox="0 0 24 24" 
-      aria-label="Verified" 
-      className={`${size} text-[#0095f6] fill-current`} 
-      fill="currentColor"
+      aria-label="Vix Verified" 
+      className={`${size} relative z-10 drop-shadow-[0_0_8px_rgba(255,0,128,0.5)]`}
+      fill="none"
     >
-      <path d="M12.003 21.312l-3.235-2.022-3.691.802.133-3.803-2.735-2.646 2.441-2.92-1.07-3.633 3.64-.842 1.63-3.449L12.003 4.2l2.887-1.425 1.63 3.449 3.64.842-1.07 3.633 2.441 2.92-2.735 2.646.133 3.803-3.691-.802-3.235 2.022zM10.15 14.885l4.823-4.83-1.061-1.06-3.762 3.766-1.704-1.704-1.06 1.06 2.764 2.768z" />
+      <defs>
+        <linearGradient id="vix-badge-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ff0080" />
+          <stop offset="100%" stopColor="#7928ca" />
+        </linearGradient>
+      </defs>
+      <path 
+        d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" 
+        fill="url(#vix-badge-gradient)"
+      />
+      <path 
+        d="M9 12l2 2 4-4" 
+        stroke="white" 
+        strokeWidth="2.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+      />
     </svg>
   </span>
 );

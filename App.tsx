@@ -32,41 +32,21 @@ const App: React.FC = () => {
   useEffect(() => {
     init();
 
-    // Global listener for post deletions
     const handleGlobalPostDelete = (e: any) => {
       const deletedId = e.detail?.id;
-      if (deletedId) {
-        setPosts(prev => prev.filter(p => p.id !== deletedId));
-      }
+      if (deletedId) setPosts(prev => prev.filter(p => p.id !== deletedId));
     };
 
-    // Global listener for specific post updates (e.g. Boosting)
     const handlePostUpdate = (e: any) => {
       const { id, boosted_likes } = e.detail;
       setPosts(prev => prev.map(p => p.id === id ? { ...p, boosted_likes } : p));
     };
 
-    // Global listener for identity updates (Verification, Boosts)
     const handleIdentityUpdate = (e: any) => {
       const { id, ...updates } = e.detail;
-      
-      // Update current user if applicable
-      if (currentUser?.id === id) {
-        setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
-      }
-      
-      // Update viewed user if applicable (crucial for Profile view persistence)
-      if (viewedUser?.id === id) {
-        setViewedUser(prev => prev ? { ...prev, ...updates } : null);
-      }
-
-      // Update all posts belonging to this user (e.g. update verification badge)
-      setPosts(prev => prev.map(p => {
-        if (p.user_id === id) {
-          return { ...p, user: { ...p.user, ...updates } };
-        }
-        return p;
-      }));
+      if (currentUser?.id === id) setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
+      if (viewedUser?.id === id) setViewedUser(prev => prev ? { ...prev, ...updates } : null);
+      setPosts(prev => prev.map(p => p.user_id === id ? { ...p, user: { ...p.user, ...updates } } : p));
     };
 
     window.addEventListener('vixreel-post-deleted', handleGlobalPostDelete);
@@ -81,6 +61,7 @@ const App: React.FC = () => {
   }, [currentUser?.id, viewedUser?.id]);
 
   const init = async () => {
+    setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -90,12 +71,15 @@ const App: React.FC = () => {
           setCurrentUser(profile);
           updateSavedAccounts(profile, session);
           await fetchPosts();
+        } else {
+          setCurrentUser(null);
         }
       } else {
         setCurrentUser(null);
       }
     } catch (err) {
       console.error("VixReel Engine Error:", err);
+      setCurrentUser(null);
     } finally {
       setLoading(false);
     }
@@ -126,7 +110,6 @@ const App: React.FC = () => {
       if (error) throw error;
       await init();
     } catch (err) {
-      alert("Session expired. Account will be removed.");
       removeAccount(account.id);
     } finally {
       setLoading(false);
@@ -151,26 +134,20 @@ const App: React.FC = () => {
   };
 
   const resolveIdentity = async (authUser: any): Promise<UserProfile | null> => {
-    try {
-      let { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-      if (dbProfile) return dbProfile as UserProfile;
-
-      const metadata = authUser.user_metadata || {};
-      const username = metadata.username || (authUser.phone ? `user_${authUser.phone.slice(-4)}` : `user_${authUser.id.slice(0, 5)}`);
-      
-      const { data: newProfile, error } = await supabase.from('profiles').upsert({
+    // Attempt to get the profile created by the trigger
+    let { data: dbProfile, error } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+    
+    // If trigger hasn't finished yet or failed, try one manual upsert fallback
+    if (!dbProfile && !error) {
+      const { data: fallback } = await supabase.from('profiles').upsert({
         id: authUser.id,
-        username: username,
-        full_name: metadata.full_name || username,
-        email: authUser.email || null,
-        phone: authUser.phone || null,
-        is_verified: authUser.email === 'davidhen498@gmail.com'
+        username: `user_${authUser.id.slice(0, 5)}`,
+        email: authUser.email
       }).select().single();
-      
-      return error ? null : (newProfile as UserProfile);
-    } catch (e) {
-      return null;
+      return fallback as UserProfile;
     }
+    
+    return dbProfile as UserProfile;
   };
 
   const fetchPosts = async () => {
@@ -196,7 +173,11 @@ const App: React.FC = () => {
   if (!currentUser || isAddingAccount) {
     return (
       <Auth 
-        onAuthSuccess={() => { setIsAddingAccount(false); init(); }} 
+        onAuthSuccess={(profile) => { 
+          setCurrentUser(profile);
+          setIsAddingAccount(false); 
+          fetchPosts();
+        }} 
         onCancelAdd={() => setIsAddingAccount(false)}
         isAddingAccount={isAddingAccount}
       />
@@ -237,23 +218,23 @@ const App: React.FC = () => {
                 ) : (
                   <div className="py-32 text-center opacity-20 flex flex-col items-center">
                     <Trash2 className="w-16 h-16 mb-4" />
-                    <p className="font-bold uppercase tracking-[0.3em] text-xs">No artifacts in grid</p>
+                    <p className="font-bold uppercase tracking-[0.3em] text-xs">No posts yet</p>
                   </div>
                 )}
               </div>
             </div>
           )}
-          {currentView === 'EXPLORE' && <div className="animate-vix-in"><Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} /></div>}
-          {currentView === 'PROFILE' && viewedUser && <div className="animate-vix-in"><Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
+          {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
+          {currentView === 'PROFILE' && viewedUser && <Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
               if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
               setViewedUser(prev => prev ? {...prev, ...u} : null);
-            }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} onLogout={() => setIsAccountMenuOpen(true)} /></div>}
+            }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} onLogout={() => setIsAccountMenuOpen(true)} />}
           
           {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
-          {currentView === 'SEARCH' && <div className="animate-vix-in"><Search onSelectUser={(u) => setView('PROFILE', u)} /></div>}
-          {currentView === 'MESSAGES' && <div className="animate-vix-in"><Messages currentUser={currentUser} initialChatUser={initialChatUser} /></div>}
-          {currentView === 'ADMIN' && currentUser.is_admin && <div className="animate-vix-in"><Admin /></div>}
-          {currentView === 'NOTIFICATIONS' && <div className="animate-vix-in"><Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} /></div>}
+          {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
+          {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
+          {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
+          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
         </div>
       </main>
 

@@ -16,7 +16,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onOpenAdmin,
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-bold">Notifications</h2>
         
-        {/* The "Small Dot" - Secret Admin Trigger with larger hit area */}
+        {/* Secret Admin Trigger */}
         <div 
           onClick={(e) => {
             e.stopPropagation();
@@ -39,7 +39,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onOpenAdmin,
             onClick={onOpenAdmin}
             className="flex items-center gap-2 vix-gradient px-4 py-2 rounded-xl text-white font-bold text-sm shadow-xl shadow-pink-500/20 hover:scale-105 transition-transform animate-in fade-in zoom-in duration-300"
           >
-            <Shield className="w-4 h-4" /> ADMIN PANEL
+            <Shield className="w-4 h-4" /> OPEN ADMIN
           </button>
         )}
       </div>

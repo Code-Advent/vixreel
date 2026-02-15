@@ -33,8 +33,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
 
   const canComment = post.user.allow_comments !== false;
   
-  // THE FIX: Summing real database likes + Admin boosted likes + local interaction offset
-  // This ensures your 120k likes remain visible and accurate.
+  // PERSISTENCE FIX: Real Database Likes + Admin Boosted (e.g. 120k) + Local user interaction
   const currentTotalLikes = realLikesCount + (post.boosted_likes || 0) + likesOffset;
 
   useEffect(() => {
@@ -43,7 +42,6 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     fetchCommentsCount();
     if (showComments && canComment) fetchComments();
 
-    // Listen for engagement updates (likes happening elsewhere)
     const handleEngagement = () => fetchLikesCount();
     window.addEventListener('vixreel-engagement-updated', handleEngagement);
     return () => window.removeEventListener('vixreel-engagement-updated', handleEngagement);
@@ -87,10 +85,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       } else {
         await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
       }
-      // Notify other components (like Feed or Profile) to refresh if needed
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err) {
-      // Rollback on error
       setLiked(wasLiked);
       setLikesOffset(prev => wasLiked ? prev + 1 : prev - 1);
     } finally {
@@ -128,7 +124,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         setDownloadProgress(Math.floor(p * 100));
       });
     } catch (err: any) {
-      alert("Watermark synthesis failed: " + err.message);
+      alert("Download failed: " + err.message);
     } finally {
       setIsDownloading(false);
     }
@@ -189,7 +185,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                </svg>
                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{downloadProgress}%</div>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">Synthesizing Watermark</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">Processing Watermark</p>
           </div>
         )}
 
@@ -218,12 +214,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                   <MessageSquareOff className="w-6 h-6" />
                </div>
             )}
-            <button 
-              onClick={handleDownload} 
-              disabled={isDownloading}
-              className="text-zinc-500 hover:text-white transition-all disabled:opacity-30"
-              title="Download with VixReel Watermark"
-            >
+            <button onClick={handleDownload} disabled={isDownloading} className="text-zinc-500 hover:text-white transition-all disabled:opacity-30">
               <Download className="w-7 h-7" />
             </button>
           </div>
@@ -235,7 +226,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         <div className="space-y-1">
           <p className="text-xs font-bold text-white">{formatNumber(currentTotalLikes)} likes</p>
           <div className="text-sm text-zinc-400">
-            <span className="font-bold text-white mr-2 flex items-center gap-1 inline-flex">
+            <span className="font-bold text-white mr-2 inline-flex items-center gap-1">
               @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
             </span>
             {post.caption}
