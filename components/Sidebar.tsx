@@ -2,7 +2,7 @@
 import React from 'react';
 import { ViewType, UserProfile } from '../types';
 import VerificationBadge from './VerificationBadge';
-import { ShieldAlert, LogOut } from 'lucide-react';
+import { ShieldAlert, LogOut, Settings as SettingsIcon } from 'lucide-react';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -77,10 +77,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 
         <div className="mt-auto pt-6 border-t border-zinc-900 space-y-4">
           {currentUser && (
-            <div className="hidden lg:flex items-center gap-3 p-3 rounded-2xl bg-zinc-950/50 border border-zinc-900">
+            <div className="hidden lg:flex items-center gap-3 p-3 rounded-2xl bg-zinc-950/50 border border-zinc-900 cursor-pointer hover:bg-zinc-900 transition-colors" onClick={() => setView('PROFILE')}>
                <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
                <div className="flex flex-col min-w-0">
-                 <span className="font-bold text-xs truncate flex items-center gap-1">
+                 <span className="font-bold text-xs truncate flex items-center gap-1 text-white">
                    @{currentUser.username}
                    {currentUser.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                  </span>
@@ -89,11 +89,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             </div>
           )}
           <button 
-            onClick={onLogout}
-            className="w-full flex items-center p-3 rounded-2xl text-zinc-500 hover:bg-zinc-900 hover:text-white transition-all"
+            onClick={() => setView('SETTINGS')}
+            className={`w-full flex items-center p-3 rounded-2xl transition-all group ${currentView === 'SETTINGS' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-900 hover:text-white'}`}
           >
             <div className="w-6 h-6 flex items-center justify-center">
-              <i className="fa-solid fa-bars text-lg"></i>
+              <SettingsIcon className="w-5 h-5" />
             </div>
             <span className="ml-4 hidden lg:block font-bold text-sm">Settings</span>
           </button>
@@ -107,7 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <button
               key={item.id}
               onClick={() => setView(item.id)}
-              className={`p-3 transition-all ${isActive ? 'text-pink-500 scale-125' : 'text-zinc-600'}`}
+              className={`p-3 transition-all ${isActive ? 'text-blue-500 scale-125' : 'text-zinc-600'}`}
             >
               <i className={`${item.icon} text-xl`}></i>
             </button>

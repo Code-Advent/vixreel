@@ -98,7 +98,7 @@ const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-black text-[15px] flex items-center gap-2 text-zinc-200 group-hover:text-white transition-colors">
-                  @{user.username} {user.is_verified && <VerificationBadge size="w-4.5 h-4.5" />}
+                  @{user.username} {user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                 </div>
                 <div className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em] mt-1 truncate">{user.full_name || 'Creator'}</div>
               </div>

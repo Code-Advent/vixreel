@@ -15,10 +15,12 @@ interface ProfileProps {
   isOwnProfile: boolean;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onMessageUser?: (user: UserProfile) => void;
+  onOpenSettings?: () => void;
   onLogout?: () => void;
+  autoEdit?: boolean;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout }) => {
+const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, autoEdit }) => {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
   const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES'>('POSTS');
@@ -32,8 +34,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [socialLoading, setSocialLoading] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
   const [editUsername, setEditUsername] = useState(user.username);
   const [editBio, setEditBio] = useState(user.bio || '');
   const [editAvatarUrl, setEditAvatarUrl] = useState(user.avatar_url);
@@ -42,25 +42,27 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  const [isPrivate, setIsPrivate] = useState(user.is_private || false);
-  const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
-  const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
-
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (autoEdit) setIsEditModalOpen(true);
+  }, [autoEdit]);
+
+  useEffect(() => {
     fetchUserContent();
-    setIsPrivate(user.is_private || false);
-    setIsFollowingPublic(user.is_following_public !== false);
-    setAllowComments(user.allow_comments !== false);
 
     const handleGlobalDelete = (e: any) => {
       const deletedId = e.detail?.id;
       if (deletedId) {
         setPosts(prev => prev.filter(p => p.id !== deletedId));
         setLikedPosts(prev => prev.filter(p => p.id !== deletedId));
+        fetchUserContent(); // Refresh counts
       }
+    };
+
+    const handleEngagementUpdate = () => {
+      fetchUserContent(); // Recalculate likes/engagement
     };
 
     const handleIdentityUpdate = (e: any) => {
@@ -69,42 +71,76 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
     window.addEventListener('vixreel-post-deleted', handleGlobalDelete);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    window.addEventListener('vixreel-engagement-updated', handleEngagementUpdate);
+    window.addEventListener('vixreel-post-updated', handleEngagementUpdate);
+
     return () => {
       window.removeEventListener('vixreel-post-deleted', handleGlobalDelete);
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+      window.removeEventListener('vixreel-engagement-updated', handleEngagementUpdate);
+      window.removeEventListener('vixreel-post-updated', handleEngagementUpdate);
     };
   }, [user.id]);
 
   const fetchUserContent = async () => {
     setIsUpdating(true);
     try {
-      const { data: pData } = await supabase.from('posts').select('*, user:profiles(*)').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (pData) setPosts(pData as any);
-      const { data: lData } = await supabase.from('likes').select('post:posts(*, user:profiles(*))').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (lData) setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
+      // 1. Fetch user posts with their real like counts
+      const { data: pData } = await supabase
+        .from('posts')
+        .select('*, user:profiles(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (pData) {
+        // Fetch real like counts for each post
+        const postsWithLikes = await Promise.all(pData.map(async (p: any) => {
+          const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+          return { ...p, likes_count: count || 0 };
+        }));
+        setPosts(postsWithLikes as any);
+      }
+
+      // 2. Fetch liked posts
+      const { data: lData } = await supabase
+        .from('likes')
+        .select('post:posts(*, user:profiles(*))')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (lData) {
+        setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
+      }
+
+      // 3. Fetch following/followers counts
       const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+      
+      // 4. Fetch profile specific data (boosted stats)
       const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
       const boostedFollowers = freshProfile?.boosted_followers || 0;
-      let totalLikes = 0;
-      pData?.forEach(post => totalLikes += (post.likes_count || 0) + (post.boosted_likes || 0));
-      setCounts({ followers: (fCount || 0) + boostedFollowers, following: ingCount || 0, likes: totalLikes });
+      
+      // 5. Sum total likes (Real + Boosted)
+      let totalLikesSum = 0;
+      if (pData && pData.length > 0) {
+        const postIds = pData.map(p => p.id);
+        const { count: realLikesTotal } = await supabase.from('likes').select('*', { count: 'exact', head: true }).in('post_id', postIds);
+        const totalBoosted = pData.reduce((acc, p) => acc + (p.boosted_likes || 0), 0);
+        totalLikesSum = (realLikesTotal || 0) + totalBoosted;
+      }
+
+      setCounts({ 
+        followers: (fCount || 0) + boostedFollowers, 
+        following: ingCount || 0, 
+        likes: totalLikesSum 
+      });
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session && user.id !== session.user.id) {
         const { data } = await supabase.from('follows').select('*').eq('follower_id', session.user.id).eq('following_id', user.id).maybeSingle();
         setIsFollowing(!!data);
       }
     } finally { setIsUpdating(false); }
-  };
-
-  const handleToggleSetting = async (key: keyof UserProfile, value: boolean) => {
-    if (key === 'is_private') setIsPrivate(value);
-    if (key === 'is_following_public') setIsFollowingPublic(value);
-    if (key === 'allow_comments') setAllowComments(value);
-    try {
-      await supabase.from('profiles').update({ [key]: value }).eq('id', user.id);
-      onUpdateProfile({ [key]: value });
-    } catch (err) { console.error(err); }
   };
 
   const handleOpenSocial = async (type: 'FOLLOWERS' | 'FOLLOWING') => {
@@ -179,50 +215,56 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
            </div>
            <div className="pb-4 hidden sm:block">
               <h2 className="text-2xl font-black text-white flex items-center gap-2 drop-shadow-md">
-                @{user.username} {user.is_verified && <VerificationBadge size="w-7 h-7" />}
+                @{user.username} {user.is_verified && <VerificationBadge size="w-5 h-5" />}
               </h2>
            </div>
         </div>
       </div>
 
-      <div className="mt-20 px-6 sm:px-12 flex flex-col sm:flex-row sm:items-start justify-between gap-8">
-        <div className="space-y-6">
+      <div className="mt-20 px-6 sm:px-12 flex flex-col items-center sm:items-start sm:flex-row justify-between gap-10">
+        <div className="space-y-6 w-full sm:w-auto text-center sm:text-left">
           <div className="sm:hidden">
-            <h2 className="text-3xl font-black text-white flex items-center gap-2">
-              @{user.username} {user.is_verified && <VerificationBadge size="w-7 h-7" />}
+            <h2 className="text-3xl font-black text-white flex items-center justify-center gap-2">
+              @{user.username} {user.is_verified && <VerificationBadge size="w-6 h-6" />}
             </h2>
           </div>
-          <div className="max-w-lg">
+          <div className="max-w-lg mx-auto sm:mx-0">
             <h3 className="font-bold text-white mb-2">{user.full_name || user.username}</h3>
             <p className="text-zinc-500 text-sm whitespace-pre-wrap leading-relaxed">{user.bio || 'Initial bio signal pending...'}</p>
           </div>
-          <div className="flex gap-8 border-t border-zinc-900 pt-6">
-            <div onClick={() => handleOpenSocial('FOLLOWERS')} className="flex flex-col cursor-pointer group">
-              <span className="font-black text-white text-lg group-hover:text-pink-500 transition-colors">{counts.followers}</span>
+          
+          {/* Centered Stats Section */}
+          <div className="flex justify-center sm:justify-start gap-12 border-t border-zinc-900 pt-6">
+            <div onClick={() => handleOpenSocial('FOLLOWERS')} className="flex flex-col items-center cursor-pointer group">
+              <span className="font-black text-white text-lg group-hover:text-blue-500 transition-colors">{counts.followers}</span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Followers</span>
             </div>
-            <div onClick={() => handleOpenSocial('FOLLOWING')} className={`flex flex-col cursor-pointer group ${(!isOwnProfile && !user.is_following_public) ? 'opacity-30' : ''}`}>
-              <span className="font-black text-white text-lg group-hover:text-pink-500 transition-colors">
+            <div onClick={() => handleOpenSocial('FOLLOWING')} className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && !user.is_following_public) ? 'opacity-30' : ''}`}>
+              <span className="font-black text-white text-lg group-hover:text-blue-500 transition-colors">
                 {(!isOwnProfile && !user.is_following_public) ? <Lock className="w-3 h-3" /> : counts.following}
               </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Following</span>
             </div>
+            <div className="flex flex-col items-center">
+              <span className="font-black text-white text-lg">{counts.likes}</span>
+              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Likes</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 justify-center">
           {isOwnProfile ? (
             <button onClick={() => setIsEditModalOpen(true)} className="bg-zinc-900 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 text-white transition-all shadow-xl">Edit Profile</button>
           ) : (
             <>
-              <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white shadow-2xl shadow-pink-500/10'}`}>
+              <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white shadow-2xl shadow-blue-500/10'}`}>
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
               <button onClick={() => onMessageUser?.(user)} className="bg-zinc-900 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 text-white shadow-xl hover:bg-zinc-800">Message</button>
             </>
           )}
           {isOwnProfile && (
-            <button onClick={() => setIsSettingsOpen(true)} className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-500 hover:text-white transition-all"><Settings className="w-5 h-5" /></button>
+            <button onClick={onOpenSettings} className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-500 hover:text-white transition-all"><Settings className="w-5 h-5" /></button>
           )}
         </div>
       </div>
@@ -262,7 +304,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                     <p className="font-bold text-sm text-white flex items-center gap-1.5 truncate">@{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}</p>
                     <p className="text-[9px] text-zinc-600 font-black uppercase truncate tracking-tighter">{u.full_name || 'Individual Creator'}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-800 group-hover:text-pink-500" />
+                  <ChevronRight className="w-4 h-4 text-zinc-800 group-hover:text-blue-500" />
                 </div>
               ))}
             </div>
@@ -270,7 +312,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
-      {/* Edit Modal (Expanded for Cover Photo) */}
+      {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">
@@ -280,7 +322,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             </div>
             
             <div className="space-y-6">
-               {/* Cover Edit */}
                <div className="space-y-3">
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Cover Banner</span>
                   <div className="h-32 w-full bg-zinc-900 rounded-2xl overflow-hidden relative group cursor-pointer border border-zinc-800" onClick={() => coverInputRef.current?.click()}>
@@ -290,7 +331,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                   </div>
                </div>
 
-               {/* Avatar Edit */}
                <div className="flex flex-col items-center gap-4">
                   <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
                      <img src={editAvatarUrl || `https://ui-avatars.com/api/?name=${editUsername}`} className="w-24 h-24 rounded-full object-cover bg-zinc-900 border-2 border-zinc-800 group-hover:opacity-50 shadow-2xl" />
@@ -300,9 +340,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                </div>
 
                <div className="space-y-4">
-                  <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:border-pink-500/50 transition-all" placeholder="Handle" />
-                  <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none resize-none focus:border-pink-500/50 transition-all" placeholder="Narrative bio..." />
-                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">
+                  <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:border-blue-500/50 transition-all" placeholder="Handle" />
+                  <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none resize-none focus:border-blue-500/50 transition-all" placeholder="Narrative bio..." />
+                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all">
                     {isSavingProfile ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Synchronize Identity'}
                   </button>
                </div>

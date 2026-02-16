@@ -1,6 +1,6 @@
 
--- VIXREEL MASTER SCHEMA (v3.2)
--- Added cover_url support
+-- VIXREEL MASTER SCHEMA (v3.3)
+-- Added saves table support
 
 -- 1. PROFILES
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -100,6 +100,15 @@ CREATE TABLE IF NOT EXISTS public.stories (
   expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
 );
 
+-- 9. SAVES
+CREATE TABLE IF NOT EXISTS public.saves (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(post_id, user_id)
+);
+
 -- RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
@@ -108,6 +117,7 @@ ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saves ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
@@ -135,3 +145,7 @@ DROP POLICY IF EXISTS "Stories are viewable while active" ON public.stories;
 CREATE POLICY "Stories are viewable while active" ON public.stories FOR SELECT USING (expires_at > NOW());
 DROP POLICY IF EXISTS "Users can manage own stories" ON public.stories;
 CREATE POLICY "Users can manage own stories" ON public.stories FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Saves are viewable by owner" ON public.saves;
+CREATE POLICY "Saves are viewable by owner" ON public.saves FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can toggle saves" ON public.saves;
+CREATE POLICY "Users can toggle saves" ON public.saves FOR ALL USING (auth.uid() = user_id);

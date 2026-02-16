@@ -13,6 +13,7 @@ import Messages from './components/Messages';
 import Admin from './components/Admin';
 import Notifications from './components/Notifications';
 import Explore from './components/Explore';
+import SettingsPage from './components/SettingsPage';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -23,6 +24,7 @@ const App: React.FC = () => {
   const [initialChatUser, setInitialChatUser] = useState<UserProfile | null>(null);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [profileAutoEdit, setProfileAutoEdit] = useState(false);
   
   const [savedAccounts, setSavedAccounts] = useState<AccountSession[]>(() => {
     const saved = localStorage.getItem('vixreel_saved_accounts');
@@ -81,7 +83,8 @@ const App: React.FC = () => {
       console.error("VixReel Engine Error:", err);
       setCurrentUser(null);
     } finally {
-      setLoading(false);
+      // Simulate splash screen duration
+      setTimeout(() => setLoading(false), 2000);
     }
   };
 
@@ -134,10 +137,7 @@ const App: React.FC = () => {
   };
 
   const resolveIdentity = async (authUser: any): Promise<UserProfile | null> => {
-    // Attempt to get the profile created by the trigger
     let { data: dbProfile, error } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
-    
-    // If trigger hasn't finished yet or failed, try one manual upsert fallback
     if (!dbProfile && !error) {
       const { data: fallback } = await supabase.from('profiles').upsert({
         id: authUser.id,
@@ -146,7 +146,6 @@ const App: React.FC = () => {
       }).select().single();
       return fallback as UserProfile;
     }
-    
     return dbProfile as UserProfile;
   };
 
@@ -156,17 +155,26 @@ const App: React.FC = () => {
   };
 
   const setView = (view: ViewType, explicitUser?: UserProfile) => {
+    setProfileAutoEdit(false);
     if (explicitUser) setViewedUser(explicitUser);
     else if (view === 'PROFILE') setViewedUser(currentUser);
     setCurrentView(view);
   };
 
   if (loading) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-white">
-      <div className="w-20 h-20 rounded-[2rem] vix-gradient animate-pulse flex items-center justify-center shadow-[0_0_80px_rgba(255,0,128,0.2)]">
-        <span className="logo-font text-4xl">V</span>
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-between py-24 text-white">
+      <div /> {/* Spacer for centering */}
+      
+      <div className="flex flex-col items-center animate-vix-in">
+        <h1 className="logo-font text-7xl vix-text-gradient drop-shadow-[0_0_40px_rgba(255,0,128,0.2)]">
+          VixReel
+        </h1>
       </div>
-      <h2 className="logo-font text-3xl vix-text-gradient mt-6">VixReel</h2>
+
+      <div className="flex flex-col items-center gap-2 opacity-60 animate-pulse">
+        <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.6em]">from</span>
+        <span className="text-lg font-black tracking-[0.25em] text-white">VERISAZ</span>
+      </div>
     </div>
   );
 
@@ -194,7 +202,7 @@ const App: React.FC = () => {
         isAdminUnlocked={currentUser.is_admin} 
       />
 
-      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar bg-[radial-gradient(circle_at_top_right,_rgba(255,0,128,0.03)_0%,_transparent_50%)]">
+      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar bg-[radial-gradient(circle_at_top_right,_rgba(0,149,246,0.03)_0%,_transparent_50%)]">
         <div className="container mx-auto max-w-[935px] pt-4 px-4">
           {currentView === 'FEED' && (
             <div className="flex flex-col items-center pb-20 animate-vix-in">
@@ -225,16 +233,39 @@ const App: React.FC = () => {
             </div>
           )}
           {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
-          {currentView === 'PROFILE' && viewedUser && <Profile user={viewedUser} isOwnProfile={viewedUser.id === currentUser.id} onUpdateProfile={(u) => {
-              if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
-              setViewedUser(prev => prev ? {...prev, ...u} : null);
-            }} onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} onLogout={() => setIsAccountMenuOpen(true)} />}
+          {currentView === 'PROFILE' && viewedUser && (
+            <Profile 
+              user={viewedUser} 
+              isOwnProfile={viewedUser.id === currentUser.id} 
+              onUpdateProfile={(u) => {
+                if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
+                setViewedUser(prev => prev ? {...prev, ...u} : null);
+              }} 
+              onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
+              onLogout={() => setIsAccountMenuOpen(true)}
+              onOpenSettings={() => setCurrentView('SETTINGS')}
+              autoEdit={profileAutoEdit}
+            />
+          )}
           
           {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
           {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
           {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
           {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
           {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
+          {currentView === 'SETTINGS' && (
+            <SettingsPage 
+              user={currentUser} 
+              onUpdateProfile={(u) => setCurrentUser(prev => prev ? {...prev, ...u} : null)} 
+              onLogout={() => setIsAccountMenuOpen(true)} 
+              onOpenSwitchAccount={() => setIsAccountMenuOpen(true)}
+              setView={setView}
+              onTriggerEditProfile={() => {
+                setView('PROFILE', currentUser);
+                setProfileAutoEdit(true);
+              }}
+            />
+          )}
         </div>
       </main>
 
@@ -248,29 +279,29 @@ const App: React.FC = () => {
             </div>
             <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh] no-scrollbar">
               {savedAccounts.map(acc => (
-                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-zinc-900/40 border-pink-500/20' : 'hover:bg-zinc-900/20 border-transparent'}`}>
+                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-zinc-900/40 border-blue-500/20' : 'hover:bg-zinc-900/20 border-transparent'}`}>
                    <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => acc.id !== currentUser.id && switchAccount(acc)}>
                       <div className={`w-12 h-12 rounded-full p-0.5 ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-zinc-800'}`}>
                         <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-black" />
                       </div>
                       <div className="flex flex-col">
                         <p className="font-bold text-sm text-white">@{acc.username}</p>
-                        {acc.id === currentUser.id && <span className="text-[9px] text-pink-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">Active</span>}
+                        {acc.id === currentUser.id && <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">Active</span>}
                       </div>
                    </div>
                    {acc.id !== currentUser.id ? (
                      <button onClick={(e) => { e.stopPropagation(); removeAccount(acc.id); }} className="p-3 text-zinc-700 hover:text-red-500 transition-all">
                        <Trash2 className="w-4 h-4" />
                      </button>
-                   ) : <CheckCircle className="w-4 h-4 text-pink-500" />}
+                   ) : <CheckCircle className="w-4 h-4 text-blue-500" />}
                 </div>
               ))}
 
               <button 
                 onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
-                className="w-full flex items-center gap-4 p-4 hover:bg-zinc-900 rounded-2xl transition-all group border border-dashed border-zinc-800 hover:border-pink-500/30"
+                className="w-full flex items-center gap-4 p-4 hover:bg-zinc-900 rounded-2xl transition-all group border border-dashed border-zinc-800 hover:border-blue-500/30"
               >
-                <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-600 group-hover:text-pink-500 group-hover:bg-pink-500/5 transition-all">
+                <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
                   <Plus className="w-6 h-6" />
                 </div>
                 <span className="font-bold text-sm text-zinc-500 group-hover:text-white">Add Account</span>
