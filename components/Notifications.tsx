@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Heart, UserPlus, Shield, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface NotificationsProps {
@@ -10,46 +10,21 @@ interface NotificationsProps {
   isAdminUnlocked?: boolean;
 }
 
-const Notifications: React.FC<NotificationsProps> = ({ currentUser, onOpenAdmin, onUnlockAdmin, isAdminUnlocked }) => {
+const Notifications: React.FC<NotificationsProps> = ({ currentUser }) => {
   return (
-    <div className="max-w-[600px] mx-auto py-8 px-4 relative">
+    <div className="max-w-[600px] mx-auto py-8 px-4 relative animate-vix-in">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold">Notifications</h2>
-        
-        {/* Secret Admin Trigger */}
-        <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            onUnlockAdmin?.();
-          }}
-          className="p-4 -m-4 cursor-pointer flex items-center justify-center group"
-          title="System Access"
-        >
-          <div 
-            className={`w-2 h-2 rounded-full transition-all group-hover:scale-150 ${
-              isAdminUnlocked 
-                ? 'bg-purple-500 shadow-[0_0_10px_#a855f7]' 
-                : 'bg-zinc-800 group-hover:bg-zinc-700'
-            }`}
-          />
-        </div>
-        
-        {isAdminUnlocked && (
-          <button 
-            onClick={onOpenAdmin}
-            className="flex items-center gap-2 vix-gradient px-4 py-2 rounded-xl text-white font-bold text-sm shadow-xl shadow-pink-500/20 hover:scale-105 transition-transform animate-in fade-in zoom-in duration-300"
-          >
-            <Shield className="w-4 h-4" /> OPEN ADMIN
-          </button>
-        )}
+        <h2 className="text-2xl font-bold uppercase tracking-widest text-white">Notifications</h2>
       </div>
 
-      <div className="flex flex-col items-center justify-center py-20 text-stone-500 text-center">
-        <div className="w-20 h-20 rounded-full border border-zinc-800 flex items-center justify-center mb-6">
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-500 text-center">
+        <div className="w-24 h-24 rounded-[2rem] bg-zinc-900/50 border border-zinc-900 flex items-center justify-center mb-8 shadow-2xl">
           <Bell className="w-10 h-10 text-zinc-700" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">No notifications yet</h3>
-        <p className="max-w-xs text-sm leading-relaxed">When people like your posts or follow you, you'll see it here.</p>
+        <h3 className="text-xl font-black text-white mb-3 uppercase tracking-tight">No signals detected</h3>
+        <p className="max-w-xs text-[11px] font-medium leading-loose uppercase tracking-widest opacity-40">
+          When creators interact with your narrative, alerts will manifest here.
+        </p>
       </div>
     </div>
   );

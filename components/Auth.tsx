@@ -13,8 +13,14 @@ import {
   ShieldCheck,
   Zap,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Search,
+  ArrowLeft,
+  Key,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
+import VerificationBadge from './VerificationBadge';
 
 interface AuthProps {
   onAuthSuccess: (user: UserProfile) => void;
@@ -22,8 +28,8 @@ interface AuthProps {
   isAddingAccount?: boolean;
 }
 
-type AuthMode = 'LOGIN' | 'SIGNUP';
-type AuthStep = 'DETAILS' | 'VERIFY' | 'AVATAR';
+type AuthMode = 'LOGIN' | 'SIGNUP' | 'FIND_ACCOUNT';
+type AuthStep = 'DETAILS' | 'VERIFY' | 'AVATAR' | 'RESULT';
 type AuthMethod = 'PHONE' | 'EMAIL';
 
 const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount }) => {
@@ -31,7 +37,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [step, setStep] = useState<AuthStep>('DETAILS');
   const [authMethod, setAuthMethod] = useState<AuthMethod>('PHONE'); 
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -39,6 +47,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [username, setUsername] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [foundProfile, setFoundProfile] = useState<UserProfile | null>(null);
   
   const otpInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +67,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     e?.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
     
     try {
       if (authMethod === 'PHONE') {
@@ -68,7 +78,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         setStep('VERIFY');
       } else {
         if (mode === 'LOGIN') {
-          const { data, error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+          const { data, error: loginErr } = await supabase.auth.signInWithPassword({ 
+            email: email.trim(), 
+            password 
+          });
           if (loginErr) throw loginErr;
           if (data.user) {
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
@@ -77,7 +90,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           }
         } else {
           const { data, error: signUpErr } = await supabase.auth.signUp({ 
-            email, password, options: { data: { username: email.split('@')[0] } }
+            email: email.trim(), 
+            password, 
+            options: { data: { username: email.split('@')[0] } }
           });
           if (signUpErr) throw signUpErr;
           setStep('AVATAR');
@@ -90,23 +105,99 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     }
   };
 
+  const handleFindAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const searchEmail = email.trim();
+      if (!searchEmail) throw new Error("Email is required for lookup.");
+
+      const { data, error: findErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', searchEmail)
+        .maybeSingle();
+      
+      if (findErr) throw findErr;
+      if (!data) throw new Error("No account found with this email signal.");
+      
+      setFoundProfile(data as UserProfile);
+      setStep('RESULT');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendRecoveryCode = async (isResend = false) => {
+    const targetEmail = foundProfile?.email || email.trim();
+    if (!targetEmail) {
+      setError("Target email missing.");
+      return;
+    }
+
+    if (isResend) setResending(true);
+    else setLoading(true);
+    
+    setError(null);
+    setSuccessMsg(null);
+    
+    try {
+      const { error: otpErr } = await supabase.auth.signInWithOtp({ 
+        email: targetEmail,
+        options: { shouldCreateUser: false }
+      });
+      
+      if (otpErr) throw otpErr;
+      
+      setAuthMethod('EMAIL');
+      setStep('VERIFY');
+      setSuccessMsg("Access code transmitted via SMTP.");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setResending(false);
+    }
+  };
+
   const handleVerifySignal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otpCode.length < 6) return;
     setLoading(true);
     setError(null);
     try {
-      const formattedPhone = formatPhone(phone);
-      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
-        phone: formattedPhone, token: otpCode, type: 'sms',
-      });
+      const targetEmail = foundProfile?.email || email.trim();
+      
+      let verifyParams: any = {
+        token: otpCode,
+        // For 6-digit codes via Email OTP, use 'email' or 'magiclink' depending on your Supabase config
+        // Most modern Supabase setups use 'email' for the numeric code verification
+        type: authMethod === 'EMAIL' ? 'email' : 'sms',
+      };
+      
+      if (authMethod === 'PHONE') {
+        verifyParams.phone = formatPhone(phone);
+      } else {
+        verifyParams.email = targetEmail;
+      }
+
+      const { data, error: verifyErr } = await supabase.auth.verifyOtp(verifyParams);
       if (verifyErr) throw verifyErr;
+      
       if (data.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
         if (profile) onAuthSuccess(profile as any);
         else setStep('AVATAR');
       }
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleFinalizeIdentity = async (e: React.FormEvent) => {
@@ -116,6 +207,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error("No session");
+      
       const { data: profile, error: dbErr } = await supabase.from('profiles').upsert({
         id: authUser.id,
         username: username.toLowerCase().trim(),
@@ -123,9 +215,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         email: authUser.email,
         phone: authUser.phone
       }).select().single();
+      
       if (dbErr) throw dbErr;
       onAuthSuccess(profile as any);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const renderDetails = () => (
@@ -133,14 +230,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800 shadow-2xl">
         <button 
           type="button" 
-          onClick={() => setAuthMethod('PHONE')} 
+          onClick={() => { setAuthMethod('PHONE'); setError(null); }} 
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'PHONE' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-600'}`}
         >
           <Smartphone className="w-4 h-4" /> Phone
         </button>
         <button 
           type="button" 
-          onClick={() => setAuthMethod('EMAIL')} 
+          onClick={() => { setAuthMethod('EMAIL'); setError(null); }} 
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'EMAIL' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-600'}`}
         >
           <Mail className="w-4 h-4" /> Email
@@ -168,13 +265,25 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             </div>
             <input 
               type="password" 
-              placeholder="Secure Password" 
+              placeholder={mode === 'LOGIN' ? "Secure Password" : "Create Password"} 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
               required 
             />
           </div>
+        )}
+      </div>
+
+      <div className="flex justify-between items-center px-2">
+        {mode === 'LOGIN' && (
+          <button 
+            type="button"
+            onClick={() => { setMode('FIND_ACCOUNT'); setStep('DETAILS'); setError(null); setSuccessMsg(null); }}
+            className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-white transition-colors"
+          >
+            Find your Account
+          </button>
         )}
       </div>
 
@@ -201,18 +310,75 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
              </div>
           </div>
 
-          <div className="w-full mb-10 flex justify-center gap-10">
-            <button onClick={() => setMode('LOGIN')} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
-            <button onClick={() => setMode('SIGNUP')} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
-          </div>
+          {mode !== 'FIND_ACCOUNT' && (
+            <div className="w-full mb-10 flex justify-center gap-10">
+              <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
+              <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
+            </div>
+          )}
 
-          {step === 'DETAILS' && renderDetails()}
+          {mode === 'FIND_ACCOUNT' && step === 'DETAILS' && (
+            <div className="w-full space-y-8 animate-vix-in">
+              <div className="flex items-center gap-4 mb-4">
+                <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-zinc-900 rounded-2xl text-zinc-500 hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /></button>
+                <h3 className="text-white font-black text-xl uppercase tracking-tight">Recover Session</h3>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest leading-relaxed">Enter your email address to locate your primary creator narrative.</p>
+              <form onSubmit={handleFindAccount} className="space-y-6">
+                <div className="group relative">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-pink-500 transition-colors"><Mail className="w-5 h-5" /></div>
+                  <input 
+                    type="email" 
+                    placeholder="Identity Email" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+                    required 
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> Locate Account</>}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {mode === 'FIND_ACCOUNT' && step === 'RESULT' && foundProfile && (
+            <div className="w-full space-y-10 animate-vix-in text-center">
+              <div className="space-y-4">
+                <h3 className="text-white font-black text-2xl uppercase tracking-tight">Account Found</h3>
+                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">We located your identity signal</p>
+              </div>
+              <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
+                <div className="relative w-24 h-24 mx-auto">
+                   <img src={foundProfile.avatar_url || `https://ui-avatars.com/api/?name=${foundProfile.username}`} className="w-full h-full rounded-full border-4 border-zinc-900 object-cover shadow-2xl" />
+                   {foundProfile.is_verified && (
+                     <div className="absolute -bottom-1 -right-1">
+                        <VerificationBadge size="w-6 h-6" />
+                     </div>
+                   )}
+                </div>
+                <div className="space-y-1">
+                   <p className="text-xl font-black text-white">@{foundProfile.username}</p>
+                   <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || 'Individual Creator'}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
+                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> Send Access Code</>}
+                </button>
+                <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-white transition-all">Not your account?</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'DETAILS' && mode !== 'FIND_ACCOUNT' && renderDetails()}
           
           {step === 'VERIFY' && (
             <div className="w-full space-y-10 animate-vix-in text-center">
               <div className="space-y-2">
                 <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Check</h3>
-                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your signal</p>
+                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your {authMethod === 'EMAIL' ? 'email' : 'phone'} signal</p>
               </div>
               <div className="relative">
                 <input 
@@ -225,10 +391,22 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                   maxLength={6} 
                 />
               </div>
-              <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
-                {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enter Void'}
-              </button>
-              <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors">Resend or Change Method</button>
+              <div className="space-y-4">
+                <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enter Void'}
+                </button>
+                <div className="flex items-center justify-center gap-6">
+                  <button 
+                    onClick={() => handleSendRecoveryCode(true)} 
+                    disabled={resending}
+                    className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Resend Code
+                  </button>
+                  <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors">Change Method</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -261,6 +439,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             </form>
           )}
 
+          {successMsg && (
+            <div className="mt-8 text-green-500 text-[9px] font-black uppercase tracking-[0.2em] bg-green-500/5 p-4 rounded-xl border border-green-500/10 w-full text-center flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-3 h-3" /> {successMsg}
+            </div>
+          )}
+          
           {error && <div className="mt-8 text-red-500 text-[9px] font-black uppercase tracking-[0.2em] bg-red-500/5 p-4 rounded-xl border border-red-500/10 w-full text-center animate-shake">{error}</div>}
         </div>
 

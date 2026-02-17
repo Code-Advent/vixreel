@@ -57,12 +57,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       if (deletedId) {
         setPosts(prev => prev.filter(p => p.id !== deletedId));
         setLikedPosts(prev => prev.filter(p => p.id !== deletedId));
-        fetchUserContent(); // Refresh counts
+        fetchUserContent(); 
       }
     };
 
     const handleEngagementUpdate = () => {
-      fetchUserContent(); // Recalculate likes/engagement
+      fetchUserContent(); 
     };
 
     const handleIdentityUpdate = (e: any) => {
@@ -85,7 +85,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const fetchUserContent = async () => {
     setIsUpdating(true);
     try {
-      // 1. Fetch user posts with their real like counts
       const { data: pData } = await supabase
         .from('posts')
         .select('*, user:profiles(*)')
@@ -93,7 +92,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         .order('created_at', { ascending: false });
       
       if (pData) {
-        // Fetch real like counts for each post
         const postsWithLikes = await Promise.all(pData.map(async (p: any) => {
           const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
           return { ...p, likes_count: count || 0 };
@@ -101,7 +99,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setPosts(postsWithLikes as any);
       }
 
-      // 2. Fetch liked posts
       const { data: lData } = await supabase
         .from('likes')
         .select('post:posts(*, user:profiles(*))')
@@ -112,15 +109,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
       }
 
-      // 3. Fetch following/followers counts
       const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
-      
-      // 4. Fetch profile specific data (boosted stats)
       const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
       const boostedFollowers = freshProfile?.boosted_followers || 0;
       
-      // 5. Sum total likes (Real + Boosted)
       let totalLikesSum = 0;
       if (pData && pData.length > 0) {
         const postIds = pData.map(p => p.id);
@@ -195,7 +188,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   return (
     <div className="max-w-[935px] mx-auto animate-vix-in pb-32">
-      {/* Cover Photo Area */}
       <div className="relative h-48 sm:h-64 w-full bg-zinc-900 group">
         {user.cover_url ? (
           <img src={user.cover_url} className="w-full h-full object-cover" />
@@ -206,7 +198,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         )}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-all"></div>
         
-        {/* Profile Overlap Header */}
         <div className="absolute -bottom-12 left-6 sm:left-12 flex items-end gap-6 sm:gap-8">
            <div className="relative">
               <div className="w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-black ring-4 ring-black shadow-2xl overflow-hidden">
@@ -214,8 +205,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               </div>
            </div>
            <div className="pb-4 hidden sm:block">
-              <h2 className="text-2xl font-black text-white flex items-center gap-2 drop-shadow-md">
-                @{user.username} {user.is_verified && <VerificationBadge size="w-5 h-5" />}
+              <h2 className="text-2xl font-black text-white flex items-center gap-1.5 drop-shadow-md">
+                @{user.username} {user.is_verified && <VerificationBadge size="w-4 h-4" />}
               </h2>
            </div>
         </div>
@@ -224,8 +215,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       <div className="mt-20 px-6 sm:px-12 flex flex-col items-center sm:items-start sm:flex-row justify-between gap-10">
         <div className="space-y-6 w-full sm:w-auto text-center sm:text-left">
           <div className="sm:hidden">
-            <h2 className="text-3xl font-black text-white flex items-center justify-center gap-2">
-              @{user.username} {user.is_verified && <VerificationBadge size="w-6 h-6" />}
+            <h2 className="text-3xl font-black text-white flex items-center justify-center gap-1.5">
+              @{user.username} {user.is_verified && <VerificationBadge size="w-5 h-5" />}
             </h2>
           </div>
           <div className="max-w-lg mx-auto sm:mx-0">
@@ -233,7 +224,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <p className="text-zinc-500 text-sm whitespace-pre-wrap leading-relaxed">{user.bio || 'Initial bio signal pending...'}</p>
           </div>
           
-          {/* Centered Stats Section */}
           <div className="flex justify-center sm:justify-start gap-12 border-t border-zinc-900 pt-6">
             <div onClick={() => handleOpenSocial('FOLLOWERS')} className="flex flex-col items-center cursor-pointer group">
               <span className="font-black text-white text-lg group-hover:text-blue-500 transition-colors">{counts.followers}</span>
@@ -269,7 +259,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       </div>
 
-      {/* Grid Tabs */}
       <div className="mt-12 px-4 border-t border-zinc-900">
         <div className="flex justify-center gap-12">
           <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-white text-white' : 'border-transparent text-zinc-700'}`}><Grid className="w-4 h-4" /> Posts</button>
@@ -288,7 +277,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       </div>
 
-      {/* Social Modal */}
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[3rem] overflow-hidden shadow-2xl animate-vix-in">
@@ -312,7 +300,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
-      {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">

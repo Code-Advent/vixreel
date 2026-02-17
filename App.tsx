@@ -83,7 +83,6 @@ const App: React.FC = () => {
       console.error("VixReel Engine Error:", err);
       setCurrentUser(null);
     } finally {
-      // Simulate splash screen duration
       setTimeout(() => setLoading(false), 2000);
     }
   };
@@ -163,14 +162,12 @@ const App: React.FC = () => {
 
   if (loading) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-between py-24 text-white">
-      <div /> {/* Spacer for centering */}
-      
+      <div />
       <div className="flex flex-col items-center animate-vix-in">
         <h1 className="logo-font text-7xl vix-text-gradient drop-shadow-[0_0_40px_rgba(255,0,128,0.2)]">
           VixReel
         </h1>
       </div>
-
       <div className="flex flex-col items-center gap-2 opacity-60 animate-pulse">
         <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.6em]">from</span>
         <span className="text-lg font-black tracking-[0.25em] text-white">VERISAZ</span>
@@ -269,7 +266,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Account Switching Modal */}
       {isAccountMenuOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
@@ -296,7 +292,6 @@ const App: React.FC = () => {
                    ) : <CheckCircle className="w-4 h-4 text-blue-500" />}
                 </div>
               ))}
-
               <button 
                 onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
                 className="w-full flex items-center gap-4 p-4 hover:bg-zinc-900 rounded-2xl transition-all group border border-dashed border-zinc-800 hover:border-blue-500/30"
@@ -307,7 +302,6 @@ const App: React.FC = () => {
                 <span className="font-bold text-sm text-zinc-500 group-hover:text-white">Add Account</span>
               </button>
             </div>
-            
             <div className="p-6 border-t border-zinc-900 bg-zinc-900/10">
               <button onClick={handleLogout} className="w-full py-4 text-center text-red-500 font-black text-[11px] uppercase tracking-widest hover:text-red-400 transition-colors">Relinquish Primary Session</button>
             </div>

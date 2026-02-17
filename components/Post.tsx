@@ -32,8 +32,6 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const canComment = post.user.allow_comments !== false;
-  
-  // PERSISTENCE FIX: Real Database Likes + Admin Boosted (e.g. 120k) + Local user interaction
   const currentTotalLikes = realLikesCount + (post.boosted_likes || 0) + likesOffset;
 
   useEffect(() => {
@@ -55,10 +53,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   const fetchLikesCount = async () => {
-    const { count } = await supabase
-      .from('likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('post_id', post.id);
+    const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
     setRealLikesCount(count || 0);
   };
 
@@ -78,34 +73,23 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     setIsLiking(true);
     setLiked(!wasLiked);
     setLikesOffset(prev => wasLiked ? prev - 1 : prev + 1);
-
     try {
-      if (wasLiked) {
-        await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
-      } else {
-        await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
-      }
+      if (wasLiked) await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
+      else await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err) {
       setLiked(wasLiked);
       setLikesOffset(prev => wasLiked ? prev + 1 : prev - 1);
-    } finally {
-      setIsLiking(false);
-    }
+    } finally { setIsLiking(false); }
   };
 
   const handleSave = async () => {
     const wasSaved = saved;
     setSaved(!wasSaved);
     try {
-      if (wasSaved) {
-        await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
-      } else {
-        await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
-      }
-    } catch (err) {
-      setSaved(wasSaved);
-    }
+      if (wasSaved) await supabase.from('saves').delete().match({ post_id: post.id, user_id: currentUserId });
+      else await supabase.from('saves').insert({ post_id: post.id, user_id: currentUserId });
+    } catch (err) { setSaved(wasSaved); }
   };
 
   const handleDownload = async () => {
@@ -116,18 +100,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       a.click();
       return;
     }
-
     setIsDownloading(true);
     setDownloadProgress(0);
     try {
       await downloadVideoWithWatermark(post.media_url, post.user.username, (p) => {
         setDownloadProgress(Math.floor(p * 100));
       });
-    } catch (err: any) {
-      alert("Download failed: " + err.message);
-    } finally {
-      setIsDownloading(false);
-    }
+    } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
   };
 
   const handleDelete = async () => {
@@ -139,12 +118,10 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         const mediaPath = pathParts[1];
         await supabase.storage.from('posts').remove([mediaPath]);
       }
-      const { error } = await supabase.from('posts').delete().eq('id', post.id);
-      if (error) throw error;
+      await supabase.from('posts').delete().eq('id', post.id);
       onDelete?.(post.id);
       window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
     } catch (err: any) { 
-      console.error("Deletion error:", err);
       alert("Delete failed: " + err.message); 
       setIsDeleting(false); 
     }
@@ -156,8 +133,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         <div className="flex items-center gap-3">
           <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-800 shadow-sm" />
           <div className="flex flex-col">
-            <span className="text-sm font-bold flex items-center gap-1.5 text-white">
-              {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+            <span className="text-sm font-bold flex items-center gap-1 text-white">
+              {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
               {post.user.is_private && <Lock className="w-3 h-3 text-zinc-600" />}
             </span>
           </div>
