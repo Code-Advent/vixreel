@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message } from '../types';
 import VerificationBadge from './VerificationBadge';
@@ -10,232 +10,404 @@ interface MessagesProps {
   initialChatUser?: UserProfile | null;
 }
 
+interface ChatPreview extends UserProfile {
+  last_message?: string;
+  last_message_at?: string;
+}
+
 const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => {
-  const [chats, setChats] = useState<UserProfile[]>([]);
+  const [chats, setChats] = useState<ChatPreview[]>([]);
   const [activeChat, setActiveChat] = useState<UserProfile | null>(initialChatUser || null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
 
+  // Initialize and Real-time Subscription
   useEffect(() => {
     fetchChats();
     
-    // Subscribe to new messages real-time
     const channel = supabase
-      .channel('vix-messages-realtime-global')
+      .channel('vix-messages-realtime-v3')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const newMsg = payload.new as Message;
-          // Only append if message is relevant to current active chat
+          
+          // Check if this message belongs to the current open conversation
           if (activeChat && (
             (newMsg.sender_id === activeChat.id && newMsg.receiver_id === currentUser.id) ||
             (newMsg.sender_id === currentUser.id && newMsg.receiver_id === activeChat.id)
           )) {
-            setMessages(prev => [...prev, newMsg]);
+            setMessages(prev => {
+              // Prevent duplicates if optimistic update already added it
+              const exists = prev.some(m => m.id === newMsg.id || (m.content === newMsg.content && m.sender_id === newMsg.sender_id && Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 1000));
+              if (exists) return prev;
+              return [...prev, newMsg];
+            });
           }
-          fetchChats(); // Refresh sidebar to show latest activity
+          
+          // Refresh chat list to update previews and order
+          fetchChats();
         }
       )
       .subscribe();
 
-    // Listen for global identity updates (Verification)
-    const handleIdentityUpdate = (e: any) => {
-      const { id, ...updates } = e.detail;
-      setChats(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-      if (activeChat?.id === id) {
-        setActiveChat(prev => prev ? { ...prev, ...updates } : null);
-      }
-    };
-
-    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
-  }, [activeChat, currentUser.id]);
+  }, [activeChat?.id, currentUser.id]);
 
+  // Handle active chat changes
   useEffect(() => {
     if (activeChat) {
       fetchMessages();
+      messageInputRef.current?.focus();
     }
-  }, [activeChat]);
+  }, [activeChat?.id]);
 
+  // Scroll to bottom whenever messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [messages]);
 
-  const fetchChats = async () => {
-    const { data: sent } = await supabase.from('messages').select('receiver:profiles(*)').eq('sender_id', currentUser.id);
-    const { data: recv } = await supabase.from('messages').select('sender:profiles(*)').eq('receiver_id', currentUser.id);
-    
-    const uniqueUsersMap = new Map<string, UserProfile>();
-    
-    // Add initial user if exists (ensures they appear even if no messages exist)
-    if (initialChatUser) {
-      uniqueUsersMap.set(initialChatUser.id, initialChatUser);
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-    sent?.forEach(m => {
-      const u = m.receiver as unknown as UserProfile;
-      if (u) uniqueUsersMap.set(u.id, u);
-    });
-    
-    recv?.forEach(m => {
-      const u = m.sender as unknown as UserProfile;
-      if (u) uniqueUsersMap.set(u.id, u);
-    });
-    
-    setChats(Array.from(uniqueUsersMap.values()));
+  const fetchChats = async () => {
+    try {
+      // Fetch latest messages for each conversation
+      const { data: msgs, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!msgs) return;
+
+      const uniqueUsersMap = new Map<string, ChatPreview>();
+      
+      // If we were directed here with an initial user, make sure they're in the list
+      if (initialChatUser && !uniqueUsersMap.has(initialChatUser.id)) {
+        uniqueUsersMap.set(initialChatUser.id, { ...initialChatUser });
+      }
+
+      msgs.forEach(m => {
+        const otherUser = m.sender_id === currentUser.id ? m.receiver : m.sender;
+        if (otherUser && !uniqueUsersMap.has(otherUser.id)) {
+          uniqueUsersMap.set(otherUser.id, {
+            ...otherUser,
+            last_message: m.content,
+            last_message_at: m.created_at
+          });
+        }
+      });
+      
+      setChats(Array.from(uniqueUsersMap.values()));
+    } catch (err) {
+      console.error("Error fetching chats:", err);
+    }
   };
 
   const fetchMessages = async () => {
     if (!activeChat) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
-      .order('created_at', { ascending: true });
-    if (data) setMessages(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      if (data) setMessages(data);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchUsers = async (val: string) => {
+    setSearchQuery(val);
+    if (val.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', currentUser.id)
+        .ilike('username', `%${val}%`)
+        .limit(8);
+      
+      if (data) setSearchResults(data as UserProfile[]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!text.trim() || !activeChat) return;
     
-    const msgText = text;
+    const msgContent = text.trim();
     setText('');
-    
-    const { error } = await supabase.from('messages').insert({
+
+    // Optimistic UI Update: Show it instantly
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId,
       sender_id: currentUser.id,
       receiver_id: activeChat.id,
-      content: msgText
-    });
-    
-    if (error) {
-      console.error("Message transmission failure", error);
-      setText(msgText); // Restore text on failure
-    } else {
-      fetchChats(); // Update chat list immediately for new conversations
+      content: msgContent,
+      created_at: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    try {
+      const { data, error } = await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: activeChat.id,
+        content: msgContent
+      }).select().single();
+      
+      if (error) throw error;
+
+      // Replace optimistic message with the real one from DB
+      setMessages(prev => prev.map(m => m.id === tempId ? data : m));
+      fetchChats();
+    } catch (err) {
+      console.error("Transmission failure:", err);
+      // Remove failed message and restore text for retry
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setText(msgContent);
     }
   };
 
   return (
-    <div className="max-w-[935px] mx-auto h-[88vh] border border-zinc-900 rounded-[3rem] flex overflow-hidden mt-4 bg-black shadow-2xl">
-      {/* Sidebar - Chat List */}
+    <div className="max-w-[1000px] mx-auto h-[88vh] border border-zinc-900 rounded-[3rem] flex overflow-hidden mt-4 bg-[#050505] shadow-2xl relative ring-1 ring-white/5">
+      
+      {/* Sidebar - Chat Previews */}
       <div className={`w-full md:w-80 border-r border-zinc-900 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/20">
-          <span className="font-black uppercase text-[11px] tracking-[0.4em] text-zinc-500">Messages</span>
-          <MessageCircle className="w-5 h-5 text-zinc-800" />
+        <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/10">
+          <div className="flex flex-col">
+            <span className="font-black uppercase text-[10px] tracking-[0.4em] text-zinc-500">Narrative</span>
+            <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest mt-1">Direct Encrypted</span>
+          </div>
+          <button 
+            onClick={() => setShowNewChatModal(true)}
+            className="p-3 bg-zinc-900 rounded-2xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg hover:shadow-pink-500/10 active:scale-95"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-black">
-          {chats.map(u => (
+        
+        <div className="flex-1 overflow-y-auto no-scrollbar bg-black divide-y divide-zinc-900/20">
+          {chats.length > 0 ? chats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
-              className={`flex items-center gap-4 p-6 cursor-pointer transition-all duration-300 border-b border-zinc-900/30 ${activeChat?.id === u.id ? 'bg-zinc-900/60 border-l-[4px] border-pink-500' : 'hover:bg-zinc-900/20 border-l-[4px] border-transparent'}`}
+              className={`flex items-center gap-4 p-5 cursor-pointer transition-all duration-300 relative group ${activeChat?.id === u.id ? 'bg-zinc-900/40' : 'hover:bg-zinc-900/20'}`}
             >
+              {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1 vix-gradient"></div>}
               <div className="relative shrink-0">
-                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full border border-zinc-800 object-cover shadow-lg" />
-                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-black rounded-full"></div>
+                <img 
+                  src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
+                  className={`w-12 h-12 rounded-full border border-zinc-800 object-cover shadow-lg transition-transform group-hover:scale-105 ${u.is_verified ? 'ring-2 ring-pink-500/20' : ''}`} 
+                />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-[14px] truncate flex items-center gap-1.5 text-zinc-200">
-                  {u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+                <div className="flex justify-between items-start mb-0.5">
+                  <span className="font-black text-[13px] truncate flex items-center gap-1.5 text-zinc-200">
+                    {u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+                  </span>
+                  {u.last_message_at && (
+                    <span className="text-[8px] text-zinc-700 font-bold uppercase shrink-0">
+                      {new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
-                <div className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1">Active Now</div>
+                <p className={`text-[10px] font-medium truncate max-w-[150px] ${activeChat?.id === u.id ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                  {u.last_message || 'Start signal exchange...'}
+                </p>
               </div>
             </div>
-          ))}
-          {chats.length === 0 && (
-            <div className="p-20 text-center opacity-30 flex flex-col items-center">
-              <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center mb-6 border border-zinc-800 border-dashed">
-                <MessageCircle className="w-8 h-8 text-zinc-700" />
+          )) : (
+            <div className="p-16 text-center opacity-30 flex flex-col items-center justify-center h-full space-y-6">
+              <div className="w-16 h-16 rounded-[1.5rem] bg-zinc-900/50 flex items-center justify-center border border-zinc-800 border-dashed">
+                <MessageCircle className="w-8 h-8 text-zinc-800" />
               </div>
-              <p className="text-zinc-700 text-[10px] font-black uppercase tracking-[0.4em]">No messages yet</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em]">No narratives active</p>
+              <button onClick={() => setShowNewChatModal(true)} className="px-8 py-3 vix-gradient rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-pink-500/10 active:scale-95 transition-all">Initialize Comms</button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main Messaging Window */}
       <div className={`flex-1 flex flex-col bg-zinc-950/40 backdrop-blur-3xl ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
         {activeChat ? (
           <>
-            <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/50 backdrop-blur-xl z-20">
-              <div className="flex items-center gap-5">
-                <button onClick={() => setActiveChat(null)} className="md:hidden p-3 -ml-3 text-zinc-500 hover:text-white transition-colors"><ArrowLeft className="w-6 h-6" /></button>
+            <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/30 backdrop-blur-xl z-20">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500 hover:text-white transition-colors"><ChevronLeft className="w-6 h-6" /></button>
                 <div className="relative">
-                  <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-11 h-11 rounded-full border border-zinc-800 object-cover shadow-xl" />
+                  <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-zinc-800 object-cover shadow-xl" />
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-black rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                 </div>
                 <div>
-                  <div className="font-black text-[16px] flex items-center gap-2 text-white">
-                    {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-4 h-4" />}
+                  <div className="font-black text-[15px] flex items-center gap-1.5 text-white">
+                    {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                   </div>
-                  <span className="text-[9px] text-green-500 font-black uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    Online
-                  </span>
+                  <span className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em]">{activeChat.full_name || 'Individual Creator'}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 p-8 overflow-y-auto space-y-6 no-scrollbar bg-[radial-gradient(circle_at_bottom_left,_rgba(255,0,128,0.02)_0%,_transparent_50%)]">
-              {loading ? (
+            <div className="flex-1 p-6 sm:p-10 overflow-y-auto space-y-6 no-scrollbar relative">
+              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-zinc-950/80 to-transparent pointer-events-none z-10"></div>
+              
+              {loading && messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-zinc-800 animate-spin" /></div>
               ) : (
-                messages.map(m => (
-                  <div key={m.id} className={`flex ${m.sender_id === currentUser.id ? 'justify-end' : 'justify-start'} animate-vix-in`}>
-                    <div className={`p-5 px-8 rounded-[2.5rem] max-w-[85%] sm:max-w-[65%] text-[14px] shadow-2xl relative group ${
-                      m.sender_id === currentUser.id 
-                        ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
-                        : 'bg-zinc-900 text-zinc-300 rounded-tl-none border border-zinc-800'
-                    }`}>
-                      <p className="leading-relaxed font-medium">{m.content}</p>
-                      <div className={`text-[8px] opacity-40 mt-3 font-black uppercase tracking-widest ${m.sender_id === currentUser.id ? 'text-right' : 'text-left'}`}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                messages.map((m, i) => {
+                  const isOwn = m.sender_id === currentUser.id;
+                  const showTime = i === 0 || Math.abs(new Date(m.created_at).getTime() - new Date(messages[i-1].created_at).getTime()) > 600000;
+                  
+                  return (
+                    <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
+                      {showTime && (
+                        <span className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.4em] my-6 w-full text-center">
+                          {new Date(m.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                      <div className={`group relative max-w-[85%] sm:max-w-[70%] p-5 px-7 rounded-[2.5rem] text-[13px] font-medium shadow-2xl transition-all ${
+                        isOwn 
+                          ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
+                          : 'bg-zinc-900/80 text-zinc-300 rounded-tl-none border border-zinc-800/50 backdrop-blur-md'
+                      }`}>
+                        {m.content}
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            <form onSubmit={sendMessage} className="p-8 bg-zinc-900/40 border-t border-zinc-900 flex gap-5 backdrop-blur-2xl">
-              <input 
-                value={text} 
-                onChange={e => setText(e.target.value)} 
-                placeholder="Type a message..." 
-                className="flex-1 bg-black/60 border border-zinc-800 rounded-[2.5rem] px-10 py-5 text-sm focus:border-pink-500/30 outline-none transition-all text-white placeholder:text-zinc-800 font-medium shadow-inner" 
-              />
+            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-zinc-900/20 border-t border-zinc-900 flex gap-4 backdrop-blur-2xl">
+              <div className="flex-1 relative">
+                <input 
+                  ref={messageInputRef}
+                  value={text} 
+                  onChange={e => setText(e.target.value)} 
+                  placeholder="Type your message..." 
+                  className="w-full bg-black/60 border border-zinc-800 rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-white placeholder:text-zinc-800 font-semibold shadow-inner" 
+                />
+              </div>
               <button 
                 type="submit" 
                 disabled={!text.trim()}
-                className="vix-gradient p-5 rounded-full shadow-2xl shadow-pink-500/20 active:scale-90 transition-all disabled:opacity-20 shrink-0"
+                className="vix-gradient p-5 rounded-full shadow-2xl shadow-pink-500/20 active:scale-90 transition-all disabled:opacity-20 shrink-0 flex items-center justify-center group"
               >
-                <Send className="w-5 h-5 text-white" />
+                <Send className="w-5 h-5 text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </button>
             </form>
           </>
         ) : (
-          <div className="text-center space-y-10 animate-vix-in p-12">
-            <div className="w-32 h-32 rounded-[4rem] bg-zinc-900/30 flex items-center justify-center mx-auto border border-zinc-800 border-dashed shadow-2xl">
-              <MessageCircle className="w-14 h-14 text-zinc-800" />
+          <div className="text-center space-y-12 animate-vix-in p-12 max-w-sm">
+            <div className="relative">
+              <div className="absolute inset-0 bg-pink-500/10 blur-3xl rounded-full"></div>
+              <div className="w-28 h-28 rounded-[3rem] bg-zinc-900/30 flex items-center justify-center mx-auto border border-zinc-900 border-dashed shadow-2xl relative z-10">
+                <MessageCircle className="w-12 h-12 text-zinc-800" />
+              </div>
             </div>
-            <div className="space-y-4">
-              <h3 className="text-3xl font-black uppercase tracking-[0.5em] text-zinc-400">Select a Chat</h3>
-              <p className="text-zinc-700 text-[11px] font-black uppercase tracking-[0.2em] max-w-sm mx-auto leading-loose opacity-60">
-                Start a conversation with other creators on VixReel. Pick a person to start chatting.
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-white">Encrypted Signal</h3>
+              <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">
+                Initialize a secure narrative protocol to begin private signal exchange between creators.
               </p>
+              <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-12 py-4 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">Select Creator</button>
             </div>
           </div>
         )}
       </div>
+
+      {/* New Conversation Discovery Modal */}
+      {showNewChatModal && (
+        <div className="absolute inset-0 z-[100] bg-black/98 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-2xl animate-vix-in">
+          <button 
+            onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
+            className="absolute top-12 right-12 p-3 text-zinc-700 hover:text-white transition-colors bg-zinc-900/50 rounded-full border border-zinc-800"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="w-full max-w-md space-y-10">
+            <div className="text-center space-y-3">
+               <h3 className="text-3xl font-black text-white uppercase tracking-widest">Signal Search</h3>
+               <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">Establish new narrative connection</p>
+            </div>
+
+            <div className="relative group">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search @handle..." 
+                value={searchQuery}
+                onChange={e => handleSearchUsers(e.target.value)}
+                autoFocus
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-[2rem] py-6 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-white placeholder:text-zinc-800 font-bold"
+              />
+            </div>
+
+            <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar">
+              {isSearching ? (
+                <div className="flex flex-col items-center py-10 gap-4">
+                  <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
+                  <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">Scanning Registry...</span>
+                </div>
+              ) : searchResults.length > 0 ? (
+                searchResults.map(u => (
+                  <div 
+                    key={u.id}
+                    onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
+                    className="flex items-center gap-4 p-5 rounded-[2rem] bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-pink-500/20 cursor-pointer transition-all group"
+                  >
+                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-zinc-800 shadow-xl" />
+                    <div className="flex-1">
+                      <p className="font-black text-sm text-zinc-200 flex items-center gap-1.5">
+                        @{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+                      </p>
+                      <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest truncate">{u.full_name || 'Individual Creator'}</p>
+                    </div>
+                    <div className="bg-zinc-900 p-3 rounded-2xl text-zinc-600 group-hover:text-pink-500 transition-colors">
+                      <ChevronLeft className="w-4 h-4 rotate-180" />
+                    </div>
+                  </div>
+                ))
+              ) : searchQuery.length >= 2 && (
+                <div className="text-center py-20 opacity-30">
+                  <Search className="w-10 h-10 text-zinc-800 mx-auto mb-4" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">No identity match found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
