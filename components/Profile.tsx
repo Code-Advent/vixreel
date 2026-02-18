@@ -165,14 +165,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Authentication session expired.");
-      const activeUid = session.user.id;
-
+      // 1. Get User via getUser() to force a session check/refresh
+      const { data: { user: authUser }, error: sessionError } = await supabase.auth.getUser();
+      if (sessionError || !authUser) {
+        throw new Error("Identity verification failed. Please re-authenticate.");
+      }
+      
+      const activeUid = authUser.id;
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
 
-      // Upload Avatar
+      // 2. Upload Avatar (avatars/{uid}/{timestamp}.ext)
       if (editAvatarFile) {
         const ext = editAvatarFile.name.split('.').pop() || 'png';
         const path = `${activeUid}/avatar-${Date.now()}.${ext}`;
@@ -180,7 +183,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           .from('avatars')
           .upload(path, editAvatarFile, { upsert: true });
         
-        if (uploadErr) throw uploadErr;
+        if (uploadErr) {
+          console.error("Avatar Upload Fail:", uploadErr);
+          throw new Error(`Avatar Sync: ${uploadErr.message}`);
+        }
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -188,7 +194,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
 
-      // Upload Cover
+      // 3. Upload Cover
       if (editCoverFile) {
         const ext = editCoverFile.name.split('.').pop() || 'png';
         const path = `${activeUid}/cover-${Date.now()}.${ext}`;
@@ -196,7 +202,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           .from('avatars')
           .upload(path, editCoverFile, { upsert: true });
         
-        if (uploadErr) throw uploadErr;
+        if (uploadErr) {
+          console.error("Cover Upload Fail:", uploadErr);
+          throw new Error(`Cover Sync: ${uploadErr.message}`);
+        }
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -204,12 +213,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Update Database Table
+      // 4. Update Profile Registry
       const { error: updateErr } = await supabase
         .from('profiles')
         .update({
           username: editUsername.toLowerCase().trim(),
-          bio: editBio,
+          bio: editBio.trim(),
           avatar_url: finalAvatarUrl,
           cover_url: finalCoverUrl
         })
@@ -217,6 +226,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
       if (updateErr) throw updateErr;
 
+      // Local Update & UI Sync
       onUpdateProfile({ 
         username: editUsername, 
         bio: editBio, 
@@ -228,8 +238,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { detail: { id: activeUid } }));
 
     } catch (err: any) {
-      console.error("Save Error:", err);
-      alert(err.message || "Failed to update profile identity.");
+      console.error("VixReel Identity Sync Error:", err);
+      alert(err.message || "Failed to synchronize profile changes.");
     } finally {
       setIsSavingProfile(false);
     }

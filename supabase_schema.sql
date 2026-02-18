@@ -1,6 +1,6 @@
 
--- VIXREEL DATABASE CONTEXT v4.5
--- PERMISSIONS COMPATIBILITY PATCH
+-- VIXREEL DATABASE CONTEXT v4.6
+-- IDENTITY & STORAGE SYNC PROTOCOL
 
 -- 1. PROFILES INFRASTRUCTURE
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure columns exist regardless of previous state
+-- Ensure all identity columns are present
 DO $$ 
 BEGIN 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='avatar_url') THEN
@@ -33,7 +33,7 @@ BEGIN
   END IF;
 END $$;
 
--- 2. BUCKET CONFIGURATION
+-- 2. BUCKET INITIALIZATION
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true),
        ('posts', 'posts', true),
@@ -49,9 +49,9 @@ CREATE POLICY "public_profiles_read" ON public.profiles FOR SELECT USING (true);
 DROP POLICY IF EXISTS "owner_profiles_manage" ON public.profiles;
 CREATE POLICY "owner_profiles_manage" ON public.profiles FOR ALL USING (auth.uid() = id);
 
--- 4. STORAGE RLS (Simplified & Hardened)
--- Note: We do NOT 'ALTER TABLE storage.objects' as it's a system table and usually has RLS enabled.
--- Users often don't have 'owner' rights to ALTER it, leading to Error 42501.
+-- 4. STORAGE RLS (Optimized for reliability)
+-- Uses folder-based ownership where the first part of the path must be the user's UUID.
+-- Example: avatars/{user_id}/photo.png
 
 DROP POLICY IF EXISTS "storage_read_public" ON storage.objects;
 CREATE POLICY "storage_read_public" ON storage.objects FOR SELECT USING (bucket_id IN ('avatars', 'posts', 'stories'));
