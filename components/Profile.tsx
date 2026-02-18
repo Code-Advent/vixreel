@@ -167,23 +167,60 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     try {
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
+      
+      // Upload avatar to permanent storage if a new one was selected
       if (editAvatarFile) {
         const name = `${user.id}-av-${Date.now()}`;
-        await supabase.storage.from('avatars').upload(`avatars/${name}`, editAvatarFile);
-        finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(`avatars/${name}`).data.publicUrl;
+        const { error: avErr } = await supabase.storage
+          .from('avatars')
+          .upload(`avatars/${name}`, editAvatarFile);
+        
+        if (avErr) throw avErr;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`avatars/${name}`);
+        finalAvatarUrl = publicUrl;
       }
+      
+      // Upload cover to permanent storage if a new one was selected
       if (editCoverFile) {
         const name = `${user.id}-cv-${Date.now()}`;
-        await supabase.storage.from('avatars').upload(`covers/${name}`, editCoverFile);
-        finalCoverUrl = supabase.storage.from('avatars').getPublicUrl(`covers/${name}`).data.publicUrl;
+        const { error: cvErr } = await supabase.storage
+          .from('avatars')
+          .upload(`covers/${name}`, editCoverFile);
+        
+        if (cvErr) throw cvErr;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`covers/${name}`);
+        finalCoverUrl = publicUrl;
       }
-      await supabase.from('profiles').update({ 
-        username: editUsername.toLowerCase().trim(), bio: editBio.trim(), 
-        avatar_url: finalAvatarUrl, cover_url: finalCoverUrl 
+
+      // Synchronize changes with database
+      const { error: updateErr } = await supabase.from('profiles').update({ 
+        username: editUsername.toLowerCase().trim(), 
+        bio: editBio.trim(), 
+        avatar_url: finalAvatarUrl, 
+        cover_url: finalCoverUrl 
       }).eq('id', user.id);
+      
+      if (updateErr) throw updateErr;
+
       onUpdateProfile({ username: editUsername, bio: editBio, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl });
       setIsEditModalOpen(false);
-    } catch (err: any) { alert(err.message); } finally { setIsSavingProfile(false); }
+      
+      // Dispatch global update to ensure all components refresh the identity
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
+        detail: { id: user.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
+      }));
+      
+    } catch (err: any) { 
+      alert("Synchronization failure: " + err.message); 
+    } finally { 
+      setIsSavingProfile(false); 
+    }
   };
 
   return (
@@ -312,9 +349,19 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                <div className="space-y-3">
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Cover Banner</span>
                   <div className="h-32 w-full bg-zinc-900 rounded-2xl overflow-hidden relative group cursor-pointer border border-zinc-800" onClick={() => coverInputRef.current?.click()}>
-                     <img src={editCoverUrl || ''} className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                     {editCoverUrl ? (
+                       <img src={editCoverUrl} className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                     ) : (
+                       <div className="w-full h-full flex items-center justify-center bg-zinc-900"><ImageIcon className="w-10 h-10 text-zinc-800" /></div>
+                     )}
                      <div className="absolute inset-0 flex items-center justify-center"><Camera className="w-6 h-6 text-white" /></div>
-                     <input ref={coverInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setEditCoverFile(f); setEditCoverUrl(URL.createObjectURL(f)); } }} />
+                     <input ref={coverInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                       const f = e.target.files?.[0]; 
+                       if (f) { 
+                         setEditCoverFile(f); 
+                         setEditCoverUrl(URL.createObjectURL(f)); 
+                       } 
+                     }} />
                   </div>
                </div>
 
@@ -323,14 +370,20 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                      <img src={editAvatarUrl || `https://ui-avatars.com/api/?name=${editUsername}`} className="w-24 h-24 rounded-full object-cover bg-zinc-900 border-2 border-zinc-800 group-hover:opacity-50 shadow-2xl" />
                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="w-6 h-6 text-white" /></div>
                   </div>
-                  <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setEditAvatarFile(f); setEditAvatarUrl(URL.createObjectURL(f)); } }} />
+                  <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                    const f = e.target.files?.[0]; 
+                    if (f) { 
+                      setEditAvatarFile(f); 
+                      setEditAvatarUrl(URL.createObjectURL(f)); 
+                    } 
+                  }} />
                </div>
 
                <div className="space-y-4">
                   <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:border-blue-500/50 transition-all" placeholder="Handle" />
                   <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-white outline-none resize-none focus:border-blue-500/50 transition-all" placeholder="Narrative bio..." />
-                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all">
-                    {isSavingProfile ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Synchronize Identity'}
+                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-3">
+                    {isSavingProfile ? <><Loader2 className="w-5 h-5 animate-spin" /> Transmitting...</> : 'Synchronize Identity'}
                   </button>
                </div>
             </div>

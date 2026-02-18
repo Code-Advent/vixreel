@@ -47,6 +47,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [username, setUsername] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [foundProfile, setFoundProfile] = useState<UserProfile | null>(null);
   
   const otpInputRef = useRef<HTMLInputElement>(null);
@@ -174,8 +175,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       
       let verifyParams: any = {
         token: otpCode,
-        // For 6-digit codes via Email OTP, use 'email' or 'magiclink' depending on your Supabase config
-        // Most modern Supabase setups use 'email' for the numeric code verification
         type: authMethod === 'EMAIL' ? 'email' : 'sms',
       };
       
@@ -204,14 +203,32 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     e.preventDefault();
     if (!username.trim()) { setError("Username required"); return; }
     setLoading(true);
+    setError(null);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error("No session");
+
+      let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
+
+      // Permanently upload avatar if selected
+      if (avatarFile) {
+        const fileName = `${authUser.id}-av-${Date.now()}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('avatars')
+          .upload(`avatars/${fileName}`, avatarFile);
+        
+        if (!uploadErr) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(`avatars/${fileName}`);
+          finalAvatarUrl = publicUrl;
+        }
+      }
       
       const { data: profile, error: dbErr } = await supabase.from('profiles').upsert({
         id: authUser.id,
         username: username.toLowerCase().trim(),
-        avatar_url: avatarUrl || `https://ui-avatars.com/api/?name=${username}`,
+        avatar_url: finalAvatarUrl,
         email: authUser.email,
         phone: authUser.phone
       }).select().single();
@@ -423,7 +440,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                 <div className="absolute bottom-1 right-1 bg-pink-500 rounded-full p-2 border-4 border-[#050505] shadow-lg">
                   <User className="w-4 h-4 text-white" />
                 </div>
-                <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) setAvatarUrl(URL.createObjectURL(f)); }} />
+                <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={e => { 
+                  const f = e.target.files?.[0]; 
+                  if (f) { 
+                    setAvatarFile(f); 
+                    setAvatarUrl(URL.createObjectURL(f)); 
+                  } 
+                }} />
               </div>
               <input 
                 type="text" 
