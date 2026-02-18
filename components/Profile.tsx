@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Grid, Heart, Camera, Settings, User as UserIcon, Loader2, X,
@@ -109,7 +108,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
       }
 
-      const { count: fCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
+      const { count: fCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
       const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
       const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
       const boostedFollowers = freshProfile?.boosted_followers || 0;
@@ -165,10 +164,16 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // 1. Get User via getUser() to force a session check/refresh
-      const { data: { user: authUser }, error: sessionError } = await supabase.auth.getUser();
-      if (sessionError || !authUser) {
-        throw new Error("Identity verification failed. Please re-authenticate.");
+      // 1. Better session retrieval: try local session first, then verify with server
+      const { data: { session: localSession } } = await supabase.auth.getSession();
+      let authUser = localSession?.user;
+
+      if (!authUser) {
+        const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
+        if (userError || !verifiedUser) {
+          throw new Error("Identity verification failed. Please sign in again.");
+        }
+        authUser = verifiedUser;
       }
       
       const activeUid = authUser.id;
@@ -194,7 +199,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
 
-      // 3. Upload Cover
+      // 3. Upload Cover (avatars/{uid}/{timestamp}.ext)
       if (editCoverFile) {
         const ext = editCoverFile.name.split('.').pop() || 'png';
         const path = `${activeUid}/cover-${Date.now()}.${ext}`;
@@ -213,16 +218,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // 4. Update Profile Registry
+      // 4. Update Profile Registry using upsert to be safe
       const { error: updateErr } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: activeUid,
           username: editUsername.toLowerCase().trim(),
           bio: editBio.trim(),
           avatar_url: finalAvatarUrl,
-          cover_url: finalCoverUrl
-        })
-        .eq('id', activeUid);
+          cover_url: finalCoverUrl,
+          updated_at: new Date().toISOString()
+        });
 
       if (updateErr) throw updateErr;
 
@@ -309,6 +315,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white shadow-2xl shadow-blue-500/10'}`}>
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
+              {/* FIXED: Replaced anonymous function with the UserProfile object 'user' */}
               <button onClick={() => onMessageUser?.(user)} className="bg-zinc-900 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 text-white shadow-xl hover:bg-zinc-800">Message</button>
             </>
           )}

@@ -205,13 +205,20 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     setLoading(true);
     setError(null);
     try {
+      // 1. Get session more reliably
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("No session active.");
-      const activeUid = session.user.id;
+      let authUser = session?.user;
 
+      if (!authUser) {
+        const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
+        if (userError || !verifiedUser) throw new Error("No active session found. Please re-authenticate.");
+        authUser = verifiedUser;
+      }
+
+      const activeUid = authUser.id;
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
-      // Upload Avatar - Path MUST be {userId}/{filename}
+      // 2. Upload Avatar - Path MUST be {userId}/{filename}
       if (avatarFile) {
         const ext = avatarFile.name.split('.').pop() || 'png';
         const filePath = `${activeUid}/avatar-${Date.now()}.${ext}`;
@@ -229,12 +236,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         }
       }
       
+      // 3. Upsert Profile for maximum robustness
       const { data: profile, error: dbErr } = await supabase.from('profiles').upsert({
         id: activeUid,
         username: username.toLowerCase().trim(),
         avatar_url: finalAvatarUrl,
-        email: session.user.email,
-        phone: session.user.phone
+        email: authUser.email,
+        phone: authUser.phone,
+        updated_at: new Date().toISOString()
       }).select().single();
       
       if (dbErr) throw dbErr;

@@ -1,6 +1,6 @@
 
--- VIXREEL DATABASE CONTEXT v4.6
--- IDENTITY & STORAGE SYNC PROTOCOL
+-- VIXREEL DATABASE CONTEXT v4.7
+-- RELIABILITY & IDENTITY SYNC PATCH
 
 -- 1. PROFILES INFRASTRUCTURE
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure all identity columns are present
+-- Explicitly ensure all columns are present (prevents 'column not found' errors)
 DO $$ 
 BEGIN 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='avatar_url') THEN
@@ -34,6 +34,7 @@ BEGIN
 END $$;
 
 -- 2. BUCKET INITIALIZATION
+-- We ensure public access is enabled for the buckets
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true),
        ('posts', 'posts', true),
@@ -46,12 +47,12 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "public_profiles_read" ON public.profiles;
 CREATE POLICY "public_profiles_read" ON public.profiles FOR SELECT USING (true);
 
+-- Allow owners full control (Select, Insert, Update, Delete)
 DROP POLICY IF EXISTS "owner_profiles_manage" ON public.profiles;
-CREATE POLICY "owner_profiles_manage" ON public.profiles FOR ALL USING (auth.uid() = id);
+CREATE POLICY "owner_profiles_manage" ON public.profiles FOR ALL TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
--- 4. STORAGE RLS (Optimized for reliability)
--- Uses folder-based ownership where the first part of the path must be the user's UUID.
--- Example: avatars/{user_id}/photo.png
+-- 4. STORAGE RLS (Optimized for reliability using path matching)
+-- This enforces that files in 'avatars/UID/...' can only be managed by UID.
 
 DROP POLICY IF EXISTS "storage_read_public" ON storage.objects;
 CREATE POLICY "storage_read_public" ON storage.objects FOR SELECT USING (bucket_id IN ('avatars', 'posts', 'stories'));
@@ -60,23 +61,23 @@ DROP POLICY IF EXISTS "storage_insert_owner" ON storage.objects;
 CREATE POLICY "storage_insert_owner" ON storage.objects FOR INSERT TO authenticated 
 WITH CHECK (
   bucket_id IN ('avatars', 'posts', 'stories') AND 
-  (storage.foldername(name))[1] = auth.uid()::text
+  (name LIKE (auth.uid()::text || '/%'))
 );
 
 DROP POLICY IF EXISTS "storage_update_owner" ON storage.objects;
 CREATE POLICY "storage_update_owner" ON storage.objects FOR UPDATE TO authenticated 
 USING (
   bucket_id IN ('avatars', 'posts', 'stories') AND 
-  (storage.foldername(name))[1] = auth.uid()::text
+  (name LIKE (auth.uid()::text || '/%'))
 )
 WITH CHECK (
   bucket_id IN ('avatars', 'posts', 'stories') AND 
-  (storage.foldername(name))[1] = auth.uid()::text
+  (name LIKE (auth.uid()::text || '/%'))
 );
 
 DROP POLICY IF EXISTS "storage_delete_owner" ON storage.objects;
 CREATE POLICY "storage_delete_owner" ON storage.objects FOR DELETE TO authenticated 
 USING (
   bucket_id IN ('avatars', 'posts', 'stories') AND 
-  (storage.foldername(name))[1] = auth.uid()::text
+  (name LIKE (auth.uid()::text || '/%'))
 );
