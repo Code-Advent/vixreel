@@ -165,16 +165,21 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // Identity Check: Since this component is only for the owner when editing, 
-      // the user.id prop IS the definitive identity source verified by App.tsx.
-      const activeUid = user.id;
-      
+      // Identity Check: Fetch the fresh user from auth to ensure we have a valid session and ID
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        alert("Session validation failed. Please refresh and log in.");
+        setIsSavingProfile(false);
+        return;
+      }
+
+      const activeUid = authUser.id;
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
-      // Upload Avatar - Path MUST be {userId}/{filename}
+      // Upload Avatar
       if (editAvatarFile) {
-        const fileName = `av-${Date.now()}`;
+        const fileName = `av-${Date.now()}.png`;
         const filePath = `${activeUid}/${fileName}`;
         const { error: avErr } = await supabase.storage
           .from('avatars')
@@ -188,9 +193,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
       
-      // Upload Cover - Path MUST be {userId}/{filename}
+      // Upload Cover
       if (editCoverFile) {
-        const fileName = `cv-${Date.now()}`;
+        const fileName = `cv-${Date.now()}.png`;
         const filePath = `${activeUid}/${fileName}`;
         const { error: cvErr } = await supabase.storage
           .from('avatars')
@@ -204,7 +209,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Update Database Table - Explicitly using activeUid
+      // Update Database Table
       const { error: updateErr } = await supabase.from('profiles').update({ 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
@@ -212,9 +217,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         cover_url: finalCoverUrl 
       }).eq('id', activeUid);
       
-      if (updateErr) {
-        throw updateErr;
-      }
+      if (updateErr) throw updateErr;
 
       onUpdateProfile({ username: editUsername, bio: editBio, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl });
       setIsEditModalOpen(false);
@@ -225,7 +228,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       
     } catch (err: any) { 
       console.error("Profile sync error:", err);
-      alert(err.message || "Failed to synchronize profile. Check connection."); 
+      alert(err.message || "Failed to synchronize profile. Check your connection."); 
     } finally { 
       setIsSavingProfile(false); 
     }
@@ -324,7 +327,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[3rem] overflow-hidden shadow-2xl animate-vix-in">
+          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
             <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/20">
               <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">{socialModalType} Registry</h3>
               <button onClick={() => setIsSocialModalOpen(false)}><X className="w-6 h-6 text-zinc-700 hover:text-white" /></button>
