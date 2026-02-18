@@ -165,21 +165,25 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Narrative session expired. Please re-authenticate.");
+      // Use getUser() as it is more definitive for auth status than getSession()
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        alert("Session lost. Please log in again.");
+        return;
+      }
       
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
-      // CRITICAL: Path must be exactly {userId}/{filename} to satisfy RLS policy
+      // Upload avatar
       if (editAvatarFile) {
         const fileName = `av-${Date.now()}`;
-        const filePath = `${session.user.id}/${fileName}`;
+        const filePath = `${authUser.id}/${fileName}`;
         const { error: avErr } = await supabase.storage
           .from('avatars')
           .upload(filePath, editAvatarFile, { upsert: true });
         
-        if (avErr) throw new Error(`Avatar Sync Failed: ${avErr.message}`);
+        if (avErr) throw new Error(`Avatar Upload Error: ${avErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -187,14 +191,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
       
+      // Upload cover
       if (editCoverFile) {
         const fileName = `cv-${Date.now()}`;
-        const filePath = `${session.user.id}/${fileName}`;
+        const filePath = `${authUser.id}/${fileName}`;
         const { error: cvErr } = await supabase.storage
           .from('avatars')
           .upload(filePath, editCoverFile, { upsert: true });
         
-        if (cvErr) throw new Error(`Cover Sync Failed: ${cvErr.message}`);
+        if (cvErr) throw new Error(`Cover Upload Error: ${cvErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -202,26 +207,31 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Explicit update on profiles table
+      // Update Database
       const { error: updateErr } = await supabase.from('profiles').update({ 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
         cover_url: finalCoverUrl 
-      }).eq('id', session.user.id);
+      }).eq('id', authUser.id);
       
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        if (updateErr.message.includes('cover_url')) {
+          throw new Error("Schema update required. Please run the SQL migration script in your Supabase SQL Editor.");
+        }
+        throw updateErr;
+      }
 
       onUpdateProfile({ username: editUsername, bio: editBio, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl });
       setIsEditModalOpen(false);
       
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
-        detail: { id: session.user.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
+        detail: { id: authUser.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
       }));
       
     } catch (err: any) { 
-      console.error("Profile synchronization error:", err);
-      alert(err.message || "Identity synchronization failure."); 
+      console.error("Profile sync error:", err);
+      alert(err.message || "Failed to sync profile."); 
     } finally { 
       setIsSavingProfile(false); 
     }
@@ -318,7 +328,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       </div>
 
-      {/* Social Modal */}
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[3rem] overflow-hidden shadow-2xl animate-vix-in">
@@ -342,7 +351,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
-      {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">
