@@ -211,16 +211,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
       // Permanently upload avatar if selected
+      // MUST START WITH UID: {userId}/{filename}
       if (avatarFile) {
-        const fileName = `${authUser.id}-av-${Date.now()}`;
+        const fileName = `av-${Date.now()}`;
+        const filePath = `${authUser.id}/${fileName}`;
         const { error: uploadErr } = await supabase.storage
           .from('avatars')
-          .upload(`avatars/${fileName}`, avatarFile);
+          .upload(filePath, avatarFile);
         
         if (!uploadErr) {
           const { data: { publicUrl } } = supabase.storage
             .from('avatars')
-            .getPublicUrl(`avatars/${fileName}`);
+            .getPublicUrl(filePath);
           finalAvatarUrl = publicUrl;
         }
       }

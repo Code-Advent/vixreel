@@ -165,36 +165,42 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Narrative session expired. Please re-authenticate.");
+      
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
       // Upload avatar to permanent storage if a new one was selected
+      // PATH MUST START WITH UID FOR RLS: {userId}/{filename}
       if (editAvatarFile) {
-        const name = `${user.id}-av-${Date.now()}`;
+        const fileName = `av-${Date.now()}`;
+        const filePath = `${session.user.id}/${fileName}`;
         const { error: avErr } = await supabase.storage
           .from('avatars')
-          .upload(`avatars/${name}`, editAvatarFile);
+          .upload(filePath, editAvatarFile, { upsert: true });
         
-        if (avErr) throw avErr;
+        if (avErr) throw new Error(`Avatar Sync Failed: ${avErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
-          .getPublicUrl(`avatars/${name}`);
+          .getPublicUrl(filePath);
         finalAvatarUrl = publicUrl;
       }
       
       // Upload cover to permanent storage if a new one was selected
       if (editCoverFile) {
-        const name = `${user.id}-cv-${Date.now()}`;
+        const fileName = `cv-${Date.now()}`;
+        const filePath = `${session.user.id}/${fileName}`;
         const { error: cvErr } = await supabase.storage
           .from('avatars')
-          .upload(`covers/${name}`, editCoverFile);
+          .upload(filePath, editCoverFile, { upsert: true });
         
-        if (cvErr) throw cvErr;
+        if (cvErr) throw new Error(`Cover Sync Failed: ${cvErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
-          .getPublicUrl(`covers/${name}`);
+          .getPublicUrl(filePath);
         finalCoverUrl = publicUrl;
       }
 
@@ -204,7 +210,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
         cover_url: finalCoverUrl 
-      }).eq('id', user.id);
+      }).eq('id', session.user.id);
       
       if (updateErr) throw updateErr;
 
@@ -213,11 +219,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       
       // Dispatch global update to ensure all components refresh the identity
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
-        detail: { id: user.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
+        detail: { id: session.user.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
       }));
       
     } catch (err: any) { 
-      alert("Synchronization failure: " + err.message); 
+      console.error("Profile synchronization error:", err);
+      alert(err.message || "Identity synchronization failure. Check your connection protocol."); 
     } finally { 
       setIsSavingProfile(false); 
     }

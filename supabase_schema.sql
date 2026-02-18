@@ -1,6 +1,6 @@
 
--- VIXREEL MASTER SCHEMA (v3.3)
--- Added saves table support
+-- VIXREEL MASTER SCHEMA (v3.6)
+-- Hardened RLS for Storage and Profiles
 
 -- 1. PROFILES
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS public.saves (
   UNIQUE(post_id, user_id)
 );
 
--- RLS
+-- RLS ENABLING
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
@@ -119,33 +119,81 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saves ENABLE ROW LEVEL SECURITY;
 
+-- DATABASE POLICIES
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can manage their own profile" ON public.profiles;
+CREATE POLICY "Users can manage their own profile" ON public.profiles 
+FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
 DROP POLICY IF EXISTS "Posts are viewable by everyone" ON public.posts;
 CREATE POLICY "Posts are viewable by everyone" ON public.posts FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can insert their own posts" ON public.posts;
-CREATE POLICY "Users can insert their own posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Users can delete their own posts" ON public.posts;
-CREATE POLICY "Users can delete their own posts" ON public.posts FOR DELETE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can manage their own posts" ON public.posts;
+CREATE POLICY "Users can manage their own posts" ON public.posts 
+FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Likes are viewable by everyone" ON public.likes;
 CREATE POLICY "Likes are viewable by everyone" ON public.likes FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Users can toggle likes" ON public.likes;
 CREATE POLICY "Users can toggle likes" ON public.likes FOR ALL USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Comments are viewable by everyone" ON public.comments;
 CREATE POLICY "Comments are viewable by everyone" ON public.comments FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Users can manage own comments" ON public.comments;
 CREATE POLICY "Users can manage own comments" ON public.comments FOR ALL USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Messages are viewable by participants" ON public.messages;
 CREATE POLICY "Messages are viewable by participants" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
 DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
 CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
 DROP POLICY IF EXISTS "Stories are viewable while active" ON public.stories;
 CREATE POLICY "Stories are viewable while active" ON public.stories FOR SELECT USING (expires_at > NOW());
+
 DROP POLICY IF EXISTS "Users can manage own stories" ON public.stories;
 CREATE POLICY "Users can manage own stories" ON public.stories FOR ALL USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Saves are viewable by owner" ON public.saves;
 CREATE POLICY "Saves are viewable by owner" ON public.saves FOR SELECT USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "Users can toggle saves" ON public.saves;
 CREATE POLICY "Users can toggle saves" ON public.saves FOR ALL USING (auth.uid() = user_id);
+
+-- STORAGE RLS
+-- Use exact folder ownership pattern: {userId}/{filename}
+-- The path in the storage.objects table name column is what we check against.
+
+-- Avatars Bucket
+DROP POLICY IF EXISTS "Users can manage own avatars" ON storage.objects;
+CREATE POLICY "Users can manage own avatars" ON storage.objects 
+FOR ALL TO authenticated 
+USING (bucket_id = 'avatars' AND (name LIKE auth.uid()::text || '/%'))
+WITH CHECK (bucket_id = 'avatars' AND (name LIKE auth.uid()::text || '/%'));
+
+DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
+CREATE POLICY "Anyone can view avatars" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
+
+-- Posts Bucket
+DROP POLICY IF EXISTS "Users can manage own posts storage" ON storage.objects;
+CREATE POLICY "Users can manage own posts storage" ON storage.objects 
+FOR ALL TO authenticated 
+USING (bucket_id = 'posts' AND (name LIKE auth.uid()::text || '/%'))
+WITH CHECK (bucket_id = 'posts' AND (name LIKE auth.uid()::text || '/%'));
+
+DROP POLICY IF EXISTS "Anyone can view posts storage" ON storage.objects;
+CREATE POLICY "Anyone can view posts storage" ON storage.objects FOR SELECT USING (bucket_id = 'posts');
+
+-- Stories Bucket
+DROP POLICY IF EXISTS "Users can manage own stories storage" ON storage.objects;
+CREATE POLICY "Users can manage own stories storage" ON storage.objects 
+FOR ALL TO authenticated 
+USING (bucket_id = 'stories' AND (name LIKE auth.uid()::text || '/%'))
+WITH CHECK (bucket_id = 'stories' AND (name LIKE auth.uid()::text || '/%'));
+
+DROP POLICY IF EXISTS "Anyone can view stories storage" ON storage.objects;
+CREATE POLICY "Anyone can view stories storage" ON storage.objects FOR SELECT USING (bucket_id = 'stories');
