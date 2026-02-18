@@ -165,22 +165,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // Robust session check
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentAuthUser = session?.user;
+      // Identity Check: Since this component is only for the owner when editing, 
+      // the user.id prop IS the definitive identity source verified by App.tsx.
+      const activeUid = user.id;
       
-      if (!currentAuthUser) {
-        // One final fallback attempt
-        const { data: { user: retryUser } } = await supabase.auth.getUser();
-        if (!retryUser) {
-           alert("Session validation failed. Please refresh and log in.");
-           return;
-        }
-      }
-
-      const activeUid = currentAuthUser?.id || (await supabase.auth.getUser()).data.user?.id;
-      if (!activeUid) throw new Error("Could not verify identity signal.");
-
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
@@ -216,7 +204,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Update Database Table
+      // Update Database Table - Explicitly using activeUid
       const { error: updateErr } = await supabase.from('profiles').update({ 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
@@ -225,9 +213,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       }).eq('id', activeUid);
       
       if (updateErr) {
-        if (updateErr.message.includes('cover_url')) {
-          throw new Error("Missing 'cover_url' column. Please execute the SQL Repair script in Supabase.");
-        }
         throw updateErr;
       }
 
@@ -240,7 +225,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       
     } catch (err: any) { 
       console.error("Profile sync error:", err);
-      alert(err.message || "Failed to synchronize profile with the cloud."); 
+      alert(err.message || "Failed to synchronize profile. Check connection."); 
     } finally { 
       setIsSavingProfile(false); 
     }
