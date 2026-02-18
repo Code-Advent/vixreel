@@ -171,8 +171,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
-      // Upload avatar to permanent storage if a new one was selected
-      // PATH MUST START WITH UID FOR RLS: {userId}/{filename}
+      // CRITICAL: Path must be exactly {userId}/{filename} to satisfy RLS policy
       if (editAvatarFile) {
         const fileName = `av-${Date.now()}`;
         const filePath = `${session.user.id}/${fileName}`;
@@ -188,7 +187,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
       
-      // Upload cover to permanent storage if a new one was selected
       if (editCoverFile) {
         const fileName = `cv-${Date.now()}`;
         const filePath = `${session.user.id}/${fileName}`;
@@ -204,7 +202,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Synchronize changes with database
+      // Explicit update on profiles table
       const { error: updateErr } = await supabase.from('profiles').update({ 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
@@ -217,14 +215,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       onUpdateProfile({ username: editUsername, bio: editBio, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl });
       setIsEditModalOpen(false);
       
-      // Dispatch global update to ensure all components refresh the identity
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
         detail: { id: session.user.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
       }));
       
     } catch (err: any) { 
       console.error("Profile synchronization error:", err);
-      alert(err.message || "Identity synchronization failure. Check your connection protocol."); 
+      alert(err.message || "Identity synchronization failure."); 
     } finally { 
       setIsSavingProfile(false); 
     }
@@ -321,6 +318,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       </div>
 
+      {/* Social Modal */}
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm bg-zinc-950 border border-zinc-900 rounded-[3rem] overflow-hidden shadow-2xl animate-vix-in">
@@ -344,6 +342,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
       )}
 
+      {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">
