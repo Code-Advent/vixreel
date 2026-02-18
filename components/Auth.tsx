@@ -206,19 +206,21 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     setError(null);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) throw new Error("No session");
+      if (!authUser) throw new Error("No session active.");
 
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
       // Upload Avatar - Path MUST be {userId}/{filename}
       if (avatarFile) {
-        const fileName = `av-${Date.now()}`;
+        const fileName = `av-${Date.now()}.png`;
         const filePath = `${authUser.id}/${fileName}`;
         const { error: uploadErr } = await supabase.storage
           .from('avatars')
-          .upload(filePath, avatarFile);
+          .upload(filePath, avatarFile, { upsert: true });
         
-        if (!uploadErr) {
+        if (uploadErr) {
+          console.error("Avatar upload error:", uploadErr);
+        } else {
           const { data: { publicUrl } } = supabase.storage
             .from('avatars')
             .getPublicUrl(filePath);

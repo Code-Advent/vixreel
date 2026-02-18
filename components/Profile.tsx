@@ -165,19 +165,25 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // Identity Check: Fetch the fresh user from auth to ensure we have a valid session and ID
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        alert("Session validation failed. Please refresh and log in.");
+      // Robust session check
+      const { data: { session } } = await supabase.auth.getSession();
+      let activeUid = session?.user?.id;
+      
+      if (!activeUid) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        activeUid = authUser?.id;
+      }
+      
+      if (!activeUid) {
+        alert("Session lost. Please refresh and log in again.");
         setIsSavingProfile(false);
         return;
       }
 
-      const activeUid = authUser.id;
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
-      // Upload Avatar
+      // Upload Avatar - Path MUST be {userId}/{filename}
       if (editAvatarFile) {
         const fileName = `av-${Date.now()}.png`;
         const filePath = `${activeUid}/${fileName}`;
@@ -193,7 +199,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
       
-      // Upload Cover
+      // Upload Cover - Path MUST be {userId}/{filename}
       if (editCoverFile) {
         const fileName = `cv-${Date.now()}.png`;
         const filePath = `${activeUid}/${fileName}`;
