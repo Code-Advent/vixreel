@@ -165,78 +165,73 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // Robust session check
       const { data: { session } } = await supabase.auth.getSession();
-      let activeUid = session?.user?.id;
-      
-      if (!activeUid) {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        activeUid = authUser?.id;
-      }
-      
-      if (!activeUid) {
-        alert("Session lost. Please refresh and log in again.");
-        setIsSavingProfile(false);
-        return;
-      }
+      if (!session) throw new Error("Authentication session expired.");
+      const activeUid = session.user.id;
 
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
-      
-      // Upload Avatar - Path MUST be {userId}/{filename}
+
+      // Upload Avatar
       if (editAvatarFile) {
-        const fileName = `av-${Date.now()}.png`;
-        const filePath = `${activeUid}/${fileName}`;
-        const { error: avErr } = await supabase.storage
+        const ext = editAvatarFile.name.split('.').pop() || 'png';
+        const path = `${activeUid}/avatar-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
           .from('avatars')
-          .upload(filePath, editAvatarFile, { upsert: true });
+          .upload(path, editAvatarFile, { upsert: true });
         
-        if (avErr) throw new Error(`Avatar Sync Failed: ${avErr.message}`);
+        if (uploadErr) throw uploadErr;
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
-          .getPublicUrl(filePath);
+          .getPublicUrl(path);
         finalAvatarUrl = publicUrl;
       }
-      
-      // Upload Cover - Path MUST be {userId}/{filename}
+
+      // Upload Cover
       if (editCoverFile) {
-        const fileName = `cv-${Date.now()}.png`;
-        const filePath = `${activeUid}/${fileName}`;
-        const { error: cvErr } = await supabase.storage
+        const ext = editCoverFile.name.split('.').pop() || 'png';
+        const path = `${activeUid}/cover-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
           .from('avatars')
-          .upload(filePath, editCoverFile, { upsert: true });
+          .upload(path, editCoverFile, { upsert: true });
         
-        if (cvErr) throw new Error(`Cover Sync Failed: ${cvErr.message}`);
+        if (uploadErr) throw uploadErr;
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
-          .getPublicUrl(filePath);
+          .getPublicUrl(path);
         finalCoverUrl = publicUrl;
       }
 
       // Update Database Table
-      const { error: updateErr } = await supabase.from('profiles').update({ 
-        username: editUsername.toLowerCase().trim(), 
-        bio: editBio.trim(), 
-        avatar_url: finalAvatarUrl, 
-        cover_url: finalCoverUrl 
-      }).eq('id', activeUid);
-      
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({
+          username: editUsername.toLowerCase().trim(),
+          bio: editBio,
+          avatar_url: finalAvatarUrl,
+          cover_url: finalCoverUrl
+        })
+        .eq('id', activeUid);
+
       if (updateErr) throw updateErr;
 
-      onUpdateProfile({ username: editUsername, bio: editBio, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl });
+      onUpdateProfile({ 
+        username: editUsername, 
+        bio: editBio, 
+        avatar_url: finalAvatarUrl, 
+        cover_url: finalCoverUrl 
+      });
+      
       setIsEditModalOpen(false);
-      
-      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
-        detail: { id: activeUid, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
-      }));
-      
-    } catch (err: any) { 
-      console.error("Profile sync error:", err);
-      alert(err.message || "Failed to synchronize profile. Check your connection."); 
-    } finally { 
-      setIsSavingProfile(false); 
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { detail: { id: activeUid } }));
+
+    } catch (err: any) {
+      console.error("Save Error:", err);
+      alert(err.message || "Failed to update profile identity.");
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 

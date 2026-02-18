@@ -205,15 +205,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     setLoading(true);
     setError(null);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) throw new Error("No session active.");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session active.");
+      const activeUid = session.user.id;
 
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
       // Upload Avatar - Path MUST be {userId}/{filename}
       if (avatarFile) {
-        const fileName = `av-${Date.now()}.png`;
-        const filePath = `${authUser.id}/${fileName}`;
+        const ext = avatarFile.name.split('.').pop() || 'png';
+        const filePath = `${activeUid}/avatar-${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from('avatars')
           .upload(filePath, avatarFile, { upsert: true });
@@ -229,11 +230,11 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       }
       
       const { data: profile, error: dbErr } = await supabase.from('profiles').upsert({
-        id: authUser.id,
+        id: activeUid,
         username: username.toLowerCase().trim(),
         avatar_url: finalAvatarUrl,
-        email: authUser.email,
-        phone: authUser.phone
+        email: session.user.email,
+        phone: session.user.phone
       }).select().single();
       
       if (dbErr) throw dbErr;
