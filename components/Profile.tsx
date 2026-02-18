@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Grid, Heart, Camera, Settings, User as UserIcon, Loader2, X,
@@ -84,6 +85,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const fetchUserContent = async () => {
     setIsUpdating(true);
     try {
+      // Fetch posts by the user
       const { data: pData } = await supabase
         .from('posts')
         .select('*, user:profiles(*)')
@@ -98,6 +100,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setPosts(postsWithLikes as any);
       }
 
+      // Fetch posts liked by the user
       const { data: lData } = await supabase
         .from('likes')
         .select('post:posts(*, user:profiles(*))')
@@ -108,8 +111,18 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
       }
 
-      const { count: fCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
-      const { count: ingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
+      // CORRECTED: Count followers (people following this user)
+      const { count: fCount } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', user.id);
+
+      // CORRECTED: Count following (people this user follows)
+      const { count: ingCount } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', user.id);
+
       const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
       const boostedFollowers = freshProfile?.boosted_followers || 0;
       
@@ -132,7 +145,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         const { data } = await supabase.from('follows').select('*').eq('follower_id', session.user.id).eq('following_id', user.id).maybeSingle();
         setIsFollowing(!!data);
       }
-    } finally { setIsUpdating(false); }
+    } catch (err) {
+      console.error("Profile content fetch error:", err);
+    } finally { 
+      setIsUpdating(false); 
+    }
   };
 
   const handleOpenSocial = async (type: 'FOLLOWERS' | 'FOLLOWING') => {
@@ -164,23 +181,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // 1. Better session retrieval: try local session first, then verify with server
-      const { data: { session: localSession } } = await supabase.auth.getSession();
-      let authUser = localSession?.user;
-
-      if (!authUser) {
-        const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
-        if (userError || !verifiedUser) {
-          throw new Error("Identity verification failed. Please sign in again.");
-        }
-        authUser = verifiedUser;
+      const { data: { user: authUser }, error: sessionError } = await supabase.auth.getUser();
+      if (sessionError || !authUser) {
+        throw new Error("Identity verification failed. Please re-authenticate.");
       }
       
       const activeUid = authUser.id;
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
 
-      // 2. Upload Avatar (avatars/{uid}/{timestamp}.ext)
       if (editAvatarFile) {
         const ext = editAvatarFile.name.split('.').pop() || 'png';
         const path = `${activeUid}/avatar-${Date.now()}.${ext}`;
@@ -199,7 +208,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
 
-      // 3. Upload Cover (avatars/{uid}/{timestamp}.ext)
       if (editCoverFile) {
         const ext = editCoverFile.name.split('.').pop() || 'png';
         const path = `${activeUid}/cover-${Date.now()}.${ext}`;
@@ -218,21 +226,18 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // 4. Update Profile Registry using upsert to be safe
       const { error: updateErr } = await supabase
         .from('profiles')
-        .upsert({
-          id: activeUid,
+        .update({
           username: editUsername.toLowerCase().trim(),
           bio: editBio.trim(),
           avatar_url: finalAvatarUrl,
-          cover_url: finalCoverUrl,
-          updated_at: new Date().toISOString()
-        });
+          cover_url: finalCoverUrl
+        })
+        .eq('id', activeUid);
 
       if (updateErr) throw updateErr;
 
-      // Local Update & UI Sync
       onUpdateProfile({ 
         username: editUsername, 
         bio: editBio, 
@@ -315,7 +320,6 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-900 text-zinc-500 border border-zinc-800' : 'vix-gradient text-white shadow-2xl shadow-blue-500/10'}`}>
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
-              {/* FIXED: Replaced anonymous function with the UserProfile object 'user' */}
               <button onClick={() => onMessageUser?.(user)} className="bg-zinc-900 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-zinc-800 text-white shadow-xl hover:bg-zinc-800">Message</button>
             </>
           )}
