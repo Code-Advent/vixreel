@@ -165,25 +165,34 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const saveProfileChanges = async () => {
     setIsSavingProfile(true);
     try {
-      // Use getUser() as it is more definitive for auth status than getSession()
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        alert("Session lost. Please log in again.");
-        return;
-      }
+      // Robust session check
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentAuthUser = session?.user;
       
+      if (!currentAuthUser) {
+        // One final fallback attempt
+        const { data: { user: retryUser } } = await supabase.auth.getUser();
+        if (!retryUser) {
+           alert("Session validation failed. Please refresh and log in.");
+           return;
+        }
+      }
+
+      const activeUid = currentAuthUser?.id || (await supabase.auth.getUser()).data.user?.id;
+      if (!activeUid) throw new Error("Could not verify identity signal.");
+
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
       
-      // Upload avatar
+      // Upload Avatar - Path MUST be {userId}/{filename}
       if (editAvatarFile) {
         const fileName = `av-${Date.now()}`;
-        const filePath = `${authUser.id}/${fileName}`;
+        const filePath = `${activeUid}/${fileName}`;
         const { error: avErr } = await supabase.storage
           .from('avatars')
           .upload(filePath, editAvatarFile, { upsert: true });
         
-        if (avErr) throw new Error(`Avatar Upload Error: ${avErr.message}`);
+        if (avErr) throw new Error(`Avatar Sync Failed: ${avErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -191,15 +200,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalAvatarUrl = publicUrl;
       }
       
-      // Upload cover
+      // Upload Cover - Path MUST be {userId}/{filename}
       if (editCoverFile) {
         const fileName = `cv-${Date.now()}`;
-        const filePath = `${authUser.id}/${fileName}`;
+        const filePath = `${activeUid}/${fileName}`;
         const { error: cvErr } = await supabase.storage
           .from('avatars')
           .upload(filePath, editCoverFile, { upsert: true });
         
-        if (cvErr) throw new Error(`Cover Upload Error: ${cvErr.message}`);
+        if (cvErr) throw new Error(`Cover Sync Failed: ${cvErr.message}`);
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
@@ -207,17 +216,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         finalCoverUrl = publicUrl;
       }
 
-      // Update Database
+      // Update Database Table
       const { error: updateErr } = await supabase.from('profiles').update({ 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
         cover_url: finalCoverUrl 
-      }).eq('id', authUser.id);
+      }).eq('id', activeUid);
       
       if (updateErr) {
         if (updateErr.message.includes('cover_url')) {
-          throw new Error("Schema update required. Please run the SQL migration script in your Supabase SQL Editor.");
+          throw new Error("Missing 'cover_url' column. Please execute the SQL Repair script in Supabase.");
         }
         throw updateErr;
       }
@@ -226,12 +235,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       setIsEditModalOpen(false);
       
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
-        detail: { id: authUser.id, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
+        detail: { id: activeUid, username: editUsername, avatar_url: finalAvatarUrl, cover_url: finalCoverUrl, bio: editBio } 
       }));
       
     } catch (err: any) { 
       console.error("Profile sync error:", err);
-      alert(err.message || "Failed to sync profile."); 
+      alert(err.message || "Failed to synchronize profile with the cloud."); 
     } finally { 
       setIsSavingProfile(false); 
     }

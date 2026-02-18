@@ -210,8 +210,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
 
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
-      // Permanently upload avatar if selected
-      // MUST START WITH UID: {userId}/{filename}
+      // Upload Avatar - Path MUST be {userId}/{filename}
       if (avatarFile) {
         const fileName = `av-${Date.now()}`;
         const filePath = `${authUser.id}/${fileName}`;
