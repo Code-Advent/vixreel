@@ -197,59 +197,59 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   };
 
   return (
-    <div className="max-w-[1000px] mx-auto h-[88vh] border border-zinc-900 rounded-[3rem] flex overflow-hidden mt-4 bg-[#050505] shadow-2xl relative ring-1 ring-white/5">
+    <div className="max-w-[1000px] mx-auto h-[88vh] border border-[var(--vix-border)] rounded-[3rem] flex overflow-hidden mt-4 bg-[var(--vix-bg)] shadow-2xl relative ring-1 ring-white/5">
       
       {/* Sidebar - Chat Previews */}
-      <div className={`w-full md:w-80 border-r border-zinc-900 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/10">
+      <div className={`w-full md:w-80 border-r border-[var(--vix-border)] flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-8 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/10">
           <div className="flex flex-col">
             <span className="font-black uppercase text-[10px] tracking-[0.4em] text-zinc-500">Narrative</span>
             <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest mt-1">Direct Encrypted</span>
           </div>
           <button 
             onClick={() => setShowNewChatModal(true)}
-            className="p-3 bg-zinc-900 rounded-2xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg hover:shadow-pink-500/10 active:scale-95"
+            className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)] shadow-lg hover:shadow-pink-500/10 active:scale-95"
           >
             <Plus className="w-5 h-5" />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-black divide-y divide-zinc-900/20">
+        <div className="flex-1 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] divide-y divide-[var(--vix-border)]/20">
           {chats.length > 0 ? chats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
-              className={`flex items-center gap-4 p-5 cursor-pointer transition-all duration-300 relative group ${activeChat?.id === u.id ? 'bg-zinc-900/40' : 'hover:bg-zinc-900/20'}`}
+              className={`flex items-center gap-4 p-5 cursor-pointer transition-all duration-300 relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
             >
               {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1 vix-gradient"></div>}
               <div className="relative shrink-0">
                 <img 
                   src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
-                  className={`w-12 h-12 rounded-full border border-zinc-800 object-cover shadow-lg transition-transform group-hover:scale-105 ${u.is_verified ? 'ring-2 ring-pink-500/20' : ''}`} 
+                  className={`w-12 h-12 rounded-full border border-[var(--vix-border)] object-cover shadow-lg transition-transform group-hover:scale-105 ${u.is_verified ? 'ring-2 ring-pink-500/20' : ''}`} 
                 />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-0.5">
-                  <span className="font-black text-[13px] truncate flex items-center gap-1.5 text-zinc-200">
+                  <span className="font-black text-[13px] truncate flex items-center gap-1.5 text-[var(--vix-text)] opacity-80 group-hover:opacity-100">
                     {u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                   </span>
                   {u.last_message_at && (
-                    <span className="text-[8px] text-zinc-700 font-bold uppercase shrink-0">
+                    <span className="text-[8px] text-zinc-500 font-bold uppercase shrink-0">
                       {new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
                 </div>
-                <p className={`text-[10px] font-medium truncate max-w-[150px] ${activeChat?.id === u.id ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                <p className={`text-[10px] font-medium truncate max-w-[150px] ${activeChat?.id === u.id ? 'text-zinc-500' : 'text-zinc-600'}`}>
                   {u.last_message || 'Start signal exchange...'}
                 </p>
               </div>
             </div>
           )) : (
             <div className="p-16 text-center opacity-30 flex flex-col items-center justify-center h-full space-y-6">
-              <div className="w-16 h-16 rounded-[1.5rem] bg-zinc-900/50 flex items-center justify-center border border-zinc-800 border-dashed">
-                <MessageCircle className="w-8 h-8 text-zinc-800" />
+              <div className="w-16 h-16 rounded-[1.5rem] bg-[var(--vix-secondary)] flex items-center justify-center border border-[var(--vix-border)] border-dashed">
+                <MessageCircle className="w-8 h-8 text-zinc-500" />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em]">No narratives active</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--vix-text)]">No narratives active</p>
               <button onClick={() => setShowNewChatModal(true)} className="px-8 py-3 vix-gradient rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-pink-500/10 active:scale-95 transition-all">Initialize Comms</button>
             </div>
           )}
@@ -257,18 +257,18 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       </div>
 
       {/* Main Messaging Window */}
-      <div className={`flex-1 flex flex-col bg-zinc-950/40 backdrop-blur-3xl ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col bg-[var(--vix-bg)]/40 backdrop-blur-3xl ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
         {activeChat ? (
           <>
-            <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/30 backdrop-blur-xl z-20">
+            <div className="p-6 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/30 backdrop-blur-xl z-20">
               <div className="flex items-center gap-4">
-                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500 hover:text-white transition-colors"><ChevronLeft className="w-6 h-6" /></button>
+                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500 hover:text-[var(--vix-text)] transition-colors"><ChevronLeft className="w-6 h-6" /></button>
                 <div className="relative">
-                  <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-zinc-800 object-cover shadow-xl" />
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-black rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+                  <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-[var(--vix-border)] object-cover shadow-xl" />
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[var(--vix-bg)] rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                 </div>
                 <div>
-                  <div className="font-black text-[15px] flex items-center gap-1.5 text-white">
+                  <div className="font-black text-[15px] flex items-center gap-1.5 text-[var(--vix-text)]">
                     {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                   </div>
                   <span className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em]">{activeChat.full_name || 'Individual Creator'}</span>
@@ -277,7 +277,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
 
             <div className="flex-1 p-6 sm:p-10 overflow-y-auto space-y-6 no-scrollbar relative">
-              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-zinc-950/80 to-transparent pointer-events-none z-10"></div>
+              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--vix-bg)]/80 to-transparent pointer-events-none z-10"></div>
               
               {loading && messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-zinc-800 animate-spin" /></div>
@@ -289,14 +289,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   return (
                     <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
                       {showTime && (
-                        <span className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.4em] my-6 w-full text-center">
+                        <span className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.4em] my-6 w-full text-center">
                           {new Date(m.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
                       <div className={`group relative max-w-[85%] sm:max-w-[70%] p-5 px-7 rounded-[2.5rem] text-[13px] font-medium shadow-2xl transition-all ${
                         isOwn 
                           ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
-                          : 'bg-zinc-900/80 text-zinc-300 rounded-tl-none border border-zinc-800/50 backdrop-blur-md'
+                          : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]/50 backdrop-blur-md shadow-sm'
                       }`}>
                         {m.content}
                       </div>
@@ -307,14 +307,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-zinc-900/20 border-t border-zinc-900 flex gap-4 backdrop-blur-2xl">
+            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-[var(--vix-secondary)]/20 border-t border-[var(--vix-border)] flex gap-4 backdrop-blur-2xl">
               <div className="flex-1 relative">
                 <input 
                   ref={messageInputRef}
                   value={text} 
                   onChange={e => setText(e.target.value)} 
                   placeholder="Type your message..." 
-                  className="w-full bg-black/60 border border-zinc-800 rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-white placeholder:text-zinc-800 font-semibold shadow-inner" 
+                  className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
                 />
               </div>
               <button 
@@ -330,13 +330,13 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
           <div className="text-center space-y-12 animate-vix-in p-12 max-w-sm">
             <div className="relative">
               <div className="absolute inset-0 bg-pink-500/10 blur-3xl rounded-full"></div>
-              <div className="w-28 h-28 rounded-[3rem] bg-zinc-900/30 flex items-center justify-center mx-auto border border-zinc-900 border-dashed shadow-2xl relative z-10">
-                <MessageCircle className="w-12 h-12 text-zinc-800" />
+              <div className="w-28 h-28 rounded-[3rem] bg-[var(--vix-secondary)]/30 flex items-center justify-center mx-auto border border-[var(--vix-border)] border-dashed shadow-2xl relative z-10">
+                <MessageCircle className="w-12 h-12 text-zinc-500" />
               </div>
             </div>
             <div className="space-y-6">
-              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-white">Encrypted Signal</h3>
-              <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">
+              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-[var(--vix-text)]">Encrypted Signal</h3>
+              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">
                 Initialize a secure narrative protocol to begin private signal exchange between creators.
               </p>
               <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-12 py-4 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">Select Creator</button>
@@ -347,17 +347,17 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
       {/* New Conversation Discovery Modal */}
       {showNewChatModal && (
-        <div className="absolute inset-0 z-[100] bg-black/98 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-2xl animate-vix-in">
+        <div className="absolute inset-0 z-[100] bg-[var(--vix-bg)]/98 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-2xl animate-vix-in">
           <button 
             onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
-            className="absolute top-12 right-12 p-3 text-zinc-700 hover:text-white transition-colors bg-zinc-900/50 rounded-full border border-zinc-800"
+            className="absolute top-12 right-12 p-3 text-zinc-700 hover:text-[var(--vix-text)] transition-colors bg-[var(--vix-secondary)]/50 rounded-full border border-[var(--vix-border)]"
           >
             <X className="w-6 h-6" />
           </button>
           
           <div className="w-full max-w-md space-y-10">
             <div className="text-center space-y-3">
-               <h3 className="text-3xl font-black text-white uppercase tracking-widest">Signal Search</h3>
+               <h3 className="text-3xl font-black text-[var(--vix-text)] uppercase tracking-widest">Signal Search</h3>
                <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">Establish new narrative connection</p>
             </div>
 
@@ -369,7 +369,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 value={searchQuery}
                 onChange={e => handleSearchUsers(e.target.value)}
                 autoFocus
-                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-[2rem] py-6 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-white placeholder:text-zinc-800 font-bold"
+                className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-[2rem] py-6 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold"
               />
             </div>
 
@@ -384,24 +384,24 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   <div 
                     key={u.id}
                     onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
-                    className="flex items-center gap-4 p-5 rounded-[2rem] bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-pink-500/20 cursor-pointer transition-all group"
+                    className="flex items-center gap-4 p-5 rounded-[2rem] bg-[var(--vix-card)] border border-[var(--vix-border)]/50 hover:bg-[var(--vix-secondary)] hover:border-pink-500/20 cursor-pointer transition-all group"
                   >
-                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-zinc-800 shadow-xl" />
+                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)] shadow-xl" />
                     <div className="flex-1">
-                      <p className="font-black text-sm text-zinc-200 flex items-center gap-1.5">
+                      <p className="font-black text-sm text-[var(--vix-text)] flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
                         @{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                       </p>
                       <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest truncate">{u.full_name || 'Individual Creator'}</p>
                     </div>
-                    <div className="bg-zinc-900 p-3 rounded-2xl text-zinc-600 group-hover:text-pink-500 transition-colors">
+                    <div className="bg-[var(--vix-secondary)] p-3 rounded-2xl text-zinc-600 group-hover:text-pink-500 transition-colors">
                       <ChevronLeft className="w-4 h-4 rotate-180" />
                     </div>
                   </div>
                 ))
               ) : searchQuery.length >= 2 && (
                 <div className="text-center py-20 opacity-30">
-                  <Search className="w-10 h-10 text-zinc-800 mx-auto mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">No identity match found</p>
+                  <Search className="w-10 h-10 text-zinc-500 mx-auto mb-4" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">No identity match found</p>
                 </div>
               )}
             </div>

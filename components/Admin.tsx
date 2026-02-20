@@ -200,12 +200,12 @@ const Admin: React.FC = () => {
   if (!isUnlocked) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[3rem] p-12 shadow-2xl text-center space-y-10 animate-vix-in">
+        <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-12 shadow-2xl text-center space-y-10 animate-vix-in">
           <div className="w-24 h-24 mx-auto rounded-[2rem] vix-gradient flex items-center justify-center shadow-[0_0_60px_rgba(255,0,128,0.3)] border border-white/10">
             <Lock className="w-10 h-10 text-white" />
           </div>
           <div className="space-y-3">
-            <h2 className="text-3xl font-black uppercase tracking-[0.2em] text-white">Admin Login</h2>
+            <h2 className="text-3xl font-black uppercase tracking-[0.2em] text-[var(--vix-text)]">Admin Login</h2>
             <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-[0.4em]">Restricted Access</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
@@ -213,7 +213,7 @@ const Admin: React.FC = () => {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`w-full bg-black border ${passError ? 'border-red-500 animate-pulse' : 'border-zinc-800'} rounded-2xl px-6 py-5 text-center text-sm outline-none focus:border-pink-500/50 transition-all font-black tracking-[0.6em] text-white shadow-inner`}
+              className={`w-full bg-[var(--vix-bg)] border ${passError ? 'border-red-500 animate-pulse' : 'border-[var(--vix-border)]'} rounded-2xl px-6 py-5 text-center text-sm outline-none focus:border-pink-500/50 transition-all font-black tracking-[0.6em] text-[var(--vix-text)] shadow-inner`}
               placeholder="••••••••"
               autoFocus
               required
@@ -240,14 +240,14 @@ const Admin: React.FC = () => {
             <Shield className="w-10 h-10 text-purple-500" />
           </div>
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-[0.1em] text-white flex items-center gap-3">
+            <h1 className="text-3xl font-black uppercase tracking-[0.1em] text-[var(--vix-text)] flex items-center gap-3">
               Admin Panel
             </h1>
             <p className="text-[11px] text-zinc-600 font-black uppercase tracking-[0.3em] mt-1 italic opacity-60">Manage Users & Boost Content</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
-           <button onClick={fetchUsers} disabled={loading} className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white transition-all">
+           <button onClick={fetchUsers} disabled={loading} className="p-3 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
            <button onClick={() => setIsUnlocked(false)} className="bg-red-500/10 border border-red-500/20 px-8 py-3 rounded-2xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all">Logout Admin</button>
@@ -255,13 +255,13 @@ const Admin: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-5 xl:col-span-4 bg-zinc-950 rounded-[3rem] border border-zinc-900 h-[650px] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/5">
-          <div className="p-8 border-b border-zinc-900 bg-zinc-900/10 relative">
+        <div className="lg:col-span-5 xl:col-span-4 bg-[var(--vix-card)] rounded-[3rem] border border-[var(--vix-border)] h-[650px] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/5">
+          <div className="p-8 border-b border-[var(--vix-border)] bg-[var(--vix-secondary)]/10 relative">
              <SearchIcon className="absolute left-12 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700" />
              <input 
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-black/50 border border-zinc-800 rounded-[1.5rem] py-4 pl-14 pr-6 text-xs outline-none focus:border-purple-500/40 transition-all text-white placeholder:text-zinc-800 font-medium" 
+              className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[1.5rem] py-4 pl-14 pr-6 text-xs outline-none focus:border-purple-500/40 transition-all text-[var(--vix-text)] placeholder:text-zinc-800 font-medium" 
               placeholder="Search by username..."
              />
           </div>
@@ -270,14 +270,14 @@ const Admin: React.FC = () => {
               <div 
                 key={u.id} 
                 onClick={() => { setViewingUser(u); fetchUserPosts(u.id); }}
-                className={`p-5 flex items-center justify-between cursor-pointer rounded-[2rem] transition-all border ${viewingUser?.id === u.id ? 'bg-purple-500/10 border-purple-500/30' : 'hover:bg-zinc-900/50 border-transparent'}`}
+                className={`p-5 flex items-center justify-between cursor-pointer rounded-[2rem] transition-all border ${viewingUser?.id === u.id ? 'bg-purple-500/10 border-purple-500/30' : 'hover:bg-[var(--vix-secondary)] border-transparent'}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full p-[2px] ${u.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-zinc-800'}`}>
-                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-full h-full rounded-full object-cover bg-black" />
+                  <div className={`w-12 h-12 rounded-full p-[2px] ${u.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-[var(--vix-secondary)]'}`}>
+                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-bg)]" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-black text-white flex items-center gap-2">
+                    <span className="text-sm font-black text-[var(--vix-text)] flex items-center gap-2">
                       {u.username} {u.is_verified && <VerificationBadge size="w-4 h-4" />}
                     </span>
                     <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{formatNumber(u.boosted_followers || 0)} Boosted</span>
@@ -290,16 +290,16 @@ const Admin: React.FC = () => {
 
         <div className="lg:col-span-7 xl:col-span-8">
           {viewingUser ? (
-            <div className="bg-zinc-950 rounded-[3.5rem] border border-zinc-900 p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5">
+            <div className="bg-[var(--vix-card)] rounded-[3.5rem] border border-[var(--vix-border)] p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5">
               <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full"></div>
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-10 mb-16 relative z-10">
                 <div className="flex items-center gap-8">
                   <div className="w-32 h-32 rounded-full vix-gradient p-1.5 shadow-[0_20px_60px_rgba(255,0,128,0.2)]">
-                    <img src={viewingUser.avatar_url || `https://ui-avatars.com/api/?name=${viewingUser.username}`} className="w-full h-full rounded-full border-[6px] border-black object-cover bg-zinc-900" />
+                    <img src={viewingUser.avatar_url || `https://ui-avatars.com/api/?name=${viewingUser.username}`} className="w-full h-full rounded-full border-[6px] border-[var(--vix-bg)] object-cover bg-[var(--vix-secondary)]" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-4xl font-black flex items-center gap-4 text-white">
+                    <h3 className="text-4xl font-black flex items-center gap-4 text-[var(--vix-text)]">
                       {viewingUser.username} {viewingUser.is_verified && <VerificationBadge size="w-10 h-10" />}
                     </h3>
                     <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email || 'No email'}</p>
@@ -307,14 +307,14 @@ const Admin: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => handleVerify(viewingUser.id, !viewingUser.is_verified)}
-                  className={`px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all shadow-2xl ${viewingUser.is_verified ? 'bg-zinc-900 text-red-500 border border-red-500/20' : 'vix-gradient text-white'}`}
+                  className={`px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all shadow-2xl ${viewingUser.is_verified ? 'bg-[var(--vix-secondary)] text-red-500 border border-red-500/20' : 'vix-gradient text-white'}`}
                 >
                   {viewingUser.is_verified ? 'Remove Verification' : 'Verify User'}
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 relative z-10">
-                 <div className="bg-black/50 border border-zinc-900 rounded-[2.5rem] p-10 space-y-8 shadow-inner">
+                 <div className="bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[2.5rem] p-10 space-y-8 shadow-inner">
                     <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">Add Likes (Post)</h4>
                     <div className="flex flex-col gap-5">
                       <div className="relative">
@@ -322,7 +322,7 @@ const Admin: React.FC = () => {
                           type="number" 
                           value={boostAmount} 
                           onChange={e => setBoostAmount(e.target.value)}
-                          className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-8 py-5 text-lg font-black text-white outline-none"
+                          className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-2xl px-8 py-5 text-lg font-black text-[var(--vix-text)] outline-none"
                           placeholder="00"
                         />
                         <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">LIKES</span>
@@ -331,7 +331,7 @@ const Admin: React.FC = () => {
                     </div>
                  </div>
 
-                 <div className="bg-black/50 border border-zinc-900 rounded-[2.5rem] p-10 space-y-8 shadow-inner">
+                 <div className="bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[2.5rem] p-10 space-y-8 shadow-inner">
                     <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">Add Followers (Account)</h4>
                     <div className="flex flex-col gap-5">
                       <div className="relative">
@@ -339,7 +339,7 @@ const Admin: React.FC = () => {
                           type="number" 
                           value={followerBoostAmount} 
                           onChange={e => setFollowerBoostAmount(e.target.value)}
-                          className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-8 py-5 text-lg font-black text-white outline-none"
+                          className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-2xl px-8 py-5 text-lg font-black text-[var(--vix-text)] outline-none"
                           placeholder="00"
                         />
                         <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">FOLLOWERS</span>
@@ -355,7 +355,7 @@ const Admin: React.FC = () => {
                 <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2 flex items-center justify-between">User Posts</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
                   {selectedUserPosts.map(p => (
-                    <div key={p.id} className="relative aspect-square rounded-[2rem] overflow-hidden group border border-zinc-900 shadow-2xl bg-black transition-transform hover:scale-105 duration-500">
+                    <div key={p.id} className="relative aspect-square rounded-[2rem] overflow-hidden group border border-[var(--vix-border)] shadow-2xl bg-[var(--vix-bg)] transition-transform hover:scale-105 duration-500">
                       {p.media_type === 'video' ? (
                         <video src={p.media_url} className="w-full h-full object-cover opacity-60" />
                       ) : (
@@ -380,8 +380,8 @@ const Admin: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-full border-2 border-zinc-900 border-dashed rounded-[4rem] flex flex-col items-center justify-center p-24 text-center bg-zinc-950/20 shadow-inner group">
-              <div className="w-32 h-32 rounded-[2.5rem] bg-zinc-900/50 flex items-center justify-center mb-10 border border-zinc-800 shadow-2xl">
+            <div className="h-full border-2 border-[var(--vix-border)] border-dashed rounded-[4rem] flex flex-col items-center justify-center p-24 text-center bg-[var(--vix-card)]/20 shadow-inner group">
+              <div className="w-32 h-32 rounded-[2.5rem] bg-[var(--vix-secondary)] flex items-center justify-center mb-10 border border-[var(--vix-border)] shadow-2xl">
                 <Users className="w-12 h-12 text-zinc-800" />
               </div>
               <h3 className="text-zinc-500 font-black uppercase tracking-[0.6em] text-sm">Select a user</h3>

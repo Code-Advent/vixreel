@@ -10,15 +10,17 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
     "@google/genai": "^1.38.0",
+    "@supabase/supabase-js": "^2.93.1",
     "lucide-react": "^0.563.0",
-    "@supabase/supabase-js": "^2.93.1"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0-beta.8",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.0.0-beta.8",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

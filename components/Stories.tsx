@@ -90,7 +90,7 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
     }
   };
 
-  if (loading) return <div className="h-24 w-full animate-pulse bg-zinc-900/10 rounded-xl mb-4"></div>;
+  if (loading) return <div className="h-24 w-full animate-pulse bg-[var(--vix-secondary)] rounded-xl mb-4"></div>;
 
   return (
     <>
@@ -98,12 +98,12 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
         {/* Add Story Button */}
         <div className="flex flex-col items-center gap-2 min-w-[72px] cursor-pointer group relative">
           <label className="cursor-pointer">
-            <div className={`w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center relative group-hover:border-zinc-700 transition-all ${isUploading ? 'animate-pulse' : ''}`}>
+            <div className={`w-16 h-16 rounded-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] flex items-center justify-center relative group-hover:border-zinc-700 transition-all ${isUploading ? 'animate-pulse' : ''}`}>
               {isUploading ? (
                 <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
               ) : (
                 <>
-                  <div className="absolute bottom-0 right-0 bg-[#0095f6] rounded-full p-1 border-2 border-black z-10 shadow-lg">
+                  <div className="absolute bottom-0 right-0 bg-[#0095f6] rounded-full p-1 border-2 border-[var(--vix-bg)] z-10 shadow-lg">
                     <Plus className="text-white w-3 h-3" />
                   </div>
                   {currentUser?.avatar_url ? (
@@ -122,11 +122,11 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
         {stories.map((story, index) => (
           <div key={story.id} className="flex flex-col items-center gap-2 min-w-[72px] cursor-pointer animate-vix-in" onClick={() => setActiveStoryIndex(index)}>
             <div className="w-16 h-16 rounded-full vix-gradient p-[2px] shadow-xl active:scale-95 transition-transform shadow-pink-500/10">
-              <div className="w-full h-full rounded-full bg-black p-[2px]">
+              <div className="w-full h-full rounded-full bg-[var(--vix-bg)] p-[2px]">
                 <img src={story.user.avatar_url || `https://ui-avatars.com/api/?name=${story.user.username}`} className="w-full h-full rounded-full object-cover" alt={story.user.username} />
               </div>
             </div>
-            <span className="text-[10px] text-white font-bold flex items-center gap-0.5 max-w-full truncate px-1 uppercase tracking-tight">
+            <span className="text-[10px] text-[var(--vix-text)] font-bold flex items-center gap-0.5 max-w-full truncate px-1 uppercase tracking-tight">
               {story.user.username} {story.user.is_verified && <VerificationBadge size="w-2.5 h-2.5" />}
             </span>
           </div>
@@ -135,18 +135,18 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
       {/* Story Viewer Modal */}
       {activeStoryIndex !== null && (
-        <div className="fixed inset-0 z-[1000] bg-black/98 flex items-center justify-center animate-in fade-in duration-300">
-          <button onClick={() => setActiveStoryIndex(null)} className="absolute top-8 right-8 text-white/50 hover:text-white z-20 p-2 bg-black/40 rounded-full backdrop-blur-md">
+        <div className="fixed inset-0 z-[1000] bg-[var(--vix-bg)]/98 flex items-center justify-center animate-in fade-in duration-300">
+          <button onClick={() => setActiveStoryIndex(null)} className="absolute top-8 right-8 text-zinc-500 hover:text-[var(--vix-text)] z-20 p-2 bg-[var(--vix-secondary)]/40 rounded-full backdrop-blur-md">
             <X className="w-8 h-8" />
           </button>
 
           {activeStoryIndex > 0 && (
-            <button onClick={() => setActiveStoryIndex(activeStoryIndex - 1)} className="absolute left-4 md:left-20 text-white/30 hover:text-white z-10 p-4 transition-all hover:scale-110">
+            <button onClick={() => setActiveStoryIndex(activeStoryIndex - 1)} className="absolute left-4 md:left-20 text-zinc-500 hover:text-[var(--vix-text)] z-10 p-4 transition-all hover:scale-110">
               <ChevronLeft className="w-12 h-12" />
             </button>
           )}
 
-          <div className="w-full max-w-md aspect-[9/16] bg-zinc-950 relative rounded-2xl overflow-hidden shadow-[0_0_120px_rgba(255,0,128,0.2)]">
+          <div className="w-full max-w-md aspect-[9/16] bg-black relative rounded-2xl overflow-hidden shadow-[0_0_120px_rgba(255,0,128,0.2)]">
             <div className="absolute top-0 left-0 right-0 p-5 z-20 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent">
               <img 
                 src={stories[activeStoryIndex].user.avatar_url || `https://ui-avatars.com/api/?name=${stories[activeStoryIndex].user.username}`} 
@@ -177,7 +177,7 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
           </div>
 
           {activeStoryIndex < stories.length - 1 && (
-            <button onClick={() => setActiveStoryIndex(activeStoryIndex + 1)} className="absolute right-4 md:right-20 text-white/30 hover:text-white z-10 p-4 transition-all hover:scale-110">
+            <button onClick={() => setActiveStoryIndex(activeStoryIndex + 1)} className="absolute right-4 md:right-20 text-zinc-500 hover:text-[var(--vix-text)] z-10 p-4 transition-all hover:scale-110">
               <ChevronRight className="w-12 h-12" />
             </button>
           )}

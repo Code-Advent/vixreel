@@ -128,25 +128,25 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   };
 
   return (
-    <div className={`w-full max-w-[470px] mx-auto border-b border-zinc-900 pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
+    <div className={`w-full max-w-[470px] mx-auto border-b border-[var(--vix-border)] pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
-          <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-zinc-800 shadow-sm" />
+          <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
           <div className="flex flex-col">
-            <span className="text-sm font-bold flex items-center gap-1 text-white">
+            <span className="text-sm font-bold flex items-center gap-1 text-[var(--vix-text)]">
               {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
               {post.user.is_private && <Lock className="w-3 h-3 text-zinc-600" />}
             </span>
           </div>
         </div>
         {post.user.id === currentUserId && (
-          <button onClick={handleDelete} className="text-zinc-700 hover:text-red-500 transition-colors p-2">
+          <button onClick={handleDelete} className="text-zinc-500 hover:text-red-500 transition-colors p-2">
             {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
         )}
       </div>
 
-      <div className="bg-zinc-950 aspect-square rounded-3xl overflow-hidden shadow-2xl border border-zinc-900/50 relative group">
+      <div className="bg-[var(--vix-card)] aspect-square rounded-3xl overflow-hidden shadow-2xl border border-[var(--vix-border)] relative group">
         {post.media_type === 'video' ? (
           <video ref={videoRef} src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
         ) : (
@@ -178,11 +178,11 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       <div className="py-4 space-y-3">
         <div className="flex justify-between items-center">
           <div className="flex gap-4 items-center">
-            <button onClick={handleLike} className={`${liked ? 'text-pink-500' : 'text-zinc-500 hover:text-white'} transition-all`}>
+            <button onClick={handleLike} className={`${liked ? 'text-pink-500' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all`}>
               <Heart className={`w-7 h-7 ${liked ? 'fill-current' : ''}`} />
             </button>
             {canComment ? (
-               <button onClick={() => setShowComments(true)} className="text-zinc-500 hover:text-white flex items-center gap-1.5">
+               <button onClick={() => setShowComments(true)} className="text-zinc-500 hover:text-[var(--vix-text)] flex items-center gap-1.5">
                   <MessageCircle className="w-7 h-7" />
                   <span className="text-xs font-bold">{formatNumber(commentsCount)}</span>
                </button>
@@ -191,19 +191,19 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                   <MessageSquareOff className="w-6 h-6" />
                </div>
             )}
-            <button onClick={handleDownload} disabled={isDownloading} className="text-zinc-500 hover:text-white transition-all disabled:opacity-30">
+            <button onClick={handleDownload} disabled={isDownloading} className="text-zinc-500 hover:text-[var(--vix-text)] transition-all disabled:opacity-30">
               <Download className="w-7 h-7" />
             </button>
           </div>
-          <button onClick={handleSave} className={`${saved ? 'text-white' : 'text-zinc-500 hover:text-white'} transition-all`}>
+          <button onClick={handleSave} className={`${saved ? 'text-[var(--vix-text)]' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all`}>
             <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
           </button>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-bold text-white">{formatNumber(currentTotalLikes)} likes</p>
-          <div className="text-sm text-zinc-400">
-            <span className="font-bold text-white mr-2 inline-flex items-center gap-1">
+          <p className="text-xs font-bold text-[var(--vix-text)]">{formatNumber(currentTotalLikes)} likes</p>
+          <div className="text-sm text-zinc-500">
+            <span className="font-bold text-[var(--vix-text)] mr-2 inline-flex items-center gap-1">
               @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
             </span>
             {post.caption}
@@ -212,10 +212,10 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
       </div>
 
       {showComments && canComment && (
-        <div className="fixed inset-0 z-[6000] bg-black/95 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 h-[80vh] rounded-[2rem] flex flex-col shadow-2xl animate-vix-in">
-            <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
-              <h3 className="font-bold text-white uppercase text-xs tracking-widest">Comments</h3>
+        <div className="fixed inset-0 z-[6000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[var(--vix-card)] border border-[var(--vix-border)] h-[80vh] rounded-[2rem] flex flex-col shadow-2xl animate-vix-in">
+            <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center">
+              <h3 className="font-bold text-[var(--vix-text)] uppercase text-xs tracking-widest">Comments</h3>
               <button onClick={() => setShowComments(false)} className="p-2"><X className="w-6 h-6 text-zinc-500" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
@@ -223,15 +223,15 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
                 <div key={c.id} className="flex gap-4">
                   <img src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} className="w-8 h-8 rounded-full object-cover" />
                   <div className="space-y-1 flex-1">
-                    <p className="font-bold text-xs text-white flex items-center gap-1">
+                    <p className="font-bold text-xs text-[var(--vix-text)] flex items-center gap-1">
                       @{c.user.username} {c.user.is_verified && <VerificationBadge size="w-3 h-3" />}
                     </p>
-                    <p className="text-zinc-400 text-sm leading-relaxed">{c.content}</p>
+                    <p className="text-zinc-500 text-sm leading-relaxed">{c.content}</p>
                   </div>
                 </div>
               )) : (
                 <div className="h-full flex items-center justify-center opacity-20">
-                  <span className="text-xs font-black uppercase tracking-widest">No signals detected</span>
+                  <span className="text-xs font-black uppercase tracking-widest text-[var(--vix-text)]">No signals detected</span>
                 </div>
               )}
             </div>
@@ -243,8 +243,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
               setNewComment('');
               fetchComments(); fetchCommentsCount();
               setIsCommenting(false);
-            }} className="p-6 border-t border-zinc-900 flex gap-4">
-              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-zinc-900 rounded-xl px-6 py-3 text-sm outline-none border border-zinc-800 text-white" />
+            }} className="p-6 border-t border-[var(--vix-border)] flex gap-4">
+              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-[var(--vix-secondary)] rounded-xl px-6 py-3 text-sm outline-none border border-[var(--vix-border)] text-[var(--vix-text)]" />
               <button disabled={isCommenting} className="font-bold text-xs text-pink-500 uppercase tracking-widest">Post</button>
             </form>
           </div>

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Satisfy", cursive;
+  
+  --color-vix-pink: #ff0080;
+  --color-vix-purple: #7928ca;
+  --color-vix-blue: #0070f3;
+}
+
+@layer base {
+  :root {
+    --vix-bg: #ffffff;
+    --vix-text: #000000;
+    --vix-border: #e5e7eb;
+    --vix-card: #f9fafb;
+    --vix-secondary: #f3f4f6;
+    --vix-muted: #6b7280;
+  }
+
+  .dark {
+    --vix-bg: #000000;
+    --vix-text: #ffffff;
+    --vix-border: #1a1a1a;
+    --vix-card: #09090b;
+    --vix-secondary: #18181b;
+    --vix-muted: #71717a;
+  }
+
+  body {
+    @apply bg-[var(--vix-bg)] text-[var(--vix-text)] transition-colors duration-300;
+    font-family: theme('fontFamily.sans');
+  }
+}
+
+@layer components {
+  .vix-gradient {
+    background: linear-gradient(135deg, var(--color-vix-pink), var(--color-vix-purple), var(--color-vix-blue));
+  }
+  
+  .vix-text-gradient {
+    background: linear-gradient(135deg, var(--color-vix-pink), var(--color-vix-purple), var(--color-vix-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .animate-vix-in {
+    animation: vix-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes vix-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

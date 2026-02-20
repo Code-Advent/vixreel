@@ -14,13 +14,16 @@ import {
   Smartphone,
   Info,
   Check,
-  X
+  X,
+  Sun
 } from 'lucide-react';
 import { UserProfile, ViewType } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface SettingsPageProps {
   user: UserProfile;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
   onLogout: () => void;
   onOpenSwitchAccount: () => void;
@@ -30,6 +33,8 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ 
   user, 
+  theme,
+  setTheme,
   onUpdateProfile, 
   onLogout, 
   onOpenSwitchAccount, 
@@ -78,6 +83,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           label: 'Notifications', 
           action: () => setView('NOTIFICATIONS'), 
           desc: 'Control push alerts and signal pings.' 
+        },
+        { 
+          icon: theme === 'dark' ? Moon : Sun, 
+          label: 'Appearance', 
+          isToggle: true, 
+          active: theme === 'dark', 
+          onToggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
+          desc: `Currently using ${theme} mode protocol.`
         },
       ]
     },
@@ -138,7 +151,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="max-w-[700px] mx-auto py-12 px-6 animate-vix-in pb-32">
       <div className="mb-12">
-        <h1 className="text-4xl font-black uppercase tracking-[0.1em] text-white">Settings</h1>
+        <h1 className="text-4xl font-black uppercase tracking-[0.1em] text-[var(--vix-text)]">Settings</h1>
         <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em] mt-2 italic">VixReel Narrative Protocol Configuration</p>
       </div>
 
@@ -146,19 +159,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         {sections.map((section, idx) => (
           <div key={idx} className="space-y-6">
             <h3 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2">{section.title}</h3>
-            <div className="bg-zinc-950/50 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl">
               {section.items.map((item, iIdx) => (
                 <div 
                   key={iIdx} 
-                  className={`p-6 flex items-center justify-between border-b border-zinc-900/50 last:border-0 hover:bg-zinc-900/30 transition-all cursor-pointer group`}
+                  className={`p-6 flex items-center justify-between border-b border-[var(--vix-border)] last:border-0 hover:bg-[var(--vix-secondary)] transition-all cursor-pointer group`}
                   onClick={!item.isToggle ? item.action : undefined}
                 >
                   <div className="flex items-center gap-5">
-                    <div className="p-3 bg-zinc-900 rounded-2xl text-zinc-500 group-hover:text-blue-500 transition-colors">
+                    <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-500 group-hover:text-blue-500 transition-colors">
                       <item.icon className="w-5 h-5" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-bold text-sm text-white group-hover:text-blue-400 transition-colors">{item.label}</span>
+                      <span className="font-bold text-sm text-[var(--vix-text)] group-hover:text-blue-400 transition-colors">{item.label}</span>
                       <span className="text-[10px] text-zinc-600 font-medium">{item.desc}</span>
                     </div>
                   </div>
@@ -166,7 +179,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   {item.isToggle ? (
                     <button 
                       onClick={(e) => { e.stopPropagation(); item.onToggle?.(); }}
-                      className={`w-14 h-8 rounded-full p-1 transition-all flex items-center relative ${item.active ? 'bg-blue-600' : 'bg-zinc-800'}`}
+                      className={`w-14 h-8 rounded-full p-1 transition-all flex items-center relative ${item.active ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-800'}`}
                     >
                       <div className={`w-6 h-6 bg-white rounded-full shadow-lg transition-transform ${item.active ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
                         {saving === (item.label.toLowerCase().replace(' ', '_')) ? (
@@ -186,7 +199,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         <div className="pt-8">
            <button 
             onClick={onLogout}
-            className="w-full py-6 bg-zinc-950 border border-red-500/20 rounded-[2.5rem] flex items-center justify-center gap-3 text-red-500 font-black text-[11px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
+            className="w-full py-6 bg-[var(--vix-card)] border border-red-500/20 rounded-[2.5rem] flex items-center justify-center gap-3 text-red-500 font-black text-[11px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
            >
              <LogOut className="w-4 h-4" /> Relinquish Current Session
            </button>
@@ -195,14 +208,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       {/* Info Modal */}
       {infoModal && (
-        <div className="fixed inset-0 z-[10001] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-zinc-950 border border-zinc-900 rounded-[3rem] p-10 space-y-6 shadow-2xl animate-vix-in">
+        <div className="fixed inset-0 z-[10001] bg-[var(--vix-bg)]/90 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-6 shadow-2xl animate-vix-in">
              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black uppercase text-white tracking-widest">{infoModal.title}</h3>
+                <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{infoModal.title}</h3>
                 <button onClick={() => setInfoModal(null)} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
              </div>
              <p className="text-zinc-400 text-sm leading-loose whitespace-pre-wrap">{infoModal.content}</p>
-             <button onClick={() => setInfoModal(null)} className="w-full py-4 bg-zinc-900 rounded-2xl text-[10px] font-black uppercase text-white hover:bg-zinc-800 transition-all">Understood</button>
+             <button onClick={() => setInfoModal(null)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">Understood</button>
           </div>
         </div>
       )}

@@ -296,7 +296,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const renderPicker = () => (
     <div className="w-full space-y-10 animate-vix-in">
       <div className="space-y-3 text-center">
-        <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Registry</h3>
+        <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Identity Registry</h3>
         <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Select your narrative protocol</p>
       </div>
 
@@ -305,20 +305,20 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           <div 
             key={acc.id}
             onClick={() => switchAccount(acc)}
-            className="group flex items-center justify-between p-6 bg-zinc-950 border border-zinc-900 rounded-[2.5rem] hover:bg-zinc-900 hover:border-pink-500/30 cursor-pointer transition-all shadow-xl active:scale-[0.98]"
+            className="group flex items-center justify-between p-6 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] hover:bg-[var(--vix-secondary)] hover:border-pink-500/30 cursor-pointer transition-all shadow-xl active:scale-[0.98]"
           >
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-full vix-gradient p-0.5 shadow-lg group-hover:scale-105 transition-transform">
-                 <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover border-4 border-black" />
+                 <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover border-4 border-[var(--vix-bg)]" />
               </div>
               <div className="flex flex-col">
-                 <span className="font-black text-lg text-white">@{acc.username}</span>
+                 <span className="font-black text-lg text-[var(--vix-text)]">@{acc.username}</span>
                  <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest mt-1">Saved Session</span>
               </div>
             </div>
             <button 
               onClick={(e) => removeAccount(e, acc.id)}
-              className="p-3 bg-zinc-900/50 rounded-2xl text-zinc-800 hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
+              className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-800 hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -329,14 +329,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       <div className="space-y-4 pt-4">
         <button 
           onClick={() => setMode('LOGIN')}
-          className="w-full py-5 rounded-[2rem] border border-zinc-800 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:bg-zinc-900 transition-all"
+          className="w-full py-5 rounded-[2rem] border border-[var(--vix-border)] text-[var(--vix-text)] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:bg-[var(--vix-secondary)] transition-all"
         >
           <Plus className="w-4 h-4" /> Add Narrative
         </button>
         {isAddingAccount && (
           <button 
             onClick={onCancelAdd}
-            className="w-full py-3 text-zinc-700 font-black uppercase tracking-widest text-[10px] hover:text-white transition-all"
+            className="w-full py-3 text-zinc-700 font-black uppercase tracking-widest text-[10px] hover:text-[var(--vix-text)] transition-all"
           >
             Relinquish Add
           </button>
@@ -357,18 +357,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         </button>
       )}
 
-      <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800 shadow-2xl">
+      <div className="flex bg-[var(--vix-secondary)]/50 p-1 rounded-2xl border border-[var(--vix-border)] shadow-2xl">
         <button 
           type="button" 
           onClick={() => { setAuthMethod('PHONE'); setError(null); }} 
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'PHONE' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-600'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'PHONE' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-lg' : 'text-zinc-600'}`}
         >
           <Smartphone className="w-4 h-4" /> Phone
         </button>
         <button 
           type="button" 
           onClick={() => { setAuthMethod('EMAIL'); setError(null); }} 
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'EMAIL' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-600'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'EMAIL' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-lg' : 'text-zinc-600'}`}
         >
           <Mail className="w-4 h-4" /> Email
         </button>
@@ -384,7 +384,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             placeholder={authMethod === 'EMAIL' ? 'Identity Email' : 'Phone (e.g. +1...)'} 
             value={authMethod === 'EMAIL' ? email : phone} 
             onChange={e => authMethod === 'EMAIL' ? setEmail(e.target.value) : setPhone(e.target.value)} 
-            className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+            className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
             required 
           />
         </div>
@@ -398,7 +398,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               placeholder={mode === 'LOGIN' ? "Secure Password" : "Create Password"} 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
-              className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+              className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
               required 
             />
           </div>
@@ -410,7 +410,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           <button 
             type="button"
             onClick={() => { setMode('FIND_ACCOUNT'); setStep('DETAILS'); setError(null); setSuccessMsg(null); }}
-            className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-white transition-colors"
+            className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-[var(--vix-text)] transition-colors"
           >
             Recover Identity
           </button>
@@ -426,13 +426,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   );
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[var(--vix-bg)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 vix-gradient opacity-50"></div>
       <div className="absolute -top-24 -left-24 w-96 h-96 bg-pink-500/10 blur-[150px] rounded-full"></div>
       <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500/10 blur-[150px] rounded-full"></div>
 
       <div className="w-full max-w-[480px] z-10 space-y-6">
-        <div className="bg-[#050505] border border-zinc-900 rounded-[4rem] p-10 sm:p-16 flex flex-col items-center shadow-2xl ring-1 ring-white/5 relative">
+        <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[4rem] p-10 sm:p-16 flex flex-col items-center shadow-2xl ring-1 ring-white/5 relative">
           <div className="mb-12 text-center space-y-4">
              <h1 className="logo-font text-6xl vix-text-gradient drop-shadow-2xl">VixReel</h1>
              <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-zinc-700">
@@ -444,16 +444,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             <>
               {mode !== 'FIND_ACCOUNT' && mode !== 'PICKER' && (
                 <div className="w-full mb-10 flex justify-center gap-10">
-                  <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
-                  <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
+                  <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
+                  <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
                 </div>
               )}
 
               {mode === 'FIND_ACCOUNT' && step === 'DETAILS' && (
                 <div className="w-full space-y-8 animate-vix-in">
                   <div className="flex items-center gap-4 mb-4">
-                    <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-zinc-900 rounded-2xl text-zinc-500 hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /></button>
-                    <h3 className="text-white font-black text-xl uppercase tracking-tight">Recover Session</h3>
+                    <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-500 hover:text-[var(--vix-text)] transition-all"><ArrowLeft className="w-4 h-4" /></button>
+                    <h3 className="text-[var(--vix-text)] font-black text-xl uppercase tracking-tight">Recover Session</h3>
                   </div>
                   <form onSubmit={handleFindAccount} className="space-y-6">
                     <div className="group relative">
@@ -463,7 +463,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                         placeholder="Identity Email" 
                         value={email} 
                         onChange={e => setEmail(e.target.value)} 
-                        className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+                        className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
                         required 
                       />
                     </div>
@@ -477,12 +477,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {mode === 'FIND_ACCOUNT' && step === 'RESULT' && foundProfile && (
                 <div className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-4">
-                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Account Found</h3>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Account Found</h3>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">We located your identity signal</p>
                   </div>
-                  <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
+                  <div className="bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
                     <div className="relative w-24 h-24 mx-auto">
-                       <img src={foundProfile.avatar_url || `https://ui-avatars.com/api/?name=${foundProfile.username}`} className="w-full h-full rounded-full border-4 border-zinc-900 object-cover shadow-2xl" />
+                       <img src={foundProfile.avatar_url || `https://ui-avatars.com/api/?name=${foundProfile.username}`} className="w-full h-full rounded-full border-4 border-[var(--vix-border)] object-cover shadow-2xl" />
                        {foundProfile.is_verified && (
                          <div className="absolute -bottom-1 -right-1">
                             <VerificationBadge size="w-6 h-6" />
@@ -490,7 +490,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                        )}
                     </div>
                     <div className="space-y-1">
-                       <p className="text-xl font-black text-white">@{foundProfile.username}</p>
+                       <p className="text-xl font-black text-[var(--vix-text)]">@{foundProfile.username}</p>
                        <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || 'Individual Creator'}</p>
                     </div>
                   </div>
@@ -498,7 +498,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                     <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> Send Access Code</>}
                     </button>
-                    <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-white transition-all">Not your account?</button>
+                    <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-[var(--vix-text)] transition-all">Not your account?</button>
                   </div>
                 </div>
               )}
@@ -508,7 +508,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {step === 'VERIFY' && (
                 <div className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-2">
-                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Check</h3>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Identity Check</h3>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your {authMethod === 'EMAIL' ? 'email' : 'phone'} signal</p>
                   </div>
                   <div className="relative">
@@ -518,7 +518,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                       placeholder="••••••" 
                       value={otpCode} 
                       onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} 
-                      className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl py-8 text-center text-5xl font-black text-white outline-none focus:border-pink-500/50 transition-all tracking-[0.5em] shadow-inner" 
+                      className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-3xl py-8 text-center text-5xl font-black text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all tracking-[0.5em] shadow-inner" 
                       maxLength={6} 
                     />
                   </div>
@@ -530,12 +530,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                       <button 
                         onClick={() => handleSendRecoveryCode(true)} 
                         disabled={resending}
-                        className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors flex items-center gap-2"
+                        className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors flex items-center gap-2"
                       >
                         {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                         Resend Code
                       </button>
-                      <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors">Change Method</button>
+                      <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors">Change Method</button>
                     </div>
                   </div>
                 </div>
@@ -544,14 +544,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {step === 'AVATAR' && (
                 <form onSubmit={handleFinalizeIdentity} className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-2">
-                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Finalize Narrative</h3>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Finalize Narrative</h3>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Choose your handle</p>
                   </div>
                   <div className="relative w-36 h-36 mx-auto group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
-                    <div className="w-full h-full rounded-full border-4 border-zinc-900 overflow-hidden bg-zinc-950 flex items-center justify-center shadow-2xl transition-all group-hover:border-pink-500/30">
+                    <div className="w-full h-full rounded-full border-4 border-[var(--vix-border)] overflow-hidden bg-[var(--vix-bg)] flex items-center justify-center shadow-2xl transition-all group-hover:border-pink-500/30">
                       {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <Camera className="w-10 h-10 text-zinc-800 group-hover:text-pink-500 transition-colors" />}
                     </div>
-                    <div className="absolute bottom-1 right-1 bg-pink-500 rounded-full p-2 border-4 border-[#050505] shadow-lg">
+                    <div className="absolute bottom-1 right-1 bg-pink-500 rounded-full p-2 border-4 border-[var(--vix-card)] shadow-lg">
                       <User className="w-4 h-4 text-white" />
                     </div>
                     <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={e => { 
@@ -567,7 +567,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                     placeholder="@handle" 
                     value={username} 
                     onChange={e => setUsername(e.target.value)} 
-                    className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 text-center text-lg font-black text-white outline-none focus:border-pink-500/50 transition-all" 
+                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 text-center text-lg font-black text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all" 
                     required 
                   />
                   <button type="submit" disabled={loading} className="w-full vix-gradient py-6 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[12px] shadow-2xl shadow-pink-500/20">

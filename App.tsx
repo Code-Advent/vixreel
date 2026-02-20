@@ -25,6 +25,10 @@ const App: React.FC = () => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [profileAutoEdit, setProfileAutoEdit] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('vixreel_theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
   
   const [savedAccounts, setSavedAccounts] = useState<AccountSession[]>(() => {
     const saved = localStorage.getItem('vixreel_saved_accounts');
@@ -60,6 +64,14 @@ const App: React.FC = () => {
     window.addEventListener('vixreel-post-deleted', handleGlobalPostDelete);
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    
+    // Apply theme to document element
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('vixreel_theme', theme);
     
     return () => {
       window.removeEventListener('vixreel-post-deleted', handleGlobalPostDelete);
@@ -180,7 +192,7 @@ const App: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-between py-24 text-white">
+    <div className={`h-screen w-screen bg-[var(--vix-bg)] text-[var(--vix-text)] flex flex-col items-center justify-between py-24 transition-colors duration-500`}>
       <div />
       <div className="flex flex-col items-center animate-vix-in">
         <h1 className="logo-font text-7xl vix-text-gradient drop-shadow-[0_0_40px_rgba(255,0,128,0.2)]">
@@ -189,7 +201,7 @@ const App: React.FC = () => {
       </div>
       <div className="flex flex-col items-center gap-2 opacity-60 animate-pulse">
         <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.6em]">from</span>
-        <span className="text-lg font-black tracking-[0.25em] text-white">VERISAZ</span>
+        <span className={`text-lg font-black tracking-[0.25em] text-[var(--vix-text)]`}>VERISAZ</span>
       </div>
     </div>
   );
@@ -212,7 +224,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="bg-black min-h-screen text-white flex overflow-hidden">
+    <div className={`bg-[var(--vix-bg)] min-h-screen text-[var(--vix-text)] flex overflow-hidden transition-colors duration-300`}>
       <Sidebar 
         currentView={currentView} 
         setView={setView} 
@@ -221,14 +233,14 @@ const App: React.FC = () => {
         isAdminUnlocked={currentUser.is_admin} 
       />
 
-      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar bg-[radial-gradient(circle_at_top_right,_rgba(0,149,246,0.03)_0%,_transparent_50%)]">
+      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
         <div className="container mx-auto max-w-[935px] pt-4 px-4">
           {currentView === 'FEED' && (
             <div className="flex flex-col items-center pb-20 animate-vix-in">
               <div className="w-full flex justify-between items-center mb-6 px-2">
                 <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
-                <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-zinc-900/50 rounded-full border border-zinc-800 hover:border-zinc-700 transition-all">
-                  <Users className="w-5 h-5 text-zinc-400" />
+                <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
+                  <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
                 </button>
               </div>
               <div className="w-full max-w-[470px] space-y-6">
@@ -281,6 +293,8 @@ const App: React.FC = () => {
           {currentView === 'SETTINGS' && (
             <SettingsPage 
               user={currentUser} 
+              theme={theme}
+              setTheme={setTheme}
               onUpdateProfile={(u) => {
                 setCurrentUser(prev => {
                   const updated = prev ? {...prev, ...u} : null;
@@ -301,21 +315,21 @@ const App: React.FC = () => {
       </main>
 
       {isAccountMenuOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-sm bg-zinc-950 border border-zinc-900 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
-            <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/20">
+        <div className="fixed inset-0 z-[1000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="w-full max-sm bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
+            <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center bg-[var(--vix-secondary)]/20">
               <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">Switch Account</h3>
-              <button onClick={() => setIsAccountMenuOpen(false)} className="p-2 text-zinc-700 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+              <button onClick={() => setIsAccountMenuOpen(false)} className="p-2 text-zinc-700 hover:text-[var(--vix-text)] transition-colors"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh] no-scrollbar">
               {savedAccounts.map(acc => (
-                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-zinc-900/40 border-blue-500/20' : 'hover:bg-zinc-900/20 border-transparent'}`}>
+                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-[var(--vix-secondary)]/40 border-blue-500/20' : 'hover:bg-[var(--vix-secondary)]/20 border-transparent'}`}>
                    <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => acc.id !== currentUser.id && switchAccount(acc)}>
-                      <div className={`w-12 h-12 rounded-full p-0.5 ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-zinc-800'}`}>
-                        <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-black" />
+                      <div className={`w-12 h-12 rounded-full p-0.5 ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-[var(--vix-secondary)]'}`}>
+                        <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-bg)]" />
                       </div>
                       <div className="flex flex-col">
-                        <p className="font-bold text-sm text-white">@{acc.username}</p>
+                        <p className="font-bold text-sm text-[var(--vix-text)]">@{acc.username}</p>
                         {acc.id === currentUser.id && <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">Active</span>}
                       </div>
                    </div>
@@ -328,15 +342,15 @@ const App: React.FC = () => {
               ))}
               <button 
                 onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
-                className="w-full flex items-center gap-4 p-4 hover:bg-zinc-900 rounded-2xl transition-all group border border-dashed border-zinc-800 hover:border-blue-500/30"
+                className="w-full flex items-center gap-4 p-4 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all group border border-dashed border-[var(--vix-border)] hover:border-blue-500/30"
               >
-                <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
+                <div className="w-12 h-12 rounded-full bg-[var(--vix-secondary)] flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
                   <Plus className="w-6 h-6" />
                 </div>
-                <span className="font-bold text-sm text-zinc-500 group-hover:text-white">Add Account</span>
+                <span className="font-bold text-sm text-zinc-500 group-hover:text-[var(--vix-text)]">Add Account</span>
               </button>
             </div>
-            <div className="p-6 border-t border-zinc-900 bg-zinc-900/10">
+            <div className="p-6 border-t border-[var(--vix-border)] bg-[var(--vix-secondary)]/10">
               <button onClick={handleLogout} className="w-full py-4 text-center text-red-500 font-black text-[11px] uppercase tracking-widest hover:text-red-400 transition-colors">Relinquish Primary Session</button>
             </div>
           </div>

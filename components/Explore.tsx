@@ -65,7 +65,7 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
     <div className="max-w-[935px] mx-auto py-8 px-4 animate-vix-in pb-20">
       <div className="mb-12">
         <div className="flex items-center justify-between mb-8 px-2">
-          <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2">
+          <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 text-[var(--vix-text)]">
             <UserPlus className="w-5 h-5 text-pink-500" /> Suggested for you
           </h2>
           <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Explore Creators</span>
@@ -76,18 +76,18 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
             <div 
               key={user.id} 
               onClick={() => onSelectUser(user)}
-              className="min-w-[180px] bg-zinc-950 border border-zinc-900 rounded-[2.5rem] p-6 flex flex-col items-center text-center group cursor-pointer hover:border-pink-500/30 transition-all hover:scale-105"
+              className="min-w-[180px] bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 flex flex-col items-center text-center group cursor-pointer hover:border-pink-500/30 transition-all hover:scale-105"
             >
-              <div className={`w-20 h-20 rounded-full mb-4 p-1 ${user.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-zinc-800'}`}>
-                <div className="w-full h-full rounded-full border-2 border-black overflow-hidden bg-black">
+              <div className={`w-20 h-20 rounded-full mb-4 p-1 ${user.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-[var(--vix-secondary)]'}`}>
+                <div className="w-full h-full rounded-full border-2 border-[var(--vix-bg)] overflow-hidden bg-[var(--vix-bg)]">
                   <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full object-cover" />
                 </div>
               </div>
-              <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors">
+              <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors text-[var(--vix-text)]">
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
               </h3>
               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || 'Creator'}</p>
-              <button className="w-full py-2 bg-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">Follow</button>
+              <button className="w-full py-2 bg-[var(--vix-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--vix-text)] hover:text-[var(--vix-bg)] transition-all text-[var(--vix-text)]">Follow</button>
             </div>
           ))}
         </div>
@@ -95,7 +95,7 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
 
       <div>
         <div className="flex items-center justify-between mb-8 px-2">
-          <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2">
+          <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 text-[var(--vix-text)]">
             <Compass className="w-5 h-5 text-purple-500" /> Trending Now
           </h2>
         </div>
@@ -103,12 +103,12 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-6">
           {loading ? (
              Array.from({length: 9}).map((_, i) => (
-                <div key={i} className="aspect-square bg-zinc-900/50 rounded-2xl animate-pulse"></div>
+                <div key={i} className="aspect-square bg-[var(--vix-secondary)] rounded-2xl animate-pulse"></div>
              ))
           ) : explorePosts.map((post, i) => (
             <div 
               key={post.id} 
-              className={`relative aspect-square rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden group shadow-2xl border border-zinc-900/50 cursor-pointer ${i % 5 === 0 ? 'md:col-span-2 md:row-span-2' : ''}`}
+              className={`relative aspect-square rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden group shadow-2xl border border-[var(--vix-border)] cursor-pointer ${i % 5 === 0 ? 'md:col-span-2 md:row-span-2' : ''}`}
             >
               {post.media_type === 'video' ? (
                 <video src={post.media_url} className="w-full h-full object-cover" muted />
