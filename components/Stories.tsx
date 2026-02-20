@@ -49,6 +49,12 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
 
+    // Validation
+    if (file.size > 50 * 1024 * 1024) {
+      alert("Story file is too large (max 50MB).");
+      return;
+    }
+
     setIsUploading(true);
     const safeFilename = sanitizeFilename(file.name);
     const fileName = `${currentUser.id}-${Date.now()}-${safeFilename}`;
@@ -58,7 +64,10 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
     try {
       const { error: uploadError } = await supabase.storage
         .from('stories')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
 
       if (uploadError) throw uploadError;
 
@@ -67,7 +76,8 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
       const { error: dbError } = await supabase.from('stories').insert({
         user_id: currentUser.id,
         media_url: publicUrl,
-        media_type: mType
+        media_type: mType,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
       });
 
       if (dbError) throw dbError;

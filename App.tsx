@@ -46,7 +46,13 @@ const App: React.FC = () => {
 
     const handleIdentityUpdate = (e: any) => {
       const { id, ...updates } = e.detail;
-      if (currentUser?.id === id) setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
+      if (currentUser?.id === id) {
+        setCurrentUser(prev => {
+          const updated = prev ? { ...prev, ...updates } : null;
+          if (updated) updateIdentityRegistry(updated);
+          return updated;
+        });
+      }
       if (viewedUser?.id === id) setViewedUser(prev => prev ? { ...prev, ...updates } : null);
       setPosts(prev => prev.map(p => p.user_id === id ? { ...p, user: { ...p.user, ...updates } } : p));
     };
@@ -71,7 +77,7 @@ const App: React.FC = () => {
         if (profile) {
           if (session.user.email === 'davidhen498@gmail.com') profile.is_admin = true;
           setCurrentUser(profile);
-          updateSavedAccounts(profile, session);
+          syncSavedAccount(profile, session);
           await fetchPosts();
         } else {
           setCurrentUser(null);
@@ -87,7 +93,7 @@ const App: React.FC = () => {
     }
   };
 
-  const updateSavedAccounts = (profile: UserProfile, session: any) => {
+  const syncSavedAccount = (profile: UserProfile, session: any) => {
     setSavedAccounts(prev => {
       const filtered = prev.filter(acc => acc.id !== profile.id);
       const updated = [{ 
@@ -99,6 +105,19 @@ const App: React.FC = () => {
       localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const updateIdentityRegistry = (profile: UserProfile) => {
+    const saved = localStorage.getItem('vixreel_saved_accounts');
+    if (!saved) return;
+    const list: AccountSession[] = JSON.parse(saved);
+    const updated = list.map(acc => acc.id === profile.id ? {
+      ...acc,
+      username: profile.username,
+      avatar_url: profile.avatar_url
+    } : acc);
+    localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
+    setSavedAccounts(updated);
   };
 
   const switchAccount = async (account: AccountSession) => {
@@ -182,6 +201,9 @@ const App: React.FC = () => {
           setCurrentUser(profile);
           setIsAddingAccount(false); 
           fetchPosts();
+          // Force refresh of accounts list
+          const saved = localStorage.getItem('vixreel_saved_accounts');
+          if (saved) setSavedAccounts(JSON.parse(saved));
         }} 
         onCancelAdd={() => setIsAddingAccount(false)}
         isAddingAccount={isAddingAccount}
@@ -235,7 +257,13 @@ const App: React.FC = () => {
               user={viewedUser} 
               isOwnProfile={viewedUser.id === currentUser.id} 
               onUpdateProfile={(u) => {
-                if (viewedUser.id === currentUser.id) setCurrentUser(prev => prev ? {...prev, ...u} : null);
+                if (viewedUser.id === currentUser.id) {
+                  setCurrentUser(prev => {
+                    const updated = prev ? {...prev, ...u} : null;
+                    if (updated) updateIdentityRegistry(updated);
+                    return updated;
+                  });
+                }
                 setViewedUser(prev => prev ? {...prev, ...u} : null);
               }} 
               onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
@@ -253,7 +281,13 @@ const App: React.FC = () => {
           {currentView === 'SETTINGS' && (
             <SettingsPage 
               user={currentUser} 
-              onUpdateProfile={(u) => setCurrentUser(prev => prev ? {...prev, ...u} : null)} 
+              onUpdateProfile={(u) => {
+                setCurrentUser(prev => {
+                  const updated = prev ? {...prev, ...u} : null;
+                  if (updated) updateIdentityRegistry(updated);
+                  return updated;
+                });
+              }} 
               onLogout={() => setIsAccountMenuOpen(true)} 
               onOpenSwitchAccount={() => setIsAccountMenuOpen(true)}
               setView={setView}

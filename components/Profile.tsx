@@ -178,7 +178,22 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     } catch (err) { setIsFollowing(wasFollowing); }
   };
 
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditUsername(user.username);
+    setEditBio(user.bio || '');
+    setEditAvatarUrl(user.avatar_url);
+    setEditCoverUrl(user.cover_url);
+    setEditAvatarFile(null);
+    setEditCoverFile(null);
+  };
+
   const saveProfileChanges = async () => {
+    if (!editUsername.trim()) {
+      alert("Username cannot be empty.");
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
       const { data: { user: authUser }, error: sessionError } = await supabase.auth.getUser();
@@ -190,40 +205,45 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       let finalAvatarUrl = editAvatarUrl;
       let finalCoverUrl = editCoverUrl;
 
-      if (editAvatarFile) {
-        const ext = editAvatarFile.name.split('.').pop() || 'png';
-        const path = `${activeUid}/avatar-${Date.now()}.${ext}`;
+      // Helper for uploading
+      const uploadMedia = async (file: File, type: 'avatar' | 'cover') => {
+        // Validation
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} file is too large (max 10MB).`);
+        }
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} must be an image.`);
+        }
+
+        const ext = file.name.split('.').pop() || 'png';
+        const safeName = sanitizeFilename(file.name);
+        const path = `${activeUid}/${type}-${Date.now()}-${safeName}`;
+        
         const { error: uploadErr } = await supabase.storage
           .from('avatars')
-          .upload(path, editAvatarFile, { upsert: true });
+          .upload(path, file, { 
+            upsert: true,
+            contentType: file.type
+          });
         
         if (uploadErr) {
-          console.error("Avatar Upload Fail:", uploadErr);
-          throw new Error(`Avatar Sync: ${uploadErr.message}`);
+          console.error(`${type} Upload Fail:`, uploadErr);
+          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} Sync: ${uploadErr.message}`);
         }
         
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(path);
-        finalAvatarUrl = publicUrl;
+          
+        return publicUrl;
+      };
+
+      if (editAvatarFile) {
+        finalAvatarUrl = await uploadMedia(editAvatarFile, 'avatar');
       }
 
       if (editCoverFile) {
-        const ext = editCoverFile.name.split('.').pop() || 'png';
-        const path = `${activeUid}/cover-${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('avatars')
-          .upload(path, editCoverFile, { upsert: true });
-        
-        if (uploadErr) {
-          console.error("Cover Upload Fail:", uploadErr);
-          throw new Error(`Cover Sync: ${uploadErr.message}`);
-        }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(path);
-        finalCoverUrl = publicUrl;
+        finalCoverUrl = await uploadMedia(editCoverFile, 'cover');
       }
 
       const { error: updateErr } = await supabase
@@ -232,21 +252,34 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           username: editUsername.toLowerCase().trim(),
           bio: editBio.trim(),
           avatar_url: finalAvatarUrl,
-          cover_url: finalCoverUrl
+          cover_url: finalCoverUrl,
+          updated_at: new Date().toISOString()
         })
         .eq('id', activeUid);
 
       if (updateErr) throw updateErr;
 
       onUpdateProfile({ 
-        username: editUsername, 
-        bio: editBio, 
+        username: editUsername.toLowerCase().trim(), 
+        bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
         cover_url: finalCoverUrl 
       });
       
       setIsEditModalOpen(false);
-      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { detail: { id: activeUid } }));
+      setEditAvatarFile(null);
+      setEditCoverFile(null);
+      
+      // Notify other components
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
+        detail: { 
+          id: activeUid,
+          username: editUsername.toLowerCase().trim(),
+          bio: editBio.trim(),
+          avatar_url: finalAvatarUrl,
+          cover_url: finalCoverUrl
+        } 
+      }));
 
     } catch (err: any) {
       console.error("VixReel Identity Sync Error:", err);
@@ -375,7 +408,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           <div className="w-full max-w-lg bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">
             <div className="flex justify-between items-center">
               <h3 className="font-black uppercase tracking-widest text-white">Modify Identity</h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-2"><X className="w-6 h-6 text-zinc-500" /></button>
+              <button onClick={closeEditModal} className="p-2"><X className="w-6 h-6 text-zinc-500" /></button>
             </div>
             
             <div className="space-y-6">

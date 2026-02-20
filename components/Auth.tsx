@@ -1,15 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserProfile } from '../types';
+import { UserProfile, AccountSession } from '../types';
 import { 
   Loader2, 
   User,
   Camera,
   Smartphone,
   Mail,
-  Fingerprint,
-  ChevronRight,
   ShieldCheck,
   Zap,
   Lock,
@@ -18,7 +16,11 @@ import {
   ArrowLeft,
   Key,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Trash2,
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
 import VerificationBadge from './VerificationBadge';
 
@@ -28,12 +30,17 @@ interface AuthProps {
   isAddingAccount?: boolean;
 }
 
-type AuthMode = 'LOGIN' | 'SIGNUP' | 'FIND_ACCOUNT';
+type AuthMode = 'PICKER' | 'LOGIN' | 'SIGNUP' | 'FIND_ACCOUNT';
 type AuthStep = 'DETAILS' | 'VERIFY' | 'AVATAR' | 'RESULT';
 type AuthMethod = 'PHONE' | 'EMAIL';
 
 const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount }) => {
-  const [mode, setMode] = useState<AuthMode>('LOGIN');
+  const [savedAccounts, setSavedAccounts] = useState<AccountSession[]>(() => {
+    const saved = localStorage.getItem('vixreel_saved_accounts');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [mode, setMode] = useState<AuthMode>(isAddingAccount ? 'LOGIN' : (savedAccounts.length > 0 ? 'PICKER' : 'LOGIN'));
   const [step, setStep] = useState<AuthStep>('DETAILS');
   const [authMethod, setAuthMethod] = useState<AuthMethod>('PHONE'); 
   const [loading, setLoading] = useState(false);
@@ -58,6 +65,42 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       otpInputRef.current.focus();
     }
   }, [step]);
+
+  const removeAccount = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const updated = savedAccounts.filter(acc => acc.id !== id);
+    setSavedAccounts(updated);
+    localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
+    if (updated.length === 0) setMode('LOGIN');
+  };
+
+  const switchAccount = async (account: AccountSession) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: sessionErr } = await supabase.auth.setSession({
+        access_token: account.session_data.access_token,
+        refresh_token: account.session_data.refresh_token
+      });
+      
+      if (sessionErr) throw sessionErr;
+
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Narrative session expired.");
+
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+      if (profile) onAuthSuccess(profile as any);
+      else throw new Error("Identity profile mismatch.");
+    } catch (err: any) {
+      setError("Session expired. Please log in manually.");
+      const updated = savedAccounts.filter(acc => acc.id !== account.id);
+      setSavedAccounts(updated);
+      localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
+      setMode('LOGIN');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatPhone = (val: string) => {
     let cleaned = val.replace(/\D/g, '');
@@ -205,7 +248,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     setLoading(true);
     setError(null);
     try {
-      // 1. Get session more reliably
       const { data: { session } } = await supabase.auth.getSession();
       let authUser = session?.user;
 
@@ -218,7 +260,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       const activeUid = authUser.id;
       let finalAvatarUrl = `https://ui-avatars.com/api/?name=${username}`;
 
-      // 2. Upload Avatar - Path MUST be {userId}/{filename}
       if (avatarFile) {
         const ext = avatarFile.name.split('.').pop() || 'png';
         const filePath = `${activeUid}/avatar-${Date.now()}.${ext}`;
@@ -226,9 +267,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           .from('avatars')
           .upload(filePath, avatarFile, { upsert: true });
         
-        if (uploadErr) {
-          console.error("Avatar upload error:", uploadErr);
-        } else {
+        if (!uploadErr) {
           const { data: { publicUrl } } = supabase.storage
             .from('avatars')
             .getPublicUrl(filePath);
@@ -236,7 +275,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         }
       }
       
-      // 3. Upsert Profile for maximum robustness
       const { data: profile, error: dbErr } = await supabase.from('profiles').upsert({
         id: activeUid,
         username: username.toLowerCase().trim(),
@@ -255,8 +293,70 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     }
   };
 
+  const renderPicker = () => (
+    <div className="w-full space-y-10 animate-vix-in">
+      <div className="space-y-3 text-center">
+        <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Registry</h3>
+        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Select your narrative protocol</p>
+      </div>
+
+      <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar pr-2">
+        {savedAccounts.map(acc => (
+          <div 
+            key={acc.id}
+            onClick={() => switchAccount(acc)}
+            className="group flex items-center justify-between p-6 bg-zinc-950 border border-zinc-900 rounded-[2.5rem] hover:bg-zinc-900 hover:border-pink-500/30 cursor-pointer transition-all shadow-xl active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-full vix-gradient p-0.5 shadow-lg group-hover:scale-105 transition-transform">
+                 <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover border-4 border-black" />
+              </div>
+              <div className="flex flex-col">
+                 <span className="font-black text-lg text-white">@{acc.username}</span>
+                 <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest mt-1">Saved Session</span>
+              </div>
+            </div>
+            <button 
+              onClick={(e) => removeAccount(e, acc.id)}
+              className="p-3 bg-zinc-900/50 rounded-2xl text-zinc-800 hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-4 pt-4">
+        <button 
+          onClick={() => setMode('LOGIN')}
+          className="w-full py-5 rounded-[2rem] border border-zinc-800 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:bg-zinc-900 transition-all"
+        >
+          <Plus className="w-4 h-4" /> Add Narrative
+        </button>
+        {isAddingAccount && (
+          <button 
+            onClick={onCancelAdd}
+            className="w-full py-3 text-zinc-700 font-black uppercase tracking-widest text-[10px] hover:text-white transition-all"
+          >
+            Relinquish Add
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   const renderDetails = () => (
     <form onSubmit={handleInitialAction} className="w-full space-y-8 animate-vix-in">
+      {savedAccounts.length > 0 && !isAddingAccount && (
+        <button 
+          type="button" 
+          onClick={() => setMode('PICKER')}
+          className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-zinc-700 hover:text-pink-500 transition-colors flex items-center justify-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" /> Use Saved Identity
+        </button>
+      )}
+
       <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800 shadow-2xl">
         <button 
           type="button" 
@@ -312,12 +412,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             onClick={() => { setMode('FIND_ACCOUNT'); setStep('DETAILS'); setError(null); setSuccessMsg(null); }}
             className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-white transition-colors"
           >
-            Find your Account
+            Recover Identity
           </button>
         )}
       </div>
 
-      <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-[0_20px_40px_rgba(255,0,128,0.2)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+      <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
           <>{mode === 'LOGIN' ? 'Access Void' : 'Begin Narrative'} <ArrowRight className="w-4 h-4" /></>
         )}
@@ -340,139 +440,142 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
              </div>
           </div>
 
-          {mode !== 'FIND_ACCOUNT' && (
-            <div className="w-full mb-10 flex justify-center gap-10">
-              <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
-              <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
-            </div>
-          )}
+          {mode === 'PICKER' ? renderPicker() : (
+            <>
+              {mode !== 'FIND_ACCOUNT' && mode !== 'PICKER' && (
+                <div className="w-full mb-10 flex justify-center gap-10">
+                  <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
+                  <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-white border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
+                </div>
+              )}
 
-          {mode === 'FIND_ACCOUNT' && step === 'DETAILS' && (
-            <div className="w-full space-y-8 animate-vix-in">
-              <div className="flex items-center gap-4 mb-4">
-                <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-zinc-900 rounded-2xl text-zinc-500 hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /></button>
-                <h3 className="text-white font-black text-xl uppercase tracking-tight">Recover Session</h3>
-              </div>
-              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest leading-relaxed">Enter your email address to locate your primary creator narrative.</p>
-              <form onSubmit={handleFindAccount} className="space-y-6">
-                <div className="group relative">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-pink-500 transition-colors"><Mail className="w-5 h-5" /></div>
+              {mode === 'FIND_ACCOUNT' && step === 'DETAILS' && (
+                <div className="w-full space-y-8 animate-vix-in">
+                  <div className="flex items-center gap-4 mb-4">
+                    <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-zinc-900 rounded-2xl text-zinc-500 hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /></button>
+                    <h3 className="text-white font-black text-xl uppercase tracking-tight">Recover Session</h3>
+                  </div>
+                  <form onSubmit={handleFindAccount} className="space-y-6">
+                    <div className="group relative">
+                      <div className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-pink-500 transition-colors"><Mail className="w-5 h-5" /></div>
+                      <input 
+                        type="email" 
+                        placeholder="Identity Email" 
+                        value={email} 
+                        onChange={e => setEmail(e.target.value)} 
+                        className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+                        required 
+                      />
+                    </div>
+                    <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3">
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> Locate Account</>}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {mode === 'FIND_ACCOUNT' && step === 'RESULT' && foundProfile && (
+                <div className="w-full space-y-10 animate-vix-in text-center">
+                  <div className="space-y-4">
+                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Account Found</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">We located your identity signal</p>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
+                    <div className="relative w-24 h-24 mx-auto">
+                       <img src={foundProfile.avatar_url || `https://ui-avatars.com/api/?name=${foundProfile.username}`} className="w-full h-full rounded-full border-4 border-zinc-900 object-cover shadow-2xl" />
+                       {foundProfile.is_verified && (
+                         <div className="absolute -bottom-1 -right-1">
+                            <VerificationBadge size="w-6 h-6" />
+                         </div>
+                       )}
+                    </div>
+                    <div className="space-y-1">
+                       <p className="text-xl font-black text-white">@{foundProfile.username}</p>
+                       <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || 'Individual Creator'}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
+                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> Send Access Code</>}
+                    </button>
+                    <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-white transition-all">Not your account?</button>
+                  </div>
+                </div>
+              )}
+
+              {step === 'DETAILS' && mode !== 'FIND_ACCOUNT' && renderDetails()}
+              
+              {step === 'VERIFY' && (
+                <div className="w-full space-y-10 animate-vix-in text-center">
+                  <div className="space-y-2">
+                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Check</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your {authMethod === 'EMAIL' ? 'email' : 'phone'} signal</p>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      ref={otpInputRef}
+                      type="text" 
+                      placeholder="••••••" 
+                      value={otpCode} 
+                      onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} 
+                      className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl py-8 text-center text-5xl font-black text-white outline-none focus:border-pink-500/50 transition-all tracking-[0.5em] shadow-inner" 
+                      maxLength={6} 
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
+                      {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enter Void'}
+                    </button>
+                    <div className="flex items-center justify-center gap-6">
+                      <button 
+                        onClick={() => handleSendRecoveryCode(true)} 
+                        disabled={resending}
+                        className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors flex items-center gap-2"
+                      >
+                        {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        Resend Code
+                      </button>
+                      <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors">Change Method</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 'AVATAR' && (
+                <form onSubmit={handleFinalizeIdentity} className="w-full space-y-10 animate-vix-in text-center">
+                  <div className="space-y-2">
+                    <h3 className="text-white font-black text-2xl uppercase tracking-tight">Finalize Narrative</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Choose your handle</p>
+                  </div>
+                  <div className="relative w-36 h-36 mx-auto group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                    <div className="w-full h-full rounded-full border-4 border-zinc-900 overflow-hidden bg-zinc-950 flex items-center justify-center shadow-2xl transition-all group-hover:border-pink-500/30">
+                      {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <Camera className="w-10 h-10 text-zinc-800 group-hover:text-pink-500 transition-colors" />}
+                    </div>
+                    <div className="absolute bottom-1 right-1 bg-pink-500 rounded-full p-2 border-4 border-[#050505] shadow-lg">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={e => { 
+                      const f = e.target.files?.[0]; 
+                      if (f) { 
+                        setAvatarFile(f); 
+                        setAvatarUrl(URL.createObjectURL(f)); 
+                      } 
+                    }} />
+                  </div>
                   <input 
-                    type="email" 
-                    placeholder="Identity Email" 
-                    value={email} 
-                    onChange={e => setEmail(e.target.value)} 
-                    className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 pl-16 pr-6 text-sm text-white outline-none focus:border-pink-500/50 transition-all shadow-inner" 
+                    type="text" 
+                    placeholder="@handle" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)} 
+                    className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 text-center text-lg font-black text-white outline-none focus:border-pink-500/50 transition-all" 
                     required 
                   />
-                </div>
-                <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> Locate Account</>}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {mode === 'FIND_ACCOUNT' && step === 'RESULT' && foundProfile && (
-            <div className="w-full space-y-10 animate-vix-in text-center">
-              <div className="space-y-4">
-                <h3 className="text-white font-black text-2xl uppercase tracking-tight">Account Found</h3>
-                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">We located your identity signal</p>
-              </div>
-              <div className="bg-zinc-950 border border-zinc-900 rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
-                <div className="relative w-24 h-24 mx-auto">
-                   <img src={foundProfile.avatar_url || `https://ui-avatars.com/api/?name=${foundProfile.username}`} className="w-full h-full rounded-full border-4 border-zinc-900 object-cover shadow-2xl" />
-                   {foundProfile.is_verified && (
-                     <div className="absolute -bottom-1 -right-1">
-                        <VerificationBadge size="w-6 h-6" />
-                     </div>
-                   )}
-                </div>
-                <div className="space-y-1">
-                   <p className="text-xl font-black text-white">@{foundProfile.username}</p>
-                   <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || 'Individual Creator'}</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> Send Access Code</>}
-                </button>
-                <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-white transition-all">Not your account?</button>
-              </div>
-            </div>
-          )}
-
-          {step === 'DETAILS' && mode !== 'FIND_ACCOUNT' && renderDetails()}
-          
-          {step === 'VERIFY' && (
-            <div className="w-full space-y-10 animate-vix-in text-center">
-              <div className="space-y-2">
-                <h3 className="text-white font-black text-2xl uppercase tracking-tight">Identity Check</h3>
-                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your {authMethod === 'EMAIL' ? 'email' : 'phone'} signal</p>
-              </div>
-              <div className="relative">
-                <input 
-                  ref={otpInputRef}
-                  type="text" 
-                  placeholder="••••••" 
-                  value={otpCode} 
-                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} 
-                  className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl py-8 text-center text-5xl font-black text-white outline-none focus:border-pink-500/50 transition-all tracking-[0.5em] shadow-inner" 
-                  maxLength={6} 
-                />
-              </div>
-              <div className="space-y-4">
-                <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enter Void'}
-                </button>
-                <div className="flex items-center justify-center gap-6">
-                  <button 
-                    onClick={() => handleSendRecoveryCode(true)} 
-                    disabled={resending}
-                    className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors flex items-center gap-2"
-                  >
-                    {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                    Resend Code
+                  <button type="submit" disabled={loading} className="w-full vix-gradient py-6 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[12px] shadow-2xl shadow-pink-500/20">
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Activate Protocol'}
                   </button>
-                  <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-white transition-colors">Change Method</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 'AVATAR' && (
-            <form onSubmit={handleFinalizeIdentity} className="w-full space-y-10 animate-vix-in text-center">
-              <div className="space-y-2">
-                <h3 className="text-white font-black text-2xl uppercase tracking-tight">Choose Handle</h3>
-                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Define your identity</p>
-              </div>
-              <div className="relative w-36 h-36 mx-auto group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
-                <div className="w-full h-full rounded-full border-4 border-zinc-900 overflow-hidden bg-zinc-950 flex items-center justify-center shadow-2xl transition-all group-hover:border-pink-500/30">
-                  {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <Camera className="w-10 h-10 text-zinc-800 group-hover:text-pink-500 transition-colors" />}
-                </div>
-                <div className="absolute bottom-1 right-1 bg-pink-500 rounded-full p-2 border-4 border-[#050505] shadow-lg">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <input ref={avatarInputRef} type="file" className="hidden" accept="image/*" onChange={e => { 
-                  const f = e.target.files?.[0]; 
-                  if (f) { 
-                    setAvatarFile(f); 
-                    setAvatarUrl(URL.createObjectURL(f)); 
-                  } 
-                }} />
-              </div>
-              <input 
-                type="text" 
-                placeholder="@handle" 
-                value={username} 
-                onChange={e => setUsername(e.target.value)} 
-                className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl py-5 text-center text-lg font-black text-white outline-none focus:border-pink-500/50 transition-all" 
-                required 
-              />
-              <button type="submit" disabled={loading} className="w-full vix-gradient py-6 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[12px] shadow-2xl shadow-pink-500/20">
-                {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Activate Protocol'}
-              </button>
-            </form>
+                </form>
+              )}
+            </>
           )}
 
           {successMsg && (

@@ -50,15 +50,31 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
     const fileName = `${userId}-${Date.now()}-${safeFilename}`;
     const filePath = `feed/${fileName}`;
     try {
-      await supabase.storage.from('posts').upload(filePath, file);
+      const { error: uploadErr } = await supabase.storage
+        .from('posts')
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (uploadErr) throw uploadErr;
+
       const { data: { publicUrl } } = supabase.storage.from('posts').getPublicUrl(filePath);
-      await supabase.from('posts').insert({
-        user_id: userId, media_url: publicUrl, media_type: mediaType, caption: caption
+      
+      const { error: insertErr } = await supabase.from('posts').insert({
+        user_id: userId, 
+        media_url: publicUrl, 
+        media_type: mediaType, 
+        caption: caption.trim()
       });
+
+      if (insertErr) throw insertErr;
+
       onPostSuccess();
       onClose();
     } catch (err: any) {
-      alert(err.message);
+      console.error("Post Upload Error:", err);
+      alert(err.message || "Failed to share post.");
     } finally { setIsPosting(false); }
   };
 
