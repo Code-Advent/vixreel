@@ -65,6 +65,14 @@ const App: React.FC = () => {
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     
+    return () => {
+      window.removeEventListener('vixreel-post-deleted', handleGlobalPostDelete);
+      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+    };
+  }, [currentUser?.id, viewedUser?.id]);
+
+  useEffect(() => {
     // Apply theme to document element
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -72,13 +80,7 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('vixreel_theme', theme);
-    
-    return () => {
-      window.removeEventListener('vixreel-post-deleted', handleGlobalPostDelete);
-      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
-      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
-    };
-  }, [currentUser?.id, viewedUser?.id]);
+  }, [theme]);
 
   const init = async () => {
     setLoading(true);

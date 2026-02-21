@@ -17,19 +17,23 @@
     --vix-card: #f9fafb;
     --vix-secondary: #f3f4f6;
     --vix-muted: #6b7280;
+    color-scheme: light;
   }
 
-  .dark {
+  :root.dark {
     --vix-bg: #000000;
     --vix-text: #ffffff;
     --vix-border: #1a1a1a;
     --vix-card: #09090b;
     --vix-secondary: #18181b;
     --vix-muted: #71717a;
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-[var(--vix-bg)] text-[var(--vix-text)] transition-colors duration-300;
+    background-color: var(--vix-bg);
+    color: var(--vix-text);
+    @apply transition-colors duration-300;
     font-family: theme('fontFamily.sans');
   }
 }
