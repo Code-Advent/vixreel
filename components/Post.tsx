@@ -35,10 +35,45 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const canComment = post.user.allow_comments !== false;
   const currentTotalLikes = realLikesCount + (post.boosted_likes || 0) + likesOffset;
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.6 } // Play when 60% of the post is visible
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isVisible) {
+        videoRef.current.play().catch(() => {
+          // Autoplay might be blocked by browser if not muted
+          setIsMuted(true);
+          videoRef.current?.play();
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [isVisible]);
 
   useEffect(() => {
     checkStatus();
@@ -148,14 +183,23 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
     if (isReposting || reposted) return;
     setIsReposting(true);
     try {
-      const { error } = await supabase.from('posts').insert({
+      const { data: newPost, error } = await supabase.from('posts').insert({
         user_id: currentUserId,
         media_url: post.media_url,
         media_type: post.media_type,
         caption: `Reposted from @${post.user.username}: ${post.caption}`,
         reposted_from_id: post.id
-      });
+      }).select().single();
+      
       if (error) throw error;
+
+      if (newPost) {
+        await supabase.from('reposts').insert({
+          user_id: currentUserId,
+          post_id: post.id
+        });
+      }
+
       setReposted(true);
       setRepostsCount(prev => prev + 1);
       onUpdate?.();
@@ -191,7 +235,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
   };
 
   return (
-    <div className={`w-full max-w-[470px] mx-auto border-b border-[var(--vix-border)] pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
+    <div ref={containerRef} className={`w-full max-w-[470px] mx-auto border-b border-[var(--vix-border)] pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
       {post.reposted_from_id && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <Repeat2 className="w-3 h-3 text-zinc-500" />
@@ -231,17 +275,14 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
         {post.duet_from_id ? (
           <div className="flex w-full h-full">
             <div className="flex-1 border-r border-[var(--vix-border)]">
-              <video src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
+              <video src={post.media_url} loop muted={isMuted} autoPlay={isVisible} playsInline className="w-full h-full object-cover" />
             </div>
             <div className="flex-1">
-              <video src={post.media_url.replace('posts/', 'posts/duet-')} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
-              {/* Note: In a real app, media_url would point to a combined video or we'd store both URLs. 
-                  For this demo, we'll assume media_url contains the combined duet video or we'd need a more complex schema.
-                  Let's stick to media_url being the final result for simplicity, but show the layout. */}
+              <video src={post.media_url.replace('posts/', 'posts/duet-')} loop muted={isMuted} autoPlay={isVisible} playsInline className="w-full h-full object-cover" />
             </div>
           </div>
         ) : post.media_type === 'video' ? (
-          <video ref={videoRef} src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
+          <video ref={videoRef} src={post.media_url} loop muted={isMuted} playsInline className="w-full h-full object-cover" />
         ) : (
           <img src={post.media_url} className="w-full h-full object-cover" alt="Post Content" />
         )}

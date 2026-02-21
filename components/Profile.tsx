@@ -9,6 +9,7 @@ import { UserProfile, Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
 import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
+import Post from './Post';
 
 interface ProfileProps {
   user: UserProfile;
@@ -27,6 +28,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [counts, setCounts] = useState({ followers: 0, following: 0, likes: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
   
   const [isSocialModalOpen, setIsSocialModalOpen] = useState(false);
   const [socialModalType, setSocialModalType] = useState<'FOLLOWERS' | 'FOLLOWING'>('FOLLOWERS');
@@ -398,7 +400,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
         <div className="grid grid-cols-3 gap-1 sm:gap-4 mt-4">
           {(activeTab === 'POSTS' ? posts : likedPosts).map((post) => (
-            <div key={post.id} className="aspect-square bg-[var(--vix-card)] relative group cursor-pointer overflow-hidden rounded-xl border border-[var(--vix-border)] shadow-xl transition-transform hover:scale-[1.02]">
+            <div 
+              key={post.id} 
+              onClick={() => setSelectedPost(post)}
+              className="aspect-square bg-[var(--vix-card)] relative group cursor-pointer overflow-hidden rounded-xl border border-[var(--vix-border)] shadow-xl transition-transform hover:scale-[1.02]"
+            >
               {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
                 <Heart className="w-8 h-8 text-white fill-white shadow-2xl" />
@@ -407,6 +413,33 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           ))}
         </div>
       </div>
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-[10002] bg-black/95 flex items-center justify-center p-4 backdrop-blur-xl animate-vix-in">
+          <button 
+            onClick={() => setSelectedPost(null)}
+            className="absolute top-8 right-8 p-3 text-white/50 hover:text-white transition-colors bg-white/10 rounded-full border border-white/10 z-[10003]"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="w-full max-w-lg">
+             <Post 
+               post={selectedPost} 
+               currentUserId={user.id} 
+               onDelete={(id) => {
+                 setPosts(prev => prev.filter(p => p.id !== id));
+                 setSelectedPost(null);
+               }}
+               onUpdate={fetchUserContent}
+               onSelectUser={(u) => {
+                 setSelectedPost(null);
+                 // If it's a different user, we might need to handle navigation
+                 // but for now we'll just close the modal
+               }}
+             />
+          </div>
+        </div>
+      )}
 
       {isSocialModalOpen && (
         <div className="fixed inset-0 z-[10001] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4 backdrop-blur-md">

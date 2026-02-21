@@ -184,7 +184,12 @@ const App: React.FC = () => {
   };
 
   const fetchPosts = async () => {
-    const { data } = await supabase.from('posts').select('*, user:profiles(*)').order('created_at', { ascending: false });
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('posts')
+      .select('*, user:profiles(*)')
+      .gte('created_at', twentyFourHoursAgo)
+      .order('created_at', { ascending: false });
     if (data) setPosts(data as any);
   };
 

@@ -50,8 +50,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
     if (!file || isPosting) return;
     setIsPosting(true);
     const safeFilename = sanitizeFilename(file.name);
-    const fileName = `${userId}-${Date.now()}-${safeFilename}`;
-    const filePath = `feed/${fileName}`;
+    const fileName = `${Date.now()}-${safeFilename}`;
+    const filePath = `${userId}/${fileName}`;
     try {
       const { error: uploadErr } = await supabase.storage
         .from('posts')
@@ -64,16 +64,32 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
 
       const { data: { publicUrl } } = supabase.storage.from('posts').getPublicUrl(filePath);
       
-      const { error: insertErr } = await supabase.from('posts').insert({
+      const { data: newPost, error: insertErr } = await supabase.from('posts').insert({
         user_id: userId, 
         media_url: publicUrl, 
         media_type: mediaType, 
         caption: caption.trim(),
         duet_from_id: duetSource?.id,
         stitch_from_id: stitchSource?.id
-      });
+      }).select().single();
 
       if (insertErr) throw insertErr;
+
+      if (duetSource && newPost) {
+        await supabase.from('duets').insert({
+          user_id: userId,
+          original_post_id: duetSource.id,
+          duet_post_id: newPost.id
+        });
+      }
+
+      if (stitchSource && newPost) {
+        await supabase.from('stitches').insert({
+          user_id: userId,
+          original_post_id: stitchSource.id,
+          stitch_post_id: newPost.id
+        });
+      }
 
       onPostSuccess();
       onClose();
