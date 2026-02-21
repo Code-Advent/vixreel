@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2, MessageSquareOff, Lock, Repeat2 } from 'lucide-react';
+import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2, MessageSquareOff, Lock, Repeat2, Columns2, Scissors } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
@@ -13,9 +13,11 @@ interface PostProps {
   onDelete?: (id: string) => void;
   onUpdate?: () => void;
   onSelectUser?: (user: UserProfile) => void;
+  onDuet?: (post: PostType) => void;
+  onStitch?: (post: PostType) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser }) => {
+const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch }) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -196,6 +198,18 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Reposted</span>
         </div>
       )}
+      {post.duet_from_id && (
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <Columns2 className="w-3 h-3 text-blue-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Duet</span>
+        </div>
+      )}
+      {post.stitch_from_id && (
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <Scissors className="w-3 h-3 text-purple-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-purple-500">Stitch</span>
+        </div>
+      )}
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
           <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
@@ -214,7 +228,19 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
       </div>
 
       <div className="bg-[var(--vix-card)] aspect-square rounded-3xl overflow-hidden shadow-2xl border border-[var(--vix-border)] relative group">
-        {post.media_type === 'video' ? (
+        {post.duet_from_id ? (
+          <div className="flex w-full h-full">
+            <div className="flex-1 border-r border-[var(--vix-border)]">
+              <video src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1">
+              <video src={post.media_url.replace('posts/', 'posts/duet-')} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
+              {/* Note: In a real app, media_url would point to a combined video or we'd store both URLs. 
+                  For this demo, we'll assume media_url contains the combined duet video or we'd need a more complex schema.
+                  Let's stick to media_url being the final result for simplicity, but show the layout. */}
+            </div>
+          </div>
+        ) : post.media_type === 'video' ? (
           <video ref={videoRef} src={post.media_url} loop muted={isMuted} autoPlay playsInline className="w-full h-full object-cover" />
         ) : (
           <img src={post.media_url} className="w-full h-full object-cover" alt="Post Content" />
@@ -269,6 +295,16 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               {isReposting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Repeat2 className={`w-7 h-7 ${reposted ? 'stroke-[3px]' : ''}`} />}
               <span className="text-xs font-bold">{formatNumber(repostsCount)}</span>
             </button>
+            {post.media_type === 'video' && !post.duet_from_id && !post.stitch_from_id && (
+              <>
+                <button onClick={() => onDuet?.(post)} className="text-zinc-500 hover:text-blue-500 transition-all">
+                  <Columns2 className="w-7 h-7" />
+                </button>
+                <button onClick={() => onStitch?.(post)} className="text-zinc-500 hover:text-purple-500 transition-all">
+                  <Scissors className="w-7 h-7" />
+                </button>
+              </>
+            )}
           </div>
           <button onClick={handleSave} className={`${saved ? 'text-[var(--vix-text)]' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all`}>
             <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />

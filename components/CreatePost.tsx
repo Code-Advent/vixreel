@@ -1,17 +1,20 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Wand2, Loader2, Image as ImageIcon, Video, UploadCloud, ChevronRight } from 'lucide-react';
+import { X, Wand2, Loader2, Image as ImageIcon, Video, UploadCloud, ChevronRight, Columns2, Scissors } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
+import { Post } from '../types';
 
 interface CreatePostProps {
   userId: string;
   onClose: () => void;
   onPostSuccess: () => void;
+  duetSource?: Post | null;
+  stitchSource?: Post | null;
 }
 
-const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess }) => {
+const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess, duetSource, stitchSource }) => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -65,7 +68,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
         user_id: userId, 
         media_url: publicUrl, 
         media_type: mediaType, 
-        caption: caption.trim()
+        caption: caption.trim(),
+        duet_from_id: duetSource?.id,
+        stitch_from_id: stitchSource?.id
       });
 
       if (insertErr) throw insertErr;
@@ -83,7 +88,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
       {/* Header */}
       <div className="w-full flex items-center justify-between p-6 bg-[var(--vix-bg)] border-b border-[var(--vix-border)] sticky top-0 z-50">
         <button onClick={onClose} className="p-2 text-zinc-500 hover:text-[var(--vix-text)]"><X className="w-6 h-6" /></button>
-        <span className="font-bold text-sm uppercase tracking-widest text-[var(--vix-text)]">New Post</span>
+        <span className="font-bold text-sm uppercase tracking-widest text-[var(--vix-text)]">
+          {duetSource ? 'New Duet' : stitchSource ? 'New Stitch' : 'New Post'}
+        </span>
         <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
           {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
         </button>
@@ -92,14 +99,33 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
       <div className="w-full max-w-5xl flex-1 flex flex-col md:flex-row overflow-visible p-6 sm:p-12 gap-12">
         {/* Upload Area */}
         <div className="flex-1 bg-[var(--vix-card)] flex flex-col items-center justify-center rounded-[3rem] border border-[var(--vix-border)] min-h-[400px] relative p-8 shadow-2xl">
+          {duetSource && (
+            <div className="absolute top-6 left-6 flex items-center gap-2 bg-blue-500/10 px-4 py-2 rounded-full border border-blue-500/20 z-10">
+              <Columns2 className="w-3 h-3 text-blue-500" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">Duet with @{duetSource.user.username}</span>
+            </div>
+          )}
+          {stitchSource && (
+            <div className="absolute top-6 left-6 flex items-center gap-2 bg-purple-500/10 px-4 py-2 rounded-full border border-purple-500/20 z-10">
+              <Scissors className="w-3 h-3 text-purple-500" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-purple-500">Stitch with @{stitchSource.user.username}</span>
+            </div>
+          )}
           {preview ? (
             <div className="w-full h-full flex flex-col items-center justify-center gap-8">
-               <div className="relative max-h-[60vh] flex items-center justify-center w-full">
-                  {mediaType === 'video' ? (
-                    <video src={preview} controls className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl border border-zinc-800" />
-                  ) : (
-                    <img src={preview} className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl object-contain border border-zinc-800" alt="Preview" />
+               <div className="relative max-h-[60vh] flex items-center justify-center w-full gap-4">
+                  {duetSource && (
+                    <div className="flex-1 aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800">
+                      <video src={duetSource.media_url} autoPlay loop muted className="w-full h-full object-cover" />
+                    </div>
                   )}
+                  <div className={`${duetSource ? 'flex-1 aspect-[9/16]' : 'w-full'} flex items-center justify-center`}>
+                    {mediaType === 'video' ? (
+                      <video src={preview} controls className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl border border-zinc-800" />
+                    ) : (
+                      <img src={preview} className="max-w-full max-h-[50vh] rounded-2xl shadow-2xl object-contain border border-zinc-800" alt="Preview" />
+                    )}
+                  </div>
                   <button onClick={() => {setFile(null); setPreview(null);}} className="absolute -top-4 -right-4 bg-[var(--vix-secondary)] p-3 rounded-full text-[var(--vix-text)] border border-[var(--vix-border)] shadow-xl hover:bg-red-500 transition-colors">
                     <X className="w-4 h-4" />
                   </button>

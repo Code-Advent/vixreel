@@ -15,7 +15,10 @@ import {
   Info,
   Check,
   X,
-  Sun
+  Sun,
+  MapPin,
+  Users2,
+  Loader2
 } from 'lucide-react';
 import { UserProfile, ViewType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -44,10 +47,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
+  const [location, setLocation] = useState(user.location || '');
+  const [isLocationPrivate, setIsLocationPrivate] = useState(user.is_location_private || false);
+  const [showFollowersTo, setShowFollowersTo] = useState(user.show_followers_to || 'EVERYONE');
   const [saving, setSaving] = useState<string | null>(null);
   const [infoModal, setInfoModal] = useState<{title: string, content: string} | null>(null);
 
-  const toggleSetting = async (key: keyof UserProfile, value: boolean) => {
+  const toggleSetting = async (key: keyof UserProfile, value: any) => {
     setSaving(key);
     try {
       const { error } = await supabase.from('profiles').update({ [key]: value }).eq('id', user.id);
@@ -56,7 +62,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         if (key === 'is_private') setIsPrivate(value);
         if (key === 'allow_comments') setAllowComments(value);
         if (key === 'is_following_public') setIsFollowingPublic(value);
+        if (key === 'is_location_private') setIsLocationPrivate(value);
+        if (key === 'show_followers_to') setShowFollowersTo(value);
       }
+    } finally {
+      setTimeout(() => setSaving(null), 500);
+    }
+  };
+
+  const updateLocation = async () => {
+    setSaving('location');
+    try {
+      const { error } = await supabase.from('profiles').update({ location }).eq('id', user.id);
+      if (!error) onUpdateProfile({ location });
     } finally {
       setTimeout(() => setSaving(null), 500);
     }
@@ -103,7 +121,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           isToggle: true, 
           active: isPrivate, 
           onToggle: () => toggleSetting('is_private', !isPrivate),
-          desc: 'Only followers can view your narrative posts.'
+          desc: 'Only followers can view your narrative posts and lists.'
+        },
+        { 
+          icon: Users2, 
+          label: 'Follower Visibility', 
+          isSelect: true,
+          value: showFollowersTo,
+          options: [
+            { label: 'Everyone', value: 'EVERYONE' },
+            { label: 'Followers', value: 'FOLLOWERS' },
+            { label: 'Only Me', value: 'ONLY_ME' }
+          ],
+          onSelect: (val: any) => toggleSetting('show_followers_to', val),
+          desc: 'Control who can see your follower registry.'
+        },
+        { 
+          icon: MapPin, 
+          label: 'Private Location', 
+          isToggle: true, 
+          active: isLocationPrivate, 
+          onToggle: () => toggleSetting('is_location_private', !isLocationPrivate),
+          desc: 'Hide your physical signal from your profile.'
         },
         { 
           icon: MessageSquare, 
@@ -121,6 +160,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           onToggle: () => toggleSetting('is_following_public', !isFollowingPublic),
           desc: 'Make your following list visible to visitors.'
         },
+      ]
+    },
+    {
+      title: 'Identity Signal',
+      items: [
+        {
+          icon: MapPin,
+          label: 'Current Location',
+          isInput: true,
+          value: location,
+          onChange: (val: string) => setLocation(val),
+          onBlur: updateLocation,
+          desc: 'Broadcast your current sector.'
+        }
       ]
     },
     {
@@ -187,6 +240,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         ) : null}
                       </div>
                     </button>
+                  ) : item.isSelect ? (
+                    <select 
+                      value={item.value} 
+                      onChange={(e) => item.onSelect?.(e.target.value)}
+                      className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none text-[var(--vix-text)]"
+                    >
+                      {item.options?.map((opt: any) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : item.isInput ? (
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        value={item.value} 
+                        onChange={(e) => item.onChange?.(e.target.value)}
+                        onBlur={item.onBlur}
+                        className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-xs font-bold outline-none text-[var(--vix-text)] w-40"
+                        placeholder="Location..."
+                      />
+                      {saving === 'location' && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-blue-500" />}
+                    </div>
                   ) : (
                     <ChevronRight className="w-5 h-5 text-zinc-800 group-hover:text-blue-500 transition-colors" />
                   )}

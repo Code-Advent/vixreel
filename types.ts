@@ -16,6 +16,9 @@ export interface UserProfile {
   allow_comments?: boolean;
   is_following_public?: boolean;
   boosted_followers?: number; 
+  location?: string;
+  is_location_private?: boolean;
+  show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
   created_at?: string;
   updated_at?: string;
 }
@@ -35,6 +38,10 @@ export interface Post {
   has_saved?: boolean;
   reposted_from_id?: string;
   reposted_from?: Post;
+  duet_from_id?: string;
+  duet_from?: Post;
+  stitch_from_id?: string;
+  stitch_from?: Post;
 }
 
 export interface Comment {

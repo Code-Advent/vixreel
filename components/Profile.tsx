@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Grid, Heart, Camera, Settings, User as UserIcon, Loader2, X,
   ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2,
-  MessageSquare, UserCheck, Image as ImageIcon
+  MessageSquare, UserCheck, Image as ImageIcon, MapPin
 } from 'lucide-react';
 import { UserProfile, Post as PostType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -153,7 +153,21 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   };
 
   const handleOpenSocial = async (type: 'FOLLOWERS' | 'FOLLOWING') => {
-    if (!isOwnProfile && type === 'FOLLOWING' && !user.is_following_public) return;
+    if (isOwnProfile) {
+      // Owner can always see
+    } else {
+      // Privacy check for followers
+      if (type === 'FOLLOWERS') {
+        if (user.show_followers_to === 'ONLY_ME') return;
+        if (user.show_followers_to === 'FOLLOWERS' && !isFollowing) return;
+      }
+      // Privacy check for following
+      if (type === 'FOLLOWING' && !user.is_following_public) return;
+      
+      // General private account check
+      if (user.is_private && !isFollowing) return;
+    }
+
     setSocialModalType(type);
     setIsSocialModalOpen(true);
     setSocialLoading(true);
@@ -322,19 +336,33 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               @{user.username} {user.is_verified && <VerificationBadge size="w-5 h-5" />}
             </h2>
           </div>
-          <div className="max-w-lg mx-auto sm:mx-0">
-            <h3 className="font-bold text-[var(--vix-text)] mb-2">{user.full_name || user.username}</h3>
+          <div className="max-w-lg mx-auto sm:mx-0 space-y-2">
+            <h3 className="font-bold text-[var(--vix-text)]">{user.full_name || user.username}</h3>
+            {user.location && !user.is_location_private && (
+              <div className="flex items-center justify-center sm:justify-start gap-1 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                <MapPin className="w-3 h-3 text-pink-500" />
+                {user.location}
+              </div>
+            )}
             <p className="text-zinc-500 text-sm whitespace-pre-wrap leading-relaxed">{user.bio || 'Initial bio signal pending...'}</p>
           </div>
           
           <div className="flex justify-center sm:justify-start gap-12 border-t border-[var(--vix-border)] pt-6">
-            <div onClick={() => handleOpenSocial('FOLLOWERS')} className="flex flex-col items-center cursor-pointer group">
-              <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">{counts.followers}</span>
+            <div 
+              onClick={() => handleOpenSocial('FOLLOWERS')} 
+              className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? 'opacity-30' : ''}`}
+            >
+              <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
+                {(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.followers}
+              </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Followers</span>
             </div>
-            <div onClick={() => handleOpenSocial('FOLLOWING')} className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && !user.is_following_public) ? 'opacity-30' : ''}`}>
+            <div 
+              onClick={() => handleOpenSocial('FOLLOWING')} 
+              className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? 'opacity-30' : ''}`}
+            >
               <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
-                {(!isOwnProfile && !user.is_following_public) ? <Lock className="w-3 h-3" /> : counts.following}
+                {(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.following}
               </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Following</span>
             </div>

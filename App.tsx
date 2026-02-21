@@ -25,6 +25,8 @@ const App: React.FC = () => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [profileAutoEdit, setProfileAutoEdit] = useState(false);
+  const [duetSource, setDuetSource] = useState<PostType | null>(null);
+  const [stitchSource, setStitchSource] = useState<PostType | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
     return (saved as 'light' | 'dark') || 'dark';
@@ -255,6 +257,8 @@ const App: React.FC = () => {
                       onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
                       onUpdate={fetchPosts} 
                       onSelectUser={(u) => setView('PROFILE', u)}
+                      onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
+                      onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
                     />
                   ))
                 ) : (
@@ -288,7 +292,23 @@ const App: React.FC = () => {
             />
           )}
           
-          {currentView === 'CREATE' && <CreatePost userId={currentUser.id} onClose={() => setCurrentView('FEED')} onPostSuccess={fetchPosts} />}
+          {currentView === 'CREATE' && (
+            <CreatePost 
+              userId={currentUser.id} 
+              onClose={() => {
+                setCurrentView('FEED');
+                setDuetSource(null);
+                setStitchSource(null);
+              }} 
+              onPostSuccess={() => {
+                fetchPosts();
+                setDuetSource(null);
+                setStitchSource(null);
+              }} 
+              duetSource={duetSource}
+              stitchSource={stitchSource}
+            />
+          )}
           {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
           {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
           {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
