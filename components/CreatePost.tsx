@@ -136,7 +136,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess 
               value={caption} 
               onChange={e => setCaption(e.target.value)} 
               className="w-full h-48 bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl p-6 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-pink-500/30 transition-all shadow-inner placeholder:text-zinc-700" 
-              placeholder="Write a caption..." 
+              placeholder="Write a caption... Use @username to mention creators." 
             />
             <button 
               onClick={handleGenerateAICaption} 

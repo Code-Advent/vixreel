@@ -254,6 +254,7 @@ const App: React.FC = () => {
                       currentUserId={currentUser.id} 
                       onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
                       onUpdate={fetchPosts} 
+                      onSelectUser={(u) => setView('PROFILE', u)}
                     />
                   ))
                 ) : (

@@ -33,6 +33,8 @@ export interface Post {
   comments_count?: number;
   has_liked?: boolean;
   has_saved?: boolean;
+  reposted_from_id?: string;
+  reposted_from?: Post;
 }
 
 export interface Comment {

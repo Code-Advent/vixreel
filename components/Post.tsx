@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2, MessageSquareOff, Lock } from 'lucide-react';
+import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2, MessageSquareOff, Lock, Repeat2 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
@@ -12,20 +12,24 @@ interface PostProps {
   currentUserId: string;
   onDelete?: (id: string) => void;
   onUpdate?: () => void;
+  onSelectUser?: (user: UserProfile) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) => {
+const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser }) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [reposted, setReposted] = useState(false);
   const [realLikesCount, setRealLikesCount] = useState(0);
   const [likesOffset, setLikesOffset] = useState(0); 
   const [commentsCount, setCommentsCount] = useState(0);
+  const [repostsCount, setRepostsCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<CommentType[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [isReposting, setIsReposting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
@@ -38,9 +42,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     checkStatus();
     fetchLikesCount();
     fetchCommentsCount();
+    fetchRepostsCount();
     if (showComments && canComment) fetchComments();
 
-    const handleEngagement = () => fetchLikesCount();
+    const handleEngagement = () => {
+      fetchLikesCount();
+      fetchRepostsCount();
+    };
     window.addEventListener('vixreel-engagement-updated', handleEngagement);
     return () => window.removeEventListener('vixreel-engagement-updated', handleEngagement);
   }, [post.id, showComments, post.boosted_likes]);
@@ -50,6 +58,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     setLiked(!!likeData);
     const { data: saveData } = await supabase.from('saves').select('id').eq('post_id', post.id).eq('user_id', currentUserId).maybeSingle();
     setSaved(!!saveData);
+    const { data: repostData } = await supabase.from('posts').select('id').eq('reposted_from_id', post.id).eq('user_id', currentUserId).maybeSingle();
+    setReposted(!!repostData);
   };
 
   const fetchLikesCount = async () => {
@@ -60,6 +70,11 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
   const fetchCommentsCount = async () => {
     const { count } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
     setCommentsCount(count || 0);
+  };
+
+  const fetchRepostsCount = async () => {
+    const { count } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('reposted_from_id', post.id);
+    setRepostsCount(count || 0);
   };
 
   const fetchComments = async () => {
@@ -127,10 +142,62 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
     }
   };
 
+  const handleRepost = async () => {
+    if (isReposting || reposted) return;
+    setIsReposting(true);
+    try {
+      const { error } = await supabase.from('posts').insert({
+        user_id: currentUserId,
+        media_url: post.media_url,
+        media_type: post.media_type,
+        caption: `Reposted from @${post.user.username}: ${post.caption}`,
+        reposted_from_id: post.id
+      });
+      if (error) throw error;
+      setReposted(true);
+      setRepostsCount(prev => prev + 1);
+      onUpdate?.();
+      window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
+    } catch (err: any) {
+      alert("Repost failed: " + err.message);
+    } finally {
+      setIsReposting(false);
+    }
+  };
+
+  const renderCaption = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1);
+        return (
+          <button
+            key={i}
+            onClick={async () => {
+              const { data } = await supabase.from('profiles').select('*').eq('username', username).maybeSingle();
+              if (data && onSelectUser) onSelectUser(data as UserProfile);
+            }}
+            className="text-blue-500 hover:underline font-bold"
+          >
+            {part}
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   return (
     <div className={`w-full max-w-[470px] mx-auto border-b border-[var(--vix-border)] pb-8 mb-4 animate-vix-in ${isDeleting ? 'opacity-30 pointer-events-none' : ''}`}>
+      {post.reposted_from_id && (
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <Repeat2 className="w-3 h-3 text-zinc-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Reposted</span>
+        </div>
+      )}
       <div className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
           <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
           <div className="flex flex-col">
             <span className="text-sm font-bold flex items-center gap-1 text-[var(--vix-text)]">
@@ -194,6 +261,14 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
             <button onClick={handleDownload} disabled={isDownloading} className="text-zinc-500 hover:text-[var(--vix-text)] transition-all disabled:opacity-30">
               <Download className="w-7 h-7" />
             </button>
+            <button 
+              onClick={handleRepost} 
+              disabled={isReposting || reposted} 
+              className={`${reposted ? 'text-green-500' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all flex items-center gap-1.5`}
+            >
+              {isReposting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Repeat2 className={`w-7 h-7 ${reposted ? 'stroke-[3px]' : ''}`} />}
+              <span className="text-xs font-bold">{formatNumber(repostsCount)}</span>
+            </button>
           </div>
           <button onClick={handleSave} className={`${saved ? 'text-[var(--vix-text)]' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all`}>
             <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
@@ -203,10 +278,10 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate }) 
         <div className="space-y-1">
           <p className="text-xs font-bold text-[var(--vix-text)]">{formatNumber(currentTotalLikes)} likes</p>
           <div className="text-sm text-zinc-500">
-            <span className="font-bold text-[var(--vix-text)] mr-2 inline-flex items-center gap-1">
+            <span className="font-bold text-[var(--vix-text)] mr-2 inline-flex items-center gap-1 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
               @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
             </span>
-            {post.caption}
+            {renderCaption(post.caption)}
           </div>
         </div>
       </div>
