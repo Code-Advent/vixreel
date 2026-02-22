@@ -61,6 +61,39 @@ export interface Story {
   user: UserProfile;
 }
 
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  cover_url: string;
+  privacy: 'PUBLIC' | 'PRIVATE';
+  creator_id: string;
+  created_at: string;
+  updated_at: string;
+  creator?: UserProfile;
+  member_count?: number;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: 'ADMIN' | 'MEMBER';
+  joined_at: string;
+  user?: UserProfile;
+}
+
+export interface GroupPost {
+  id: string;
+  group_id: string;
+  user_id: string;
+  content: string;
+  media_url?: string;
+  media_type?: 'image' | 'video';
+  created_at: string;
+  user?: UserProfile;
+}
+
 export interface Message {
   id: string;
   sender_id: string;
@@ -76,4 +109,4 @@ export interface AccountSession {
   session_data: any; 
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS';
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS';

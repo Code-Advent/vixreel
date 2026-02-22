@@ -18,10 +18,11 @@ interface ProfileProps {
   onMessageUser?: (user: UserProfile) => void;
   onOpenSettings?: () => void;
   onLogout?: () => void;
+  onNavigateToGroups?: () => void;
   autoEdit?: boolean;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, autoEdit }) => {
+const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToGroups, autoEdit }) => {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
   const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES'>('POSTS');
@@ -377,7 +378,16 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
         <div className="flex gap-3 justify-center">
           {isOwnProfile ? (
-            <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">Edit Profile</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">Edit Profile</button>
+              <button 
+                onClick={onNavigateToGroups}
+                className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-700 hover:text-pink-500 transition-all border border-[var(--vix-border)] shadow-xl"
+                title="Communities"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+            </div>
           ) : (
             <>
               <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-[var(--vix-secondary)] text-zinc-500 border border-[var(--vix-border)]' : 'vix-gradient text-white shadow-2xl shadow-blue-500/10'}`}>

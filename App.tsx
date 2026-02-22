@@ -14,6 +14,7 @@ import Admin from './components/Admin';
 import Notifications from './components/Notifications';
 import Explore from './components/Explore';
 import SettingsPage from './components/SettingsPage';
+import Groups from './components/Groups';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -293,9 +294,12 @@ const App: React.FC = () => {
               onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
               onLogout={() => setIsAccountMenuOpen(true)}
               onOpenSettings={() => setCurrentView('SETTINGS')}
+              onNavigateToGroups={() => setCurrentView('GROUPS')}
               autoEdit={profileAutoEdit}
             />
           )}
+          
+          {currentView === 'GROUPS' && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} />}
           
           {currentView === 'CREATE' && (
             <CreatePost 
