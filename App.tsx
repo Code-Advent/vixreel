@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Users, LogOut, Trash2, X, UserPlus, CheckCircle, Plus } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { UserProfile, Post as PostType, ViewType, AccountSession } from './types';
+import { UserProfile, Post as PostType, ViewType, AccountSession, Group } from './types';
 import Sidebar from './components/Sidebar';
 import Post from './components/Post';
 import Profile from './components/Profile';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [profileAutoEdit, setProfileAutoEdit] = useState(false);
   const [duetSource, setDuetSource] = useState<PostType | null>(null);
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
     return (saved as 'light' | 'dark') || 'dark';
@@ -294,12 +295,13 @@ const App: React.FC = () => {
               onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
               onLogout={() => setIsAccountMenuOpen(true)}
               onOpenSettings={() => setCurrentView('SETTINGS')}
-              onNavigateToGroups={() => setCurrentView('GROUPS')}
+              onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
+              onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
               autoEdit={profileAutoEdit}
             />
           )}
           
-          {currentView === 'GROUPS' && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} />}
+          {(currentView === 'GROUPS' || currentView === 'GROUP_DETAILS') && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedGroup} />}
           
           {currentView === 'CREATE' && (
             <CreatePost 

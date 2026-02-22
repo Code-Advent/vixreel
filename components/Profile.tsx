@@ -5,7 +5,7 @@ import {
   ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2,
   MessageSquare, UserCheck, Image as ImageIcon, MapPin
 } from 'lucide-react';
-import { UserProfile, Post as PostType } from '../types';
+import { UserProfile, Post as PostType, Group } from '../types';
 import { supabase } from '../lib/supabase';
 import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -19,13 +19,15 @@ interface ProfileProps {
   onOpenSettings?: () => void;
   onLogout?: () => void;
   onNavigateToGroups?: () => void;
+  onSelectGroup?: (group: Group) => void;
   autoEdit?: boolean;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToGroups, autoEdit }) => {
+const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToGroups, onSelectGroup, autoEdit }) => {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
-  const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES'>('POSTS');
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES' | 'GROUPS'>('POSTS');
   const [counts, setCounts] = useState({ followers: 0, following: 0, likes: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -112,6 +114,27 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       
       if (lData) {
         setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
+      }
+
+      // Fetch groups created by the user
+      const { data: gData } = await supabase
+        .from('groups')
+        .select(`
+          *,
+          creator:profiles(*)
+        `)
+        .eq('creator_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (gData) {
+        const groupsWithCounts = await Promise.all(gData.map(async (g) => {
+          const { count } = await supabase
+            .from('group_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('group_id', g.id);
+          return { ...g, member_count: count || 0 };
+        }));
+        setUserGroups(groupsWithCounts);
       }
 
       // CORRECTED: Count followers (people following this user)
@@ -406,22 +429,54 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="flex justify-center gap-12">
           <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Grid className="w-4 h-4" /> Posts</button>
           <button onClick={() => setActiveTab('LIKES')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'LIKES' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Heart className="w-4 h-4" /> Liked</button>
+          <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> Groups</button>
         </div>
 
-        <div className="grid grid-cols-3 gap-1 sm:gap-4 mt-4">
-          {(activeTab === 'POSTS' ? posts : likedPosts).map((post) => (
-            <div 
-              key={post.id} 
-              onClick={() => setSelectedPost(post)}
-              className="aspect-square bg-[var(--vix-card)] relative group cursor-pointer overflow-hidden rounded-xl border border-[var(--vix-border)] shadow-xl transition-transform hover:scale-[1.02]"
-            >
-              {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
-                <Heart className="w-8 h-8 text-white fill-white shadow-2xl" />
+        {activeTab === 'GROUPS' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            {userGroups.length === 0 ? (
+              <div className="col-span-full py-20 text-center space-y-4 opacity-20">
+                <Users className="w-16 h-16 mx-auto" />
+                <p className="font-black uppercase tracking-widest text-xs">No groups created yet</p>
               </div>
-            </div>
-          ))}
-        </div>
+            ) : (
+              userGroups.map(group => (
+                <div 
+                  key={group.id} 
+                  onClick={() => onSelectGroup?.(group)}
+                  className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] overflow-hidden shadow-xl hover:border-pink-500/30 transition-all cursor-pointer group"
+                >
+                  <div className="h-24 relative">
+                    <img src={group.cover_url} className="w-full h-full object-cover" alt={group.name} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <h3 className="text-sm font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{group.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3 h-3 text-zinc-700" />
+                      <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} Members</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1 sm:gap-4 mt-4">
+            {(activeTab === 'POSTS' ? posts : likedPosts).map((post) => (
+              <div 
+                key={post.id} 
+                onClick={() => setSelectedPost(post)}
+                className="aspect-square bg-[var(--vix-card)] relative group cursor-pointer overflow-hidden rounded-xl border border-[var(--vix-border)] shadow-xl transition-transform hover:scale-[1.02]"
+              >
+                {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
+                  <Heart className="w-8 h-8 text-white fill-white shadow-2xl" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {selectedPost && (

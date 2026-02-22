@@ -21,6 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
     { id: 'EXPLORE' as ViewType, label: 'Explore', icon: 'fa-solid fa-compass' },
     { id: 'CREATE' as ViewType, label: 'Create', icon: 'fa-solid fa-square-plus' },
     { id: 'MESSAGES' as ViewType, label: 'Messages', icon: 'fa-solid fa-paper-plane' },
+    { id: 'GROUPS' as ViewType, label: 'Groups', icon: 'fa-solid fa-users' },
     { id: 'PROFILE' as ViewType, label: 'Profile', icon: 'fa-solid fa-user' },
   ];
 

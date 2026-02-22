@@ -12,13 +12,14 @@ import { sanitizeFilename } from '../lib/utils';
 interface GroupsProps {
   currentUser: UserProfile;
   onBack: () => void;
+  initialGroup?: Group | null;
 }
 
-const Groups: React.FC<GroupsProps> = ({ currentUser, onBack }) => {
+const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>('LIST');
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialGroup ? 'DETAILS' : 'LIST');
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(initialGroup || null);
   const [groupPosts, setGroupPosts] = useState<GroupPost[]>([]);
   const [isMember, setIsMember] = useState(false);
   
@@ -38,7 +39,10 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack }) => {
 
   useEffect(() => {
     fetchGroups();
-  }, []);
+    if (initialGroup) {
+      fetchGroupData(initialGroup.id);
+    }
+  }, [initialGroup]);
 
   const fetchGroups = async () => {
     setLoading(true);
