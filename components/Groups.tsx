@@ -6,8 +6,9 @@ import {
   Video, Send, Heart, X, Loader2, Camera
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { UserProfile, Group, GroupMember, GroupPost } from '../types';
+import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
 import { sanitizeFilename } from '../lib/utils';
+import VerificationBadge from './VerificationBadge';
 
 interface GroupsProps {
   currentUser: UserProfile;
@@ -22,6 +23,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(initialGroup || null);
   const [groupPosts, setGroupPosts] = useState<GroupPost[]>([]);
   const [isMember, setIsMember] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   
   // Create Group State
   const [newName, setNewName] = useState('');
@@ -36,6 +38,12 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [postFile, setPostFile] = useState<File | null>(null);
   const [postPreview, setPostPreview] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+
+  // Comment State
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, GroupPostComment[]>>({});
+  const [newComment, setNewComment] = useState('');
+  const [isCommenting, setIsCommenting] = useState(false);
 
   useEffect(() => {
     fetchGroups();
@@ -159,6 +167,15 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
       if (error) throw error;
       setGroupPosts(posts || []);
+
+      // Fetch likes and comments counts for each post
+      const postsWithEngagement = await Promise.all((posts || []).map(async (p) => {
+        const { count: lCount } = await supabase.from('group_post_likes').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+        const { count: cCount } = await supabase.from('group_post_comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+        const { data: myLike } = await supabase.from('group_post_likes').select('*').eq('post_id', p.id).eq('user_id', currentUser.id).maybeSingle();
+        return { ...p, likes_count: lCount || 0, comments_count: cCount || 0, is_liked: !!myLike };
+      }));
+      setGroupPosts(postsWithEngagement);
     } catch (err) {
       console.error('Error fetching group data:', err);
     }
@@ -176,6 +193,84 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       fetchGroupData(selectedGroup.id);
     } catch (err) {
       console.error('Error joining group:', err);
+    }
+  };
+
+  const leaveGroup = async () => {
+    if (!selectedGroup || isLeaving) return;
+    if (!confirm('Are you sure you want to leave this community?')) return;
+    setIsLeaving(true);
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', selectedGroup.id)
+        .eq('user_id', currentUser.id);
+      
+      if (error) throw error;
+      setIsMember(false);
+      fetchGroupData(selectedGroup.id);
+    } catch (err) {
+      console.error('Error leaving group:', err);
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  const toggleLikePost = async (postId: string) => {
+    const post = groupPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    try {
+      if (post.is_liked) {
+        await supabase.from('group_post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+        setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: false, likes_count: (p.likes_count || 1) - 1 } : p));
+      } else {
+        await supabase.from('group_post_likes').insert({ post_id: postId, user_id: currentUser.id });
+        setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 } : p));
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
+    }
+  };
+
+  const fetchComments = async (postId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('group_post_comments')
+        .select('*, user:profiles(*)')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setComments(prev => ({ ...prev, [postId]: data || [] }));
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    if (!newComment.trim() || isCommenting) return;
+    setIsCommenting(true);
+    try {
+      const { data, error } = await supabase
+        .from('group_post_comments')
+        .insert({
+          post_id: postId,
+          user_id: currentUser.id,
+          content: newComment.trim()
+        })
+        .select('*, user:profiles(*)')
+        .single();
+      
+      if (error) throw error;
+      setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
+      setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+      setNewComment('');
+    } catch (err) {
+      console.error('Error adding comment:', err);
+    } finally {
+      setIsCommenting(false);
     }
   };
 
@@ -383,7 +478,10 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
               <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
                 <div className="space-y-1">
-                  <h3 className="text-2xl font-black text-white">{selectedGroup.name}</h3>
+                  <h3 className="text-2xl font-black text-white flex items-center gap-2">
+                    {selectedGroup.name}
+                    {selectedGroup.creator?.is_verified && <VerificationBadge size="w-5 h-5" />}
+                  </h3>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
                       <Users className="w-3 h-3 text-white/70" />
@@ -395,7 +493,15 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     </div>
                   </div>
                 </div>
-                {!isMember && (
+                {isMember ? (
+                  <button 
+                    onClick={leaveGroup}
+                    disabled={isLeaving}
+                    className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                  >
+                    {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Joined'}
+                  </button>
+                ) : (
                   <button 
                     onClick={joinGroup}
                     className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
@@ -504,15 +610,62 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                         </div>
                       )}
                       <div className="flex items-center gap-6 pt-2">
-                        <button className="flex items-center gap-2 text-zinc-500 hover:text-pink-500 transition-colors">
-                          <Heart className="w-5 h-5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Like</span>
+                        <button 
+                          onClick={() => toggleLikePost(post.id)}
+                          className={`flex items-center gap-2 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
+                        >
+                          <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">{post.likes_count || 0} Likes</span>
                         </button>
-                        <button className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors">
+                        <button 
+                          onClick={() => {
+                            if (activeCommentPostId === post.id) {
+                              setActiveCommentPostId(null);
+                            } else {
+                              setActiveCommentPostId(post.id);
+                              fetchComments(post.id);
+                            }
+                          }}
+                          className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors"
+                        >
                           <MessageSquare className="w-5 h-5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Comment</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{post.comments_count || 0} Comments</span>
                         </button>
                       </div>
+
+                      {/* Comments Section */}
+                      {activeCommentPostId === post.id && (
+                        <div className="pt-4 border-t border-[var(--vix-border)] space-y-4 animate-vix-in">
+                          <div className="space-y-3 max-h-60 overflow-y-auto no-scrollbar">
+                            {comments[post.id]?.map(comment => (
+                              <div key={comment.id} className="flex gap-3">
+                                <img src={comment.user?.avatar_url} className="w-8 h-8 rounded-full object-cover" />
+                                <div className="flex-1 bg-[var(--vix-secondary)] rounded-2xl p-3">
+                                  <p className="text-[10px] font-black text-[var(--vix-text)]">@{comment.user?.username}</p>
+                                  <p className="text-[11px] text-zinc-600">{comment.content}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              value={newComment}
+                              onChange={e => setNewComment(e.target.value)}
+                              placeholder="Write a comment..."
+                              className="flex-1 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-xs outline-none focus:border-pink-500/30 transition-all"
+                              onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id)}
+                            />
+                            <button 
+                              onClick={() => handleAddComment(post.id)}
+                              disabled={!newComment.trim() || isCommenting}
+                              className="p-2 text-pink-500 hover:bg-pink-500/10 rounded-xl transition-all disabled:opacity-50"
+                            >
+                              <Send className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

@@ -429,7 +429,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="flex justify-center gap-12">
           <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Grid className="w-4 h-4" /> Posts</button>
           <button onClick={() => setActiveTab('LIKES')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'LIKES' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Heart className="w-4 h-4" /> Liked</button>
-          <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> Groups</button>
+          {!isOwnProfile && (
+            <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> Groups</button>
+          )}
         </div>
 
         {activeTab === 'GROUPS' ? (

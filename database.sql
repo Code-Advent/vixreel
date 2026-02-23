@@ -176,6 +176,24 @@ CREATE TABLE IF NOT EXISTS public.group_posts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 16a. GROUP POST LIKES TABLE
+CREATE TABLE IF NOT EXISTS public.group_post_likes (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(post_id, user_id)
+);
+
+-- 16b. GROUP POST COMMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.group_post_comments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 17. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -192,6 +210,8 @@ ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_post_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -268,6 +288,15 @@ CREATE POLICY "Members can post in groups" ON public.group_posts FOR INSERT WITH
     )
 );
 CREATE POLICY "Users can delete own group posts" ON public.group_posts FOR DELETE USING (auth.uid() = user_id);
+
+-- Group Post Likes
+CREATE POLICY "Group post likes are viewable by everyone" ON public.group_post_likes FOR SELECT USING (true);
+CREATE POLICY "Users can insert own group post likes" ON public.group_post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own group post likes" ON public.group_post_likes FOR DELETE USING (auth.uid() = user_id);
+
+-- Group Post Comments
+CREATE POLICY "Group post comments are viewable by everyone" ON public.group_post_comments FOR SELECT USING (true);
+CREATE POLICY "Users can insert own group post comments" ON public.group_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;

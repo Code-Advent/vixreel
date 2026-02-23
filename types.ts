@@ -92,6 +92,25 @@ export interface GroupPost {
   media_type?: 'image' | 'video';
   created_at: string;
   user?: UserProfile;
+  likes_count?: number;
+  comments_count?: number;
+  is_liked?: boolean;
+}
+
+export interface GroupPostLike {
+  id: string;
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface GroupPostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user?: UserProfile;
 }
 
 export interface Message {
