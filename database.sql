@@ -1,8 +1,3 @@
--- VIXREEL NARRATIVE PROTOCOL - MASTER SCHEMA V7.0
--- Includes: Profiles, Posts, Interactions (Reposts, Duets, Stitches), 
--- Locations, Stories, Messages, and Communities (Groups)
-
--- 1. EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 2. PROFILES TABLE
