@@ -113,7 +113,7 @@ const AppContent: React.FC = () => {
       console.error("VixReel Engine Error:", err);
       setCurrentUser(null);
     } finally {
-      setTimeout(() => setLoading(false), 2000);
+      setTimeout(() => setLoading(false), 500);
     }
   };
 

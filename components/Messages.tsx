@@ -70,8 +70,11 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   // Handle active chat changes
   useEffect(() => {
     if (activeChat) {
+      setMessages([]); // Clear previous messages to ensure fresh load
       fetchMessages();
       messageInputRef.current?.focus();
+    } else {
+      setMessages([]);
     }
   }, [activeChat?.id]);
 
@@ -86,12 +89,13 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
   const fetchChats = async () => {
     try {
-      // Fetch latest messages for each conversation
+      // Fetch latest messages for each conversation - limit to 500 for performance
       const { data: msgs, error } = await supabase
         .from('messages')
         .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
         .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       if (!msgs) return;
@@ -359,15 +363,15 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
           
           <div className="w-full max-w-md space-y-10">
             <div className="text-center space-y-3">
-               <h3 className="text-3xl font-black text-[var(--vix-text)] uppercase tracking-widest">Signal Search</h3>
-               <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">Establish new narrative connection</p>
+               <h3 className="text-3xl font-black text-[var(--vix-text)] uppercase tracking-widest">{t('Signal Search')}</h3>
+               <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">{t('Establish new narrative connection')}</p>
             </div>
 
             <div className="relative group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
               <input 
                 type="text" 
-                placeholder="Search @handle..." 
+                placeholder={t('Search @handle...')} 
                 value={searchQuery}
                 onChange={e => handleSearchUsers(e.target.value)}
                 autoFocus
@@ -379,7 +383,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               {isSearching ? (
                 <div className="flex flex-col items-center py-10 gap-4">
                   <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
-                  <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">Scanning Registry...</span>
+                  <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{t('Scanning Registry...')}</span>
                 </div>
               ) : searchResults.length > 0 ? (
                 searchResults.map(u => (
@@ -393,7 +397,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                       <p className="font-black text-sm text-[var(--vix-text)] flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
                         @{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                       </p>
-                      <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest truncate">{u.full_name || 'Individual Creator'}</p>
+                      <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest truncate">{u.full_name || t('Individual Creator')}</p>
                     </div>
                     <div className="bg-[var(--vix-secondary)] p-3 rounded-2xl text-zinc-600 group-hover:text-pink-500 transition-colors">
                       <ChevronLeft className="w-4 h-4 rotate-180" />
@@ -403,7 +407,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               ) : searchQuery.length >= 2 && (
                 <div className="text-center py-20 opacity-30">
                   <Search className="w-10 h-10 text-zinc-500 mx-auto mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">No identity match found</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('No identity match found')}</p>
                 </div>
               )}
             </div>
