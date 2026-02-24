@@ -18,10 +18,12 @@ import {
   Sun,
   MapPin,
   Users2,
-  Loader2
+  Loader2,
+  Globe
 } from 'lucide-react';
 import { UserProfile, ViewType } from '../types';
 import { supabase } from '../lib/supabase';
+import { useTranslation, SUPPORTED_LANGUAGES } from '../lib/translation';
 
 interface SettingsPageProps {
   user: UserProfile;
@@ -44,6 +46,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   setView,
   onTriggerEditProfile
 }) => {
+  const { t, language, setLanguage, isTranslating } = useTranslation();
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
@@ -82,120 +85,129 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const sections = [
     {
-      title: 'Account Settings',
+      title: t('Account Settings'),
       items: [
         { 
           icon: User, 
-          label: 'Edit Profile', 
+          label: t('Edit Profile'), 
           action: onTriggerEditProfile, 
-          desc: 'Update handle, bio, and identity.' 
+          desc: t('Update handle, bio, and identity.') 
         },
         { 
           icon: Smartphone, 
-          label: 'Linked Accounts', 
+          label: t('Linked Accounts'), 
           action: onOpenSwitchAccount, 
-          desc: 'Manage other VixReel identities.' 
+          desc: t('Manage other VixReel identities.') 
         },
         { 
           icon: Bell, 
-          label: 'Notifications', 
+          label: t('Notifications'), 
           action: () => setView('NOTIFICATIONS'), 
-          desc: 'Control push alerts and signal pings.' 
+          desc: t('Control push alerts and signal pings.') 
+        },
+        { 
+          icon: Globe, 
+          label: t('Language'), 
+          isSelect: true,
+          value: language,
+          options: SUPPORTED_LANGUAGES.map(l => ({ label: l.name, value: l.code })),
+          onSelect: (val: string) => setLanguage(val),
+          desc: isTranslating ? t('Synchronizing language data...') : t('Select your preferred narrative language.')
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 
-          label: 'Appearance', 
+          label: t('Appearance'), 
           isToggle: true, 
           active: theme === 'dark', 
           onToggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
-          desc: `Currently using ${theme} mode protocol.`
+          desc: `${t('Currently using')} ${t(theme)} ${t('mode protocol.')}`
         },
       ]
     },
     {
-      title: 'Privacy & Narrative',
+      title: t('Privacy & Narrative'),
       items: [
         { 
           icon: Lock, 
-          label: 'Private Account', 
+          label: t('Private Account'), 
           isToggle: true, 
           active: isPrivate, 
           onToggle: () => toggleSetting('is_private', !isPrivate),
-          desc: 'Only followers can view your narrative posts and lists.'
+          desc: t('Only followers can view your narrative posts and lists.')
         },
         { 
           icon: Users2, 
-          label: 'Follower Visibility', 
+          label: t('Follower Visibility'), 
           isSelect: true,
           value: showFollowersTo,
           options: [
-            { label: 'Everyone', value: 'EVERYONE' },
-            { label: 'Followers', value: 'FOLLOWERS' },
-            { label: 'Only Me', value: 'ONLY_ME' }
+            { label: t('Everyone'), value: 'EVERYONE' },
+            { label: t('Followers'), value: 'FOLLOWERS' },
+            { label: t('Only Me'), value: 'ONLY_ME' }
           ],
           onSelect: (val: any) => toggleSetting('show_followers_to', val),
-          desc: 'Control who can see your follower registry.'
+          desc: t('Control who can see your follower registry.')
         },
         { 
           icon: MapPin, 
-          label: 'Private Location', 
+          label: t('Private Location'), 
           isToggle: true, 
           active: isLocationPrivate, 
           onToggle: () => toggleSetting('is_location_private', !isLocationPrivate),
-          desc: 'Hide your physical signal from your profile.'
+          desc: t('Hide your physical signal from your profile.')
         },
         { 
           icon: MessageSquare, 
-          label: 'Allow Comments', 
+          label: t('Allow Comments'), 
           isToggle: true, 
           active: allowComments, 
           onToggle: () => toggleSetting('allow_comments', !allowComments),
-          desc: 'Enable others to respond to your signal.'
+          desc: t('Enable others to respond to your signal.')
         },
         { 
           icon: Eye, 
-          label: 'Public Following', 
+          label: t('Public Following'), 
           isToggle: true, 
           active: isFollowingPublic, 
           onToggle: () => toggleSetting('is_following_public', !isFollowingPublic),
-          desc: 'Make your following list visible to visitors.'
+          desc: t('Make your following list visible to visitors.')
         },
       ]
     },
     {
-      title: 'Identity Signal',
+      title: t('Identity Signal'),
       items: [
         {
           icon: MapPin,
-          label: 'Current Location',
+          label: t('Current Location'),
           isInput: true,
           value: location,
           onChange: (val: string) => setLocation(val),
           onBlur: updateLocation,
-          desc: 'Broadcast your current sector.'
+          desc: t('Broadcast your current sector.')
         }
       ]
     },
     {
-      title: 'Support',
+      title: t('Support'),
       items: [
         { 
           icon: HelpCircle, 
-          label: 'Help Center', 
+          label: t('Help Center'), 
           action: () => setInfoModal({
-            title: 'VixReel Help Center',
-            content: 'Welcome to the Help Center. Our narrative protocol is designed for creators. For issues with verification, billing, or identity synchronization, please contact core@vixreel.io. Remember: Always maintain your visual signal integrity.'
+            title: t('VixReel Help Center'),
+            content: t('Welcome to the Help Center. Our narrative protocol is designed for creators. For issues with verification, billing, or identity synchronization, please contact core@vixreel.io. Remember: Always maintain your visual signal integrity.')
           }), 
-          desc: 'FAQ and community guidelines.' 
+          desc: t('FAQ and community guidelines.') 
         },
         { 
           icon: Info, 
-          label: 'About VixReel', 
+          label: t('About VixReel'), 
           action: () => setInfoModal({
-            title: 'About VixReel',
-            content: 'VixReel Version 3.2.0-Alpha. A premium social narrative protocol built for high-performance content sharing. Credits: Engineering by World-Class AI. Aesthetic Direction by Vix Design Labs.'
+            title: t('About VixReel'),
+            content: t('VixReel Version 3.2.0-Alpha. A premium social narrative protocol built for high-performance content sharing. Credits: Engineering by World-Class AI. Aesthetic Direction by Vix Design Labs.')
           }), 
-          desc: 'Terms, conditions, and privacy policy.' 
+          desc: t('Terms, conditions, and privacy policy.') 
         },
       ]
     }
@@ -204,8 +216,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="max-w-[700px] mx-auto py-12 px-6 animate-vix-in pb-32">
       <div className="mb-12">
-        <h1 className="text-4xl font-black uppercase tracking-[0.1em] text-[var(--vix-text)]">Settings</h1>
-        <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em] mt-2 italic">VixReel Narrative Protocol Configuration</p>
+        <h1 className="text-4xl font-black uppercase tracking-[0.1em] text-[var(--vix-text)]">{t('Settings')}</h1>
+        <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em] mt-2 italic">{t('VixReel Narrative Protocol Configuration')}</p>
       </div>
 
       <div className="space-y-12">
@@ -276,7 +288,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             onClick={onLogout}
             className="w-full py-6 bg-[var(--vix-card)] border border-red-500/20 rounded-[2.5rem] flex items-center justify-center gap-3 text-red-500 font-black text-[11px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl active:scale-95"
            >
-             <LogOut className="w-4 h-4" /> Relinquish Current Session
+             <LogOut className="w-4 h-4" /> {t('Relinquish Current Session')}
            </button>
         </div>
       </div>
@@ -290,7 +302,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <button onClick={() => setInfoModal(null)} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
              </div>
              <p className="text-zinc-400 text-sm leading-loose whitespace-pre-wrap">{infoModal.content}</p>
-             <button onClick={() => setInfoModal(null)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">Understood</button>
+             <button onClick={() => setInfoModal(null)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">{t('Understood')}</button>
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
+import { useTranslation } from '../lib/translation';
 
 interface PostProps {
   post: PostType;
@@ -18,6 +19,7 @@ interface PostProps {
 }
 
 const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch }) => {
+  const { t } = useTranslation();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -239,19 +241,19 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
       {post.reposted_from_id && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <Repeat2 className="w-3 h-3 text-zinc-500" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Reposted</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('Reposted')}</span>
         </div>
       )}
       {post.duet_from_id && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <Columns2 className="w-3 h-3 text-blue-500" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Duet</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">{t('Duet')}</span>
         </div>
       )}
       {post.stitch_from_id && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <Scissors className="w-3 h-3 text-purple-500" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-purple-500">Stitch</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-purple-500">{t('Stitch')}</span>
         </div>
       )}
       <div className="flex items-center justify-between py-4">
@@ -296,7 +298,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
                </svg>
                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{downloadProgress}%</div>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">Processing Watermark</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">{t('Processing Watermark')}</p>
           </div>
         )}
 
@@ -353,7 +355,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-bold text-[var(--vix-text)]">{formatNumber(currentTotalLikes)} likes</p>
+          <p className="text-xs font-bold text-[var(--vix-text)]">{formatNumber(currentTotalLikes)} {t('likes')}</p>
           <div className="text-sm text-zinc-500">
             <span className="font-bold text-[var(--vix-text)] mr-2 inline-flex items-center gap-1 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
               @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
@@ -367,7 +369,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
         <div className="fixed inset-0 z-[6000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-[var(--vix-card)] border border-[var(--vix-border)] h-[80vh] rounded-[2rem] flex flex-col shadow-2xl animate-vix-in">
             <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center">
-              <h3 className="font-bold text-[var(--vix-text)] uppercase text-xs tracking-widest">Comments</h3>
+              <h3 className="font-bold text-[var(--vix-text)] uppercase text-xs tracking-widest">{t('Comments')}</h3>
               <button onClick={() => setShowComments(false)} className="p-2"><X className="w-6 h-6 text-zinc-500" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
@@ -383,7 +385,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
                 </div>
               )) : (
                 <div className="h-full flex items-center justify-center opacity-20">
-                  <span className="text-xs font-black uppercase tracking-widest text-[var(--vix-text)]">No signals detected</span>
+                  <span className="text-xs font-black uppercase tracking-widest text-[var(--vix-text)]">{t('No signals detected')}</span>
                 </div>
               )}
             </div>
@@ -396,8 +398,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               fetchComments(); fetchCommentsCount();
               setIsCommenting(false);
             }} className="p-6 border-t border-[var(--vix-border)] flex gap-4">
-              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="flex-1 bg-[var(--vix-secondary)] rounded-xl px-6 py-3 text-sm outline-none border border-[var(--vix-border)] text-[var(--vix-text)]" />
-              <button disabled={isCommenting} className="font-bold text-xs text-pink-500 uppercase tracking-widest">Post</button>
+              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={t('Add a comment...')} className="flex-1 bg-[var(--vix-secondary)] rounded-xl px-6 py-3 text-sm outline-none border border-[var(--vix-border)] text-[var(--vix-text)]" />
+              <button disabled={isCommenting} className="font-bold text-xs text-pink-500 uppercase tracking-widest">{t('Post')}</button>
             </form>
           </div>
         </div>

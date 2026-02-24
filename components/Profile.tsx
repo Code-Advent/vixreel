@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase';
 import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import Post from './Post';
+import { COUNTRIES_DATA } from '../constants';
+import { useTranslation } from '../lib/translation';
 
 interface ProfileProps {
   user: UserProfile;
@@ -24,6 +26,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToGroups, onSelectGroup, autoEdit }) => {
+  const { t } = useTranslation();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -45,10 +48,25 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [editCoverUrl, setEditCoverUrl] = useState(user.cover_url);
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [editDob, setEditDob] = useState(user.date_of_birth || '');
+  const [editCountry, setEditCountry] = useState('');
+  const [editState, setEditState] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user.location) {
+      const parts = user.location.split(', ');
+      if (parts.length === 2) {
+        setEditState(parts[0]);
+        setEditCountry(parts[1]);
+      } else {
+        setEditCountry(user.location);
+      }
+    }
+  }, [user.location]);
 
   useEffect(() => {
     if (autoEdit) setIsEditModalOpen(true);
@@ -224,6 +242,20 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setEditBio(user.bio || '');
     setEditAvatarUrl(user.avatar_url);
     setEditCoverUrl(user.cover_url);
+    setEditDob(user.date_of_birth || '');
+    if (user.location) {
+      const parts = user.location.split(', ');
+      if (parts.length === 2) {
+        setEditState(parts[0]);
+        setEditCountry(parts[1]);
+      } else {
+        setEditCountry(user.location);
+        setEditState('');
+      }
+    } else {
+      setEditCountry('');
+      setEditState('');
+    }
     setEditAvatarFile(null);
     setEditCoverFile(null);
   };
@@ -293,6 +325,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           bio: editBio.trim(),
           avatar_url: finalAvatarUrl,
           cover_url: finalCoverUrl,
+          date_of_birth: editDob || null,
+          location: editCountry ? (editState ? `${editState}, ${editCountry}` : editCountry) : null,
           updated_at: new Date().toISOString()
         })
         .eq('id', activeUid);
@@ -303,7 +337,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
-        cover_url: finalCoverUrl 
+        cover_url: finalCoverUrl,
+        date_of_birth: editDob || null,
+        location: editCountry ? (editState ? `${editState}, ${editCountry}` : editCountry) : null
       });
       
       setIsEditModalOpen(false);
@@ -381,7 +417,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
                 {(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.followers}
               </span>
-              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Followers</span>
+              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Followers')}</span>
             </div>
             <div 
               onClick={() => handleOpenSocial('FOLLOWING')} 
@@ -390,11 +426,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
                 {(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.following}
               </span>
-              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Following</span>
+              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Following')}</span>
             </div>
             <div className="flex flex-col items-center">
               <span className="font-black text-[var(--vix-text)] text-lg">{counts.likes}</span>
-              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Likes</span>
+              <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Likes')}</span>
             </div>
           </div>
         </div>
@@ -402,11 +438,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="flex gap-3 justify-center">
           {isOwnProfile ? (
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">Edit Profile</button>
+              <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">{t('Edit Profile')}</button>
               <button 
                 onClick={onNavigateToGroups}
                 className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-700 hover:text-pink-500 transition-all border border-[var(--vix-border)] shadow-xl"
-                title="Communities"
+                title={t('Communities')}
               >
                 <Users className="w-5 h-5" />
               </button>
@@ -414,9 +450,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           ) : (
             <>
               <button onClick={handleFollow} className={`px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-[var(--vix-secondary)] text-zinc-500 border border-[var(--vix-border)]' : 'vix-gradient text-white shadow-2xl shadow-blue-500/10'}`}>
-                {isFollowing ? 'Following' : 'Follow'}
+                {isFollowing ? t('Following') : t('Follow')}
               </button>
-              <button onClick={() => onMessageUser?.(user)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] text-[var(--vix-text)] shadow-xl hover:bg-[var(--vix-card)]">Message</button>
+              <button onClick={() => onMessageUser?.(user)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] text-[var(--vix-text)] shadow-xl hover:bg-[var(--vix-card)]">{t('Message')}</button>
             </>
           )}
           {isOwnProfile && (
@@ -427,10 +463,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
       <div className="mt-12 px-4 border-t border-[var(--vix-border)]">
         <div className="flex justify-center gap-12">
-          <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Grid className="w-4 h-4" /> Posts</button>
-          <button onClick={() => setActiveTab('LIKES')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'LIKES' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Heart className="w-4 h-4" /> Liked</button>
+          <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Grid className="w-4 h-4" /> {t('Posts')}</button>
+          <button onClick={() => setActiveTab('LIKES')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'LIKES' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Heart className="w-4 h-4" /> {t('Liked')}</button>
           {!isOwnProfile && (
-            <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> Groups</button>
+            <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> {t('Groups')}</button>
           )}
         </div>
 
@@ -439,7 +475,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             {userGroups.length === 0 ? (
               <div className="col-span-full py-20 text-center space-y-4 opacity-20">
                 <Users className="w-16 h-16 mx-auto" />
-                <p className="font-black uppercase tracking-widest text-xs">No groups created yet</p>
+                <p className="font-black uppercase tracking-widest text-xs">{t('No groups created yet')}</p>
               </div>
             ) : (
               userGroups.map(group => (
@@ -456,7 +492,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                     <h3 className="text-sm font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{group.name}</h3>
                     <div className="flex items-center gap-2">
                       <Users className="w-3 h-3 text-zinc-700" />
-                      <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} Members</span>
+                      <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} {t('Members')}</span>
                     </div>
                   </div>
                 </div>
@@ -512,7 +548,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="fixed inset-0 z-[10001] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4 backdrop-blur-md">
           <div className="w-full max-w-sm bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
             <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center bg-[var(--vix-secondary)]/20">
-              <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">{socialModalType} Registry</h3>
+              <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">{t(socialModalType)} {t('Registry')}</h3>
               <button onClick={() => setIsSocialModalOpen(false)}><X className="w-6 h-6 text-zinc-700 hover:text-[var(--vix-text)]" /></button>
             </div>
             <div className="p-4 space-y-2 overflow-y-auto max-h-[60vh] no-scrollbar">
@@ -521,7 +557,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                   <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)]" />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[var(--vix-text)] flex items-center gap-1.5 truncate">@{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}</p>
-                    <p className="text-[9px] text-zinc-600 font-black uppercase truncate tracking-tighter">{u.full_name || 'Individual Creator'}</p>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase truncate tracking-tighter">{u.full_name || t('Individual Creator')}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-zinc-800 group-hover:text-blue-500" />
                 </div>
@@ -535,13 +571,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         <div className="fixed inset-0 z-[10000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-6 overflow-y-auto no-scrollbar">
           <div className="w-full max-w-lg bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-8 sm:p-12 space-y-8 animate-vix-in">
             <div className="flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-widest text-[var(--vix-text)]">Modify Identity</h3>
+              <h3 className="font-black uppercase tracking-widest text-[var(--vix-text)]">{t('Modify Identity')}</h3>
               <button onClick={closeEditModal} className="p-2"><X className="w-6 h-6 text-zinc-500 hover:text-[var(--vix-text)]" /></button>
             </div>
             
             <div className="space-y-6">
                <div className="space-y-3">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Cover Banner</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{t('Cover Banner')}</span>
                   <div className="h-32 w-full bg-[var(--vix-secondary)] rounded-2xl overflow-hidden relative group cursor-pointer border border-[var(--vix-border)]" onClick={() => coverInputRef.current?.click()}>
                      {editCoverUrl ? (
                        <img src={editCoverUrl} className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
@@ -574,10 +610,55 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                </div>
 
                <div className="space-y-4">
-                  <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all" placeholder="Handle" />
-                  <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-blue-500/50 transition-all" placeholder="Narrative bio..." />
+                  <input value={editUsername} onChange={e => setEditUsername(e.target.value)} className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all" placeholder={t('Handle')} />
+                  
+                  <div className="space-y-2 text-left">
+                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Date of Birth')}</label>
+                    <input 
+                      type="date" 
+                      value={editDob} 
+                      onChange={e => setEditDob(e.target.value)} 
+                      className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all" 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2 text-left">
+                      <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Country')}</label>
+                      <select 
+                        value={editCountry}
+                        onChange={e => {
+                          setEditCountry(e.target.value);
+                          setEditState('');
+                        }}
+                        className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-4 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all appearance-none"
+                      >
+                        <option value="">{t('Select Country')}</option>
+                        {Object.keys(COUNTRIES_DATA).sort().map(country => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2 text-left">
+                      <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('State/Region')}</label>
+                      <select 
+                        value={editState}
+                        onChange={e => setEditState(e.target.value)}
+                        disabled={!editCountry}
+                        className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-4 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all appearance-none disabled:opacity-50"
+                      >
+                        <option value="">{t('Select State')}</option>
+                        {editCountry && COUNTRIES_DATA[editCountry]?.map(state => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-blue-500/50 transition-all" placeholder={t('Narrative bio...')} />
                   <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-3">
-                    {isSavingProfile ? <><Loader2 className="w-5 h-5 animate-spin" /> Transmitting...</> : 'Synchronize Identity'}
+                    {isSavingProfile ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('Transmitting...')}</> : t('Synchronize Identity')}
                   </button>
                </div>
             </div>

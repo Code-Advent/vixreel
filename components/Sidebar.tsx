@@ -3,6 +3,7 @@ import React from 'react';
 import { ViewType, UserProfile } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { ShieldAlert, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { useTranslation } from '../lib/translation';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -13,16 +14,17 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked }) => {
+  const { t } = useTranslation();
   const isActuallyAdmin = isAdminUnlocked || currentUser?.email === 'davidhen498@gmail.com';
   
   const navItems = [
-    { id: 'FEED' as ViewType, label: 'Home', icon: 'fa-solid fa-house' },
-    { id: 'SEARCH' as ViewType, label: 'Search', icon: 'fa-solid fa-magnifying-glass' },
-    { id: 'EXPLORE' as ViewType, label: 'Explore', icon: 'fa-solid fa-compass' },
-    { id: 'CREATE' as ViewType, label: 'Create', icon: 'fa-solid fa-square-plus' },
-    { id: 'MESSAGES' as ViewType, label: 'Messages', icon: 'fa-solid fa-paper-plane' },
-    { id: 'GROUPS' as ViewType, label: 'Groups', icon: 'fa-solid fa-users' },
-    { id: 'PROFILE' as ViewType, label: 'Profile', icon: 'fa-solid fa-user' },
+    { id: 'FEED' as ViewType, label: t('Home'), icon: 'fa-solid fa-house' },
+    { id: 'SEARCH' as ViewType, label: t('Search'), icon: 'fa-solid fa-magnifying-glass' },
+    { id: 'EXPLORE' as ViewType, label: t('Explore'), icon: 'fa-solid fa-compass' },
+    { id: 'CREATE' as ViewType, label: t('Create'), icon: 'fa-solid fa-square-plus' },
+    { id: 'MESSAGES' as ViewType, label: t('Messages'), icon: 'fa-solid fa-paper-plane' },
+    { id: 'GROUPS' as ViewType, label: t('Groups'), icon: 'fa-solid fa-users' },
+    { id: 'PROFILE' as ViewType, label: t('Profile'), icon: 'fa-solid fa-user' },
   ];
 
   return (
@@ -71,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
               <div className="w-6 h-6 flex items-center justify-center relative">
                 <ShieldAlert className="w-5 h-5" />
               </div>
-              <span className="ml-4 hidden lg:block font-bold uppercase text-[10px] tracking-widest">Admin Panel</span>
+              <span className="ml-4 hidden lg:block font-bold uppercase text-[10px] tracking-widest">{t('Admin Panel')}</span>
             </button>
           )}
         </nav>
@@ -85,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
                    @{currentUser.username}
                    {currentUser.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                  </span>
-                 <span className="text-[8px] text-zinc-600 font-bold uppercase">{currentUser.is_admin ? 'Admin' : 'Member'}</span>
+                 <span className="text-[8px] text-zinc-600 font-bold uppercase">{currentUser.is_admin ? t('Admin') : t('Member')}</span>
                </div>
             </div>
           )}
@@ -96,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <div className="w-6 h-6 flex items-center justify-center">
               <SettingsIcon className="w-5 h-5" />
             </div>
-            <span className="ml-4 hidden lg:block font-bold text-sm">Settings</span>
+            <span className="ml-4 hidden lg:block font-bold text-sm">{t('Settings')}</span>
           </button>
         </div>
       </div>

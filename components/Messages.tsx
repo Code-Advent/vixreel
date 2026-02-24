@@ -4,6 +4,7 @@ import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plu
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message } from '../types';
 import VerificationBadge from './VerificationBadge';
+import { useTranslation } from '../lib/translation';
 
 interface MessagesProps {
   currentUser: UserProfile;
@@ -16,6 +17,7 @@ interface ChatPreview extends UserProfile {
 }
 
 const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => {
+  const { t } = useTranslation();
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [activeChat, setActiveChat] = useState<UserProfile | null>(initialChatUser || null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -203,8 +205,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       <div className={`w-full md:w-80 border-r border-[var(--vix-border)] flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-8 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/10">
           <div className="flex flex-col">
-            <span className="font-black uppercase text-[10px] tracking-[0.4em] text-zinc-500">Narrative</span>
-            <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest mt-1">Direct Encrypted</span>
+            <span className="font-black uppercase text-[10px] tracking-[0.4em] text-zinc-500">{t('Narrative')}</span>
+            <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest mt-1">{t('Direct Encrypted')}</span>
           </div>
           <button 
             onClick={() => setShowNewChatModal(true)}
@@ -240,7 +242,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   )}
                 </div>
                 <p className={`text-[10px] font-medium truncate max-w-[150px] ${activeChat?.id === u.id ? 'text-zinc-500' : 'text-zinc-600'}`}>
-                  {u.last_message || 'Start signal exchange...'}
+                  {u.last_message || t('Start signal exchange...')}
                 </p>
               </div>
             </div>
@@ -249,8 +251,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div className="w-16 h-16 rounded-[1.5rem] bg-[var(--vix-secondary)] flex items-center justify-center border border-[var(--vix-border)] border-dashed">
                 <MessageCircle className="w-8 h-8 text-zinc-500" />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--vix-text)]">No narratives active</p>
-              <button onClick={() => setShowNewChatModal(true)} className="px-8 py-3 vix-gradient rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-pink-500/10 active:scale-95 transition-all">Initialize Comms</button>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--vix-text)]">{t('No narratives active')}</p>
+              <button onClick={() => setShowNewChatModal(true)} className="px-8 py-3 vix-gradient rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-pink-500/10 active:scale-95 transition-all">{t('Initialize Comms')}</button>
             </div>
           )}
         </div>
@@ -271,7 +273,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   <div className="font-black text-[15px] flex items-center gap-1.5 text-[var(--vix-text)]">
                     {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                   </div>
-                  <span className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em]">{activeChat.full_name || 'Individual Creator'}</span>
+                  <span className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em]">{activeChat.full_name || t('Individual Creator')}</span>
                 </div>
               </div>
             </div>
@@ -313,7 +315,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   ref={messageInputRef}
                   value={text} 
                   onChange={e => setText(e.target.value)} 
-                  placeholder="Type your message..." 
+                  placeholder={t('Type your message...')}
                   className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
                 />
               </div>
@@ -335,11 +337,11 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               </div>
             </div>
             <div className="space-y-6">
-              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-[var(--vix-text)]">Encrypted Signal</h3>
+              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-[var(--vix-text)]">{t('Encrypted Signal')}</h3>
               <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">
-                Initialize a secure narrative protocol to begin private signal exchange between creators.
+                {t('Initialize a secure narrative protocol to begin private signal exchange between creators.')}
               </p>
-              <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-12 py-4 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">Select Creator</button>
+              <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-12 py-4 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">{t('Select Creator')}</button>
             </div>
           </div>
         )}

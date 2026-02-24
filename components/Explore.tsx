@@ -4,6 +4,7 @@ import { Compass, UserPlus, Heart, Grid, Search as SearchIcon } from 'lucide-rea
 import { supabase } from '../lib/supabase';
 import { UserProfile, Post } from '../types';
 import VerificationBadge from './VerificationBadge';
+import { useTranslation } from '../lib/translation';
 
 interface ExploreProps {
   currentUserId: string;
@@ -11,6 +12,7 @@ interface ExploreProps {
 }
 
 const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
+  const { t } = useTranslation();
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [explorePosts, setExplorePosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,9 +68,9 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
       <div className="mb-12">
         <div className="flex items-center justify-between mb-8 px-2">
           <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 text-[var(--vix-text)]">
-            <UserPlus className="w-5 h-5 text-pink-500" /> Suggested for you
+            <UserPlus className="w-5 h-5 text-pink-500" /> {t('Suggested for you')}
           </h2>
-          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Explore Creators</span>
+          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">{t('Explore Creators')}</span>
         </div>
         
         <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
@@ -86,8 +88,8 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
               <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors text-[var(--vix-text)]">
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
               </h3>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || 'Creator'}</p>
-              <button className="w-full py-2 bg-[var(--vix-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--vix-text)] hover:text-[var(--vix-bg)] transition-all text-[var(--vix-text)]">Follow</button>
+              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || t('Creator')}</p>
+              <button className="w-full py-2 bg-[var(--vix-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--vix-text)] hover:text-[var(--vix-bg)] transition-all text-[var(--vix-text)]">{t('Follow')}</button>
             </div>
           ))}
         </div>
@@ -96,7 +98,7 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
       <div>
         <div className="flex items-center justify-between mb-8 px-2">
           <h2 className="text-xl font-black uppercase tracking-[0.2em] flex items-center gap-2 text-[var(--vix-text)]">
-            <Compass className="w-5 h-5 text-purple-500" /> Trending Now
+            <Compass className="w-5 h-5 text-purple-500" /> {t('Trending Now')}
           </h2>
         </div>
 

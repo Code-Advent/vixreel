@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
 import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
+import { useTranslation } from '../lib/translation';
 
 interface GroupsProps {
   currentUser: UserProfile;
@@ -17,6 +18,7 @@ interface GroupsProps {
 }
 
 const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) => {
+  const { t } = useTranslation();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialGroup ? 'DETAILS' : 'LIST');
@@ -326,7 +328,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             <ArrowLeft className="w-5 h-5 text-[var(--vix-text)]" />
           </button>
           <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
-            {view === 'LIST' ? 'Communities' : view === 'CREATE' ? 'New Group' : selectedGroup?.name}
+            {view === 'LIST' ? t('Communities') : view === 'CREATE' ? t('New Group') : selectedGroup?.name}
           </h2>
         </div>
         {view === 'LIST' && (
@@ -346,7 +348,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             ) : groups.length === 0 ? (
               <div className="text-center py-20 space-y-4">
                 <Users className="w-16 h-16 text-zinc-800 mx-auto opacity-20" />
-                <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">No communities found</p>
+                <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No communities found')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -361,7 +363,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       <div className="absolute bottom-4 left-6 flex items-center gap-2">
                         {group.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white/70" /> : <Globe className="w-3 h-3 text-white/70" />}
-                        <span className="text-[9px] text-white/70 font-black uppercase tracking-widest">{group.privacy}</span>
+                        <span className="text-[9px] text-white/70 font-black uppercase tracking-widest">{t(group.privacy)}</span>
                       </div>
                     </div>
                     <div className="p-6 space-y-2">
@@ -370,9 +372,9 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                       <div className="flex items-center justify-between pt-4 border-t border-[var(--vix-border)]">
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-zinc-700" />
-                          <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} Members</span>
+                          <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} {t('Members')}</span>
                         </div>
-                        <span className="text-[9px] text-zinc-800 font-black uppercase tracking-widest bg-[var(--vix-secondary)] px-3 py-1 rounded-full">View</span>
+                        <span className="text-[9px] text-zinc-800 font-black uppercase tracking-widest bg-[var(--vix-secondary)] px-3 py-1 rounded-full">{t('View')}</span>
                       </div>
                     </div>
                   </div>
@@ -385,7 +387,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         {view === 'CREATE' && (
           <form onSubmit={handleCreateGroup} className="p-6 space-y-8 max-w-lg mx-auto">
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">Cover Image</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Cover Image')}</label>
               <div 
                 onClick={() => document.getElementById('cover-input')?.click()}
                 className="h-48 rounded-[2.5rem] border-2 border-dashed border-[var(--vix-border)] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-pink-500/30 transition-all overflow-hidden relative"
@@ -395,7 +397,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 ) : (
                   <>
                     <Camera className="w-8 h-8 text-zinc-800" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700">Upload Cover</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700">{t('Upload Cover')}</span>
                   </>
                 )}
                 <input 
@@ -416,29 +418,29 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">Group Name</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Group Name')}</label>
                 <input 
                   type="text" 
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
-                  placeholder="e.g. VixReel Creators"
+                  placeholder={t('e.g. VixReel Creators')}
                   className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">Description</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
                 <textarea 
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
-                  placeholder="What is this community about?"
+                  placeholder={t('What is this community about?')}
                   className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all min-h-[120px] resize-none"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">Privacy</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Privacy')}</label>
                 <div className="flex gap-4">
                   <button 
                     type="button"
@@ -446,7 +448,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PUBLIC' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
                   >
                     <Globe className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Public</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{t('Public')}</span>
                   </button>
                   <button 
                     type="button"
@@ -454,7 +456,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PRIVATE' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
                   >
                     <Lock className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Private</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{t('Private')}</span>
                   </button>
                 </div>
               </div>
@@ -465,7 +467,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               disabled={isCreating}
               className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3"
             >
-              {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Establish Community'}
+              {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : t('Establish Community')}
             </button>
           </form>
         )}
@@ -485,11 +487,11 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
                       <Users className="w-3 h-3 text-white/70" />
-                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{selectedGroup.member_count} Members</span>
+                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{selectedGroup.member_count} {t('Members')}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {selectedGroup.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white/70" /> : <Globe className="w-3 h-3 text-white/70" />}
-                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{selectedGroup.privacy}</span>
+                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{t(selectedGroup.privacy)}</span>
                     </div>
                   </div>
                 </div>
@@ -499,14 +501,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     disabled={isLeaving}
                     className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
                   >
-                    {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Joined'}
+                    {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Joined')}
                   </button>
                 ) : (
                   <button 
                     onClick={joinGroup}
                     className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
                   >
-                    Join
+                    {t('Join')}
                   </button>
                 )}
               </div>
@@ -521,7 +523,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     <textarea 
                       value={postContent}
                       onChange={e => setPostContent(e.target.value)}
-                      placeholder={`Share something with ${selectedGroup.name}...`}
+                      placeholder={`${t('Share something with')} ${selectedGroup.name}...`}
                       className="flex-1 bg-transparent border-none outline-none text-sm text-[var(--vix-text)] resize-none py-2 min-h-[80px]"
                     />
                   </div>
@@ -569,7 +571,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                       disabled={!postContent.trim() || isPosting}
                       className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:scale-100 hover:scale-105 transition-all flex items-center gap-2"
                     >
-                      {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> Post</>}
+                      {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> {t('Post')}</>}
                     </button>
                   </div>
                 </div>
@@ -580,7 +582,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 {groupPosts.length === 0 ? (
                   <div className="text-center py-20 space-y-4">
                     <MessageSquare className="w-12 h-12 text-zinc-800 mx-auto opacity-20" />
-                    <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">No posts yet</p>
+                    <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No posts yet')}</p>
                   </div>
                 ) : (
                   groupPosts.map(post => (
@@ -615,7 +617,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                           className={`flex items-center gap-2 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
                         >
                           <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{post.likes_count || 0} Likes</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{post.likes_count || 0} {t('Likes')}</span>
                         </button>
                         <button 
                           onClick={() => {
@@ -629,7 +631,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                           className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors"
                         >
                           <MessageSquare className="w-5 h-5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{post.comments_count || 0} Comments</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{post.comments_count || 0} {t('Comments')}</span>
                         </button>
                       </div>
 
@@ -652,7 +654,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                               type="text" 
                               value={newComment}
                               onChange={e => setNewComment(e.target.value)}
-                              placeholder="Write a comment..."
+                              placeholder={t('Write a comment...')}
                               className="flex-1 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-xs outline-none focus:border-pink-500/30 transition-all"
                               onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id)}
                             />

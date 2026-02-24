@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { generateAIText } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
 import { Post } from '../types';
+import { useTranslation } from '../lib/translation';
 
 interface CreatePostProps {
   userId: string;
@@ -15,6 +16,7 @@ interface CreatePostProps {
 }
 
 const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess, duetSource, stitchSource }) => {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -105,10 +107,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
       <div className="w-full flex items-center justify-between p-6 bg-[var(--vix-bg)] border-b border-[var(--vix-border)] sticky top-0 z-50">
         <button onClick={onClose} className="p-2 text-zinc-500 hover:text-[var(--vix-text)]"><X className="w-6 h-6" /></button>
         <span className="font-bold text-sm uppercase tracking-widest text-[var(--vix-text)]">
-          {duetSource ? 'New Duet' : stitchSource ? 'New Stitch' : 'New Post'}
+          {duetSource ? t('New Duet') : stitchSource ? t('New Stitch') : t('New Post')}
         </span>
         <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
-          {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
+          {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Share')}
         </button>
       </div>
 
@@ -118,13 +120,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           {duetSource && (
             <div className="absolute top-6 left-6 flex items-center gap-2 bg-blue-500/10 px-4 py-2 rounded-full border border-blue-500/20 z-10">
               <Columns2 className="w-3 h-3 text-blue-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">Duet with @{duetSource.user.username}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{t('Duet with')} @{duetSource.user.username}</span>
             </div>
           )}
           {stitchSource && (
             <div className="absolute top-6 left-6 flex items-center gap-2 bg-purple-500/10 px-4 py-2 rounded-full border border-purple-500/20 z-10">
               <Scissors className="w-3 h-3 text-purple-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-purple-500">Stitch with @{stitchSource.user.username}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-purple-500">{t('Stitch with')} @{stitchSource.user.username}</span>
             </div>
           )}
           {preview ? (
@@ -173,12 +175,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
         {/* Sidebar Controls */}
         <div className="w-full md:w-96 flex flex-col gap-8">
           <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600">Post Details</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600">{t('Post Details')}</h3>
             <textarea 
               value={caption} 
               onChange={e => setCaption(e.target.value)} 
               className="w-full h-48 bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl p-6 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-pink-500/30 transition-all shadow-inner placeholder:text-zinc-700" 
-              placeholder="Write a caption... Use @username to mention creators." 
+              placeholder={t('Write a caption... Use @username to mention creators.')}
             />
             <button 
               onClick={handleGenerateAICaption} 
@@ -188,7 +190,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
               {isGeneratingCaption ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> AI Caption Helper</>
+                <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> {t('AI Caption Helper')}</>
               )}
             </button>
           </div>
@@ -196,7 +198,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl">
              <div className="flex items-center gap-4">
                 <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl"><ImageIcon className="w-4 h-4 text-zinc-600" /></div>
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Post Settings</span>
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{t('Post Settings')}</span>
              </div>
              <ChevronRight className="w-4 h-4 text-zinc-800" />
           </div>

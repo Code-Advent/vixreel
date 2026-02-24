@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     is_following_public BOOLEAN DEFAULT TRUE,
     boosted_followers INTEGER DEFAULT 0,
     location TEXT,
+    date_of_birth DATE,
     is_location_private BOOLEAN DEFAULT FALSE,
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Ensure all profile columns exist (Migration for existing tables)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_location_private BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME'));
 

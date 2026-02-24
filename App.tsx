@@ -15,8 +15,10 @@ import Notifications from './components/Notifications';
 import Explore from './components/Explore';
 import SettingsPage from './components/SettingsPage';
 import Groups from './components/Groups';
+import { TranslationProvider, useTranslation } from './lib/translation';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { t, setUserId } = useTranslation();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [viewedUser, setViewedUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,10 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('vixreel_saved_accounts');
     return saved ? JSON.parse(saved) : [];
   });
+
+  useEffect(() => {
+    setUserId(currentUser?.id || null);
+  }, [currentUser?.id, setUserId]);
 
   useEffect(() => {
     init();
@@ -211,7 +217,7 @@ const App: React.FC = () => {
         </h1>
       </div>
       <div className="flex flex-col items-center gap-2 opacity-60 animate-pulse">
-        <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.6em]">from</span>
+        <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.6em]">{t('from')}</span>
         <span className={`text-lg font-black tracking-[0.25em] text-[var(--vix-text)]`}>VERISAZ</span>
       </div>
     </div>
@@ -244,153 +250,161 @@ const App: React.FC = () => {
         isAdminUnlocked={currentUser.is_admin} 
       />
 
-      <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
-        <div className="container mx-auto max-w-[935px] pt-4 px-4">
-          {currentView === 'FEED' && (
-            <div className="flex flex-col items-center pb-20 animate-vix-in">
-              <div className="w-full flex justify-between items-center mb-6 px-2">
-                <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
-                <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
-                  <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
-                </button>
+        <main className="flex-1 sm:ml-16 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
+          <div className="container mx-auto max-w-[935px] pt-4 px-4">
+            {currentView === 'FEED' && (
+              <div className="flex flex-col items-center pb-20 animate-vix-in">
+                <div className="w-full flex justify-between items-center mb-6 px-2">
+                  <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
+                  <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
+                    <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
+                  </button>
+                </div>
+                <div className="w-full max-w-[470px] space-y-6">
+                  {posts.length > 0 ? (
+                    posts.map(p => (
+                      <Post 
+                        key={p.id} 
+                        post={p} 
+                        currentUserId={currentUser.id} 
+                        onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
+                        onUpdate={fetchPosts} 
+                        onSelectUser={(u) => setView('PROFILE', u)}
+                        onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
+                        onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
+                      />
+                    ))
+                  ) : (
+                    <div className="py-32 text-center opacity-20 flex flex-col items-center">
+                      <Trash2 className="w-16 h-16 mb-4" />
+                      <p className="font-bold uppercase tracking-[0.3em] text-xs">{t('No posts yet')}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="w-full max-w-[470px] space-y-6">
-                {posts.length > 0 ? (
-                  posts.map(p => (
-                    <Post 
-                      key={p.id} 
-                      post={p} 
-                      currentUserId={currentUser.id} 
-                      onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
-                      onUpdate={fetchPosts} 
-                      onSelectUser={(u) => setView('PROFILE', u)}
-                      onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
-                      onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
-                    />
-                  ))
-                ) : (
-                  <div className="py-32 text-center opacity-20 flex flex-col items-center">
-                    <Trash2 className="w-16 h-16 mb-4" />
-                    <p className="font-bold uppercase tracking-[0.3em] text-xs">No posts yet</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
-          {currentView === 'PROFILE' && viewedUser && (
-            <Profile 
-              user={viewedUser} 
-              isOwnProfile={viewedUser.id === currentUser.id} 
-              onUpdateProfile={(u) => {
-                if (viewedUser.id === currentUser.id) {
+            )}
+            {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
+            {currentView === 'PROFILE' && viewedUser && (
+              <Profile 
+                user={viewedUser} 
+                isOwnProfile={viewedUser.id === currentUser.id} 
+                onUpdateProfile={(u) => {
+                  if (viewedUser.id === currentUser.id) {
+                    setCurrentUser(prev => {
+                      const updated = prev ? {...prev, ...u} : null;
+                      if (updated) updateIdentityRegistry(updated);
+                      return updated;
+                    });
+                  }
+                  setViewedUser(prev => prev ? {...prev, ...u} : null);
+                }} 
+                onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
+                onLogout={() => setIsAccountMenuOpen(true)}
+                onOpenSettings={() => setCurrentView('SETTINGS')}
+                onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
+                onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
+                autoEdit={profileAutoEdit}
+              />
+            )}
+            
+            {(currentView === 'GROUPS' || currentView === 'GROUP_DETAILS') && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedGroup} />}
+            
+            {currentView === 'CREATE' && (
+              <CreatePost 
+                userId={currentUser.id} 
+                onClose={() => {
+                  setCurrentView('FEED');
+                  setDuetSource(null);
+                  setStitchSource(null);
+                }} 
+                onPostSuccess={() => {
+                  fetchPosts();
+                  setDuetSource(null);
+                  setStitchSource(null);
+                }} 
+                duetSource={duetSource}
+                stitchSource={stitchSource}
+              />
+            )}
+            {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
+            {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
+            {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
+            {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
+            {currentView === 'SETTINGS' && (
+              <SettingsPage 
+                user={currentUser} 
+                theme={theme}
+                setTheme={setTheme}
+                onUpdateProfile={(u) => {
                   setCurrentUser(prev => {
                     const updated = prev ? {...prev, ...u} : null;
                     if (updated) updateIdentityRegistry(updated);
                     return updated;
                   });
-                }
-                setViewedUser(prev => prev ? {...prev, ...u} : null);
-              }} 
-              onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
-              onLogout={() => setIsAccountMenuOpen(true)}
-              onOpenSettings={() => setCurrentView('SETTINGS')}
-              onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
-              onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
-              autoEdit={profileAutoEdit}
-            />
-          )}
-          
-          {(currentView === 'GROUPS' || currentView === 'GROUP_DETAILS') && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedGroup} />}
-          
-          {currentView === 'CREATE' && (
-            <CreatePost 
-              userId={currentUser.id} 
-              onClose={() => {
-                setCurrentView('FEED');
-                setDuetSource(null);
-                setStitchSource(null);
-              }} 
-              onPostSuccess={() => {
-                fetchPosts();
-                setDuetSource(null);
-                setStitchSource(null);
-              }} 
-              duetSource={duetSource}
-              stitchSource={stitchSource}
-            />
-          )}
-          {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
-          {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
-          {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
-          {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
-          {currentView === 'SETTINGS' && (
-            <SettingsPage 
-              user={currentUser} 
-              theme={theme}
-              setTheme={setTheme}
-              onUpdateProfile={(u) => {
-                setCurrentUser(prev => {
-                  const updated = prev ? {...prev, ...u} : null;
-                  if (updated) updateIdentityRegistry(updated);
-                  return updated;
-                });
-              }} 
-              onLogout={() => setIsAccountMenuOpen(true)} 
-              onOpenSwitchAccount={() => setIsAccountMenuOpen(true)}
-              setView={setView}
-              onTriggerEditProfile={() => {
-                setView('PROFILE', currentUser);
-                setProfileAutoEdit(true);
-              }}
-            />
-          )}
-        </div>
-      </main>
+                }} 
+                onLogout={() => setIsAccountMenuOpen(true)} 
+                onOpenSwitchAccount={() => setIsAccountMenuOpen(true)}
+                setView={setView}
+                onTriggerEditProfile={() => {
+                  setView('PROFILE', currentUser);
+                  setProfileAutoEdit(true);
+                }}
+              />
+            )}
+          </div>
+        </main>
 
-      {isAccountMenuOpen && (
-        <div className="fixed inset-0 z-[1000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="w-full max-sm bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
-            <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center bg-[var(--vix-secondary)]/20">
-              <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">Switch Account</h3>
-              <button onClick={() => setIsAccountMenuOpen(false)} className="p-2 text-zinc-700 hover:text-[var(--vix-text)] transition-colors"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh] no-scrollbar">
-              {savedAccounts.map(acc => (
-                <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-[var(--vix-secondary)]/40 border-blue-500/20' : 'hover:bg-[var(--vix-secondary)]/20 border-transparent'}`}>
-                   <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => acc.id !== currentUser.id && switchAccount(acc)}>
-                      <div className={`w-12 h-12 rounded-full p-0.5 ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-[var(--vix-secondary)]'}`}>
-                        <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-bg)]" />
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="font-bold text-sm text-[var(--vix-text)]">@{acc.username}</p>
-                        {acc.id === currentUser.id && <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">Active</span>}
-                      </div>
-                   </div>
-                   {acc.id !== currentUser.id ? (
-                     <button onClick={(e) => { e.stopPropagation(); removeAccount(acc.id); }} className="p-3 text-zinc-700 hover:text-red-500 transition-all">
-                       <Trash2 className="w-4 h-4" />
-                     </button>
-                   ) : <CheckCircle className="w-4 h-4 text-blue-500" />}
-                </div>
-              ))}
-              <button 
-                onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
-                className="w-full flex items-center gap-4 p-4 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all group border border-dashed border-[var(--vix-border)] hover:border-blue-500/30"
-              >
-                <div className="w-12 h-12 rounded-full bg-[var(--vix-secondary)] flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
-                  <Plus className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-sm text-zinc-500 group-hover:text-[var(--vix-text)]">Add Account</span>
-              </button>
-            </div>
-            <div className="p-6 border-t border-[var(--vix-border)] bg-[var(--vix-secondary)]/10">
-              <button onClick={handleLogout} className="w-full py-4 text-center text-red-500 font-black text-[11px] uppercase tracking-widest hover:text-red-400 transition-colors">Relinquish Primary Session</button>
+        {isAccountMenuOpen && (
+          <div className="fixed inset-0 z-[1000] bg-[var(--vix-bg)]/95 flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="w-full max-sm bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in ring-1 ring-white/5">
+              <div className="p-6 border-b border-[var(--vix-border)] flex justify-between items-center bg-[var(--vix-secondary)]/20">
+                <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-zinc-500">{t('Switch Account')}</h3>
+                <button onClick={() => setIsAccountMenuOpen(false)} className="p-2 text-zinc-700 hover:text-[var(--vix-text)] transition-colors"><X className="w-6 h-6" /></button>
+              </div>
+              <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh] no-scrollbar">
+                {savedAccounts.map(acc => (
+                  <div key={acc.id} className={`flex items-center justify-between p-4 rounded-2xl transition-all group border ${acc.id === currentUser.id ? 'bg-[var(--vix-secondary)]/40 border-blue-500/20' : 'hover:bg-[var(--vix-secondary)]/20 border-transparent'}`}>
+                     <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => acc.id !== currentUser.id && switchAccount(acc)}>
+                        <div className={`w-12 h-12 rounded-full p-0.5 ${acc.id === currentUser.id ? 'vix-gradient' : 'bg-[var(--vix-secondary)]'}`}>
+                           <img src={acc.avatar_url || `https://ui-avatars.com/api/?name=${acc.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-bg)]" />
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="font-bold text-sm text-[var(--vix-text)]">@{acc.username}</p>
+                          {acc.id === currentUser.id && <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">{t('Active')}</span>}
+                        </div>
+                     </div>
+                     {acc.id !== currentUser.id ? (
+                       <button onClick={(e) => { e.stopPropagation(); removeAccount(acc.id); }} className="p-3 text-zinc-700 hover:text-red-500 transition-all">
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                     ) : <CheckCircle className="w-4 h-4 text-blue-500" />}
+                  </div>
+                ))}
+                <button 
+                  onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all group border border-dashed border-[var(--vix-border)] hover:border-blue-500/30"
+                >
+                  <div className="w-12 h-12 rounded-full bg-[var(--vix-secondary)] flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-sm text-zinc-500 group-hover:text-[var(--vix-text)]">{t('Add Account')}</span>
+                </button>
+              </div>
+              <div className="p-6 border-t border-[var(--vix-border)] bg-[var(--vix-secondary)]/10">
+                <button onClick={handleLogout} className="w-full py-4 text-center text-red-500 font-black text-[11px] uppercase tracking-widest hover:text-red-400 transition-colors">{t('Relinquish Primary Session')}</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <TranslationProvider>
+      <AppContent />
+    </TranslationProvider>
   );
 };
 

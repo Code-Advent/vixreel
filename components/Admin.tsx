@@ -21,8 +21,10 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, Post } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { formatNumber } from '../lib/utils';
+import { useTranslation } from '../lib/translation';
 
 const Admin: React.FC = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserPosts, setSelectedUserPosts] = useState<Post[]>([]);
@@ -205,8 +207,8 @@ const Admin: React.FC = () => {
             <Lock className="w-10 h-10 text-white" />
           </div>
           <div className="space-y-3">
-            <h2 className="text-3xl font-black uppercase tracking-[0.2em] text-[var(--vix-text)]">Admin Login</h2>
-            <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-[0.4em]">Restricted Access</p>
+            <h2 className="text-3xl font-black uppercase tracking-[0.2em] text-[var(--vix-text)]">{t('Admin Login')}</h2>
+            <p className="text-[11px] text-zinc-600 font-bold uppercase tracking-[0.4em]">{t('Restricted Access')}</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <input 
@@ -219,7 +221,7 @@ const Admin: React.FC = () => {
               required
             />
             <button type="submit" className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
-              Unlock Panel <ChevronRight className="w-5 h-5" />
+              {t('Unlock Panel')} <ChevronRight className="w-5 h-5" />
             </button>
           </form>
         </div>
@@ -241,16 +243,16 @@ const Admin: React.FC = () => {
           </div>
           <div>
             <h1 className="text-3xl font-black uppercase tracking-[0.1em] text-[var(--vix-text)] flex items-center gap-3">
-              Admin Panel
+              {t('Admin Panel')}
             </h1>
-            <p className="text-[11px] text-zinc-600 font-black uppercase tracking-[0.3em] mt-1 italic opacity-60">Manage Users & Boost Content</p>
+            <p className="text-[11px] text-zinc-600 font-black uppercase tracking-[0.3em] mt-1 italic opacity-60">{t('Manage Users & Boost Content')}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
            <button onClick={fetchUsers} disabled={loading} className="p-3 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
-           <button onClick={() => setIsUnlocked(false)} className="bg-red-500/10 border border-red-500/20 px-8 py-3 rounded-2xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all">Logout Admin</button>
+           <button onClick={() => setIsUnlocked(false)} className="bg-red-500/10 border border-red-500/20 px-8 py-3 rounded-2xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all">{t('Logout Admin')}</button>
         </div>
       </div>
 
@@ -262,7 +264,7 @@ const Admin: React.FC = () => {
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[1.5rem] py-4 pl-14 pr-6 text-xs outline-none focus:border-purple-500/40 transition-all text-[var(--vix-text)] placeholder:text-zinc-800 font-medium" 
-              placeholder="Search by username..."
+              placeholder={t('Search by username...')}
              />
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-2">
@@ -280,7 +282,7 @@ const Admin: React.FC = () => {
                     <span className="text-sm font-black text-[var(--vix-text)] flex items-center gap-2">
                       {u.username} {u.is_verified && <VerificationBadge size="w-4 h-4" />}
                     </span>
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{formatNumber(u.boosted_followers || 0)} Boosted</span>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{formatNumber(u.boosted_followers || 0)} {t('Boosted')}</span>
                   </div>
                 </div>
               </div>
@@ -302,20 +304,20 @@ const Admin: React.FC = () => {
                     <h3 className="text-4xl font-black flex items-center gap-4 text-[var(--vix-text)]">
                       {viewingUser.username} {viewingUser.is_verified && <VerificationBadge size="w-10 h-10" />}
                     </h3>
-                    <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email || 'No email'}</p>
+                    <p className="text-sm text-zinc-500 font-medium tracking-tight italic">{viewingUser.email || t('No email')}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => handleVerify(viewingUser.id, !viewingUser.is_verified)}
                   className={`px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all shadow-2xl ${viewingUser.is_verified ? 'bg-[var(--vix-secondary)] text-red-500 border border-red-500/20' : 'vix-gradient text-white'}`}
                 >
-                  {viewingUser.is_verified ? 'Remove Verification' : 'Verify User'}
+                  {viewingUser.is_verified ? t('Remove Verification') : t('Verify User')}
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 relative z-10">
                  <div className="bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[2.5rem] p-10 space-y-8 shadow-inner">
-                    <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">Add Likes (Post)</h4>
+                    <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">{t('Add Likes (Post)')}</h4>
                     <div className="flex flex-col gap-5">
                       <div className="relative">
                         <input 
@@ -325,14 +327,14 @@ const Admin: React.FC = () => {
                           className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-2xl px-8 py-5 text-lg font-black text-[var(--vix-text)] outline-none"
                           placeholder="00"
                         />
-                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">LIKES</span>
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">{t('LIKES')}</span>
                       </div>
-                      <p className="text-[9px] text-zinc-600 uppercase text-center">Select a post below to add likes.</p>
+                      <p className="text-[9px] text-zinc-600 uppercase text-center">{t('Select a post below to add likes.')}</p>
                     </div>
                  </div>
 
                  <div className="bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[2.5rem] p-10 space-y-8 shadow-inner">
-                    <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">Add Followers (Account)</h4>
+                    <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">{t('Add Followers (Account)')}</h4>
                     <div className="flex flex-col gap-5">
                       <div className="relative">
                         <input 
@@ -342,17 +344,17 @@ const Admin: React.FC = () => {
                           className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-2xl px-8 py-5 text-lg font-black text-[var(--vix-text)] outline-none"
                           placeholder="00"
                         />
-                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">FOLLOWERS</span>
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">{t('FOLLOWERS')}</span>
                       </div>
                       <button onClick={handleFollowerBoost} className="w-full py-4 bg-purple-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-purple-500 transition-all flex items-center justify-center gap-2 group shadow-xl hover:shadow-purple-500/20 active:scale-95">
-                        <UserPlus className="w-4 h-4 group-hover:rotate-12 transition-transform" /> Add Followers
+                        <UserPlus className="w-4 h-4 group-hover:rotate-12 transition-transform" /> {t('Add Followers')}
                       </button>
                     </div>
                  </div>
               </div>
 
               <div className="space-y-6 relative z-10">
-                <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2 flex items-center justify-between">User Posts</h4>
+                <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em] px-2 flex items-center justify-between">{t('User Posts')}</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
                   {selectedUserPosts.map(p => (
                     <div key={p.id} className="relative aspect-square rounded-[2rem] overflow-hidden group border border-[var(--vix-border)] shadow-2xl bg-[var(--vix-bg)] transition-transform hover:scale-105 duration-500">
@@ -372,7 +374,7 @@ const Admin: React.FC = () => {
                         className="absolute inset-0 bg-purple-500/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all backdrop-blur-md"
                       >
                         <ArrowUpCircle className="w-10 h-10 text-white mb-2 animate-bounce" />
-                        <span className="text-[9px] font-black text-white uppercase">Add {formatNumber(parseInt(boostAmount))} Likes</span>
+                        <span className="text-[9px] font-black text-white uppercase">{t('Add')} {formatNumber(parseInt(boostAmount))} {t('Likes')}</span>
                       </button>
                     </div>
                   ))}
@@ -384,8 +386,8 @@ const Admin: React.FC = () => {
               <div className="w-32 h-32 rounded-[2.5rem] bg-[var(--vix-secondary)] flex items-center justify-center mb-10 border border-[var(--vix-border)] shadow-2xl">
                 <Users className="w-12 h-12 text-zinc-800" />
               </div>
-              <h3 className="text-zinc-500 font-black uppercase tracking-[0.6em] text-sm">Select a user</h3>
-              <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">Choose an account from the left to manage it.</p>
+              <h3 className="text-zinc-500 font-black uppercase tracking-[0.6em] text-sm">{t('Select a user')}</h3>
+              <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">{t('Choose an account from the left to manage it.')}</p>
             </div>
           )}
         </div>

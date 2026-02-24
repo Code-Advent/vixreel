@@ -23,6 +23,8 @@ import {
   LogOut
 } from 'lucide-react';
 import VerificationBadge from './VerificationBadge';
+import { COUNTRIES_DATA } from '../constants';
+import { useTranslation } from '../lib/translation';
 
 interface AuthProps {
   onAuthSuccess: (user: UserProfile) => void;
@@ -35,6 +37,7 @@ type AuthStep = 'DETAILS' | 'VERIFY' | 'AVATAR' | 'RESULT';
 type AuthMethod = 'PHONE' | 'EMAIL';
 
 const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount }) => {
+  const { t } = useTranslation();
   const [savedAccounts, setSavedAccounts] = useState<AccountSession[]>(() => {
     const saved = localStorage.getItem('vixreel_saved_accounts');
     return saved ? JSON.parse(saved) : [];
@@ -52,6 +55,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [dob, setDob] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedState, setSelectedState] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -281,6 +287,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         avatar_url: finalAvatarUrl,
         email: authUser.email,
         phone: authUser.phone,
+        date_of_birth: dob || null,
+        location: selectedCountry ? (selectedState ? `${selectedState}, ${selectedCountry}` : selectedCountry) : null,
         updated_at: new Date().toISOString()
       }).select().single();
       
@@ -296,8 +304,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const renderPicker = () => (
     <div className="w-full space-y-10 animate-vix-in">
       <div className="space-y-3 text-center">
-        <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Identity Registry</h3>
-        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Select your narrative protocol</p>
+        <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">{t('Identity Registry')}</h3>
+        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{t('Select your narrative protocol')}</p>
       </div>
 
       <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar pr-2">
@@ -313,7 +321,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               </div>
               <div className="flex flex-col">
                  <span className="font-black text-lg text-[var(--vix-text)]">@{acc.username}</span>
-                 <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest mt-1">Saved Session</span>
+                 <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest mt-1">{t('Saved Session')}</span>
               </div>
             </div>
             <button 
@@ -331,14 +339,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           onClick={() => setMode('LOGIN')}
           className="w-full py-5 rounded-[2rem] border border-[var(--vix-border)] text-[var(--vix-text)] font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:bg-[var(--vix-secondary)] transition-all"
         >
-          <Plus className="w-4 h-4" /> Add Narrative
+          <Plus className="w-4 h-4" /> {t('Add Narrative')}
         </button>
         {isAddingAccount && (
           <button 
             onClick={onCancelAdd}
             className="w-full py-3 text-zinc-700 font-black uppercase tracking-widest text-[10px] hover:text-[var(--vix-text)] transition-all"
           >
-            Relinquish Add
+            {t('Relinquish Add')}
           </button>
         )}
       </div>
@@ -353,7 +361,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           onClick={() => setMode('PICKER')}
           className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-zinc-700 hover:text-pink-500 transition-colors flex items-center justify-center gap-2"
         >
-          <ArrowLeft className="w-4 h-4" /> Use Saved Identity
+          <ArrowLeft className="w-4 h-4" /> {t('Use Saved Identity')}
         </button>
       )}
 
@@ -363,14 +371,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           onClick={() => { setAuthMethod('PHONE'); setError(null); }} 
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'PHONE' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-lg' : 'text-zinc-600'}`}
         >
-          <Smartphone className="w-4 h-4" /> Phone
+          <Smartphone className="w-4 h-4" /> {t('Phone')}
         </button>
         <button 
           type="button" 
           onClick={() => { setAuthMethod('EMAIL'); setError(null); }} 
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${authMethod === 'EMAIL' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-lg' : 'text-zinc-600'}`}
         >
-          <Mail className="w-4 h-4" /> Email
+          <Mail className="w-4 h-4" /> {t('Email')}
         </button>
       </div>
 
@@ -381,7 +389,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           </div>
           <input 
             type={authMethod === 'EMAIL' ? 'email' : 'tel'} 
-            placeholder={authMethod === 'EMAIL' ? 'Identity Email' : 'Phone (e.g. +1...)'} 
+            placeholder={authMethod === 'EMAIL' ? t('Identity Email') : t('Phone (e.g. +1...)')} 
             value={authMethod === 'EMAIL' ? email : phone} 
             onChange={e => authMethod === 'EMAIL' ? setEmail(e.target.value) : setPhone(e.target.value)} 
             className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
@@ -395,7 +403,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             </div>
             <input 
               type="password" 
-              placeholder={mode === 'LOGIN' ? "Secure Password" : "Create Password"} 
+              placeholder={mode === 'LOGIN' ? t("Secure Password") : t("Create Password")} 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
@@ -412,14 +420,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             onClick={() => { setMode('FIND_ACCOUNT'); setStep('DETAILS'); setError(null); setSuccessMsg(null); }}
             className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-[var(--vix-text)] transition-colors"
           >
-            Recover Identity
+            {t('Recover Identity')}
           </button>
         )}
       </div>
 
       <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>{mode === 'LOGIN' ? 'Access Void' : 'Begin Narrative'} <ArrowRight className="w-4 h-4" /></>
+          <>{mode === 'LOGIN' ? t('Access Void') : t('Begin Narrative')} <ArrowRight className="w-4 h-4" /></>
         )}
       </button>
     </form>
@@ -444,8 +452,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
             <>
               {mode !== 'FIND_ACCOUNT' && mode !== 'PICKER' && (
                 <div className="w-full mb-10 flex justify-center gap-10">
-                  <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Login</button>
-                  <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>Sign Up</button>
+                  <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>{t('Login')}</button>
+                  <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>{t('Sign Up')}</button>
                 </div>
               )}
 
@@ -453,14 +461,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                 <div className="w-full space-y-8 animate-vix-in">
                   <div className="flex items-center gap-4 mb-4">
                     <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-500 hover:text-[var(--vix-text)] transition-all"><ArrowLeft className="w-4 h-4" /></button>
-                    <h3 className="text-[var(--vix-text)] font-black text-xl uppercase tracking-tight">Recover Session</h3>
+                    <h3 className="text-[var(--vix-text)] font-black text-xl uppercase tracking-tight">{t('Recover Session')}</h3>
                   </div>
                   <form onSubmit={handleFindAccount} className="space-y-6">
                     <div className="group relative">
                       <div className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-pink-500 transition-colors"><Mail className="w-5 h-5" /></div>
                       <input 
                         type="email" 
-                        placeholder="Identity Email" 
+                        placeholder={t('Identity Email')} 
                         value={email} 
                         onChange={e => setEmail(e.target.value)} 
                         className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 pl-16 pr-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all shadow-inner" 
@@ -468,7 +476,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                       />
                     </div>
                     <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> Locate Account</>}
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> {t('Locate Account')}</>}
                     </button>
                   </form>
                 </div>
@@ -477,8 +485,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {mode === 'FIND_ACCOUNT' && step === 'RESULT' && foundProfile && (
                 <div className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-4">
-                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Account Found</h3>
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">We located your identity signal</p>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">{t('Account Found')}</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{t('We located your identity signal')}</p>
                   </div>
                   <div className="bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[3rem] p-8 space-y-6 shadow-2xl ring-1 ring-white/5">
                     <div className="relative w-24 h-24 mx-auto">
@@ -491,14 +499,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                     </div>
                     <div className="space-y-1">
                        <p className="text-xl font-black text-[var(--vix-text)]">@{foundProfile.username}</p>
-                       <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || 'Individual Creator'}</p>
+                       <p className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{foundProfile.full_name || t('Individual Creator')}</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> Send Access Code</>}
+                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> {t('Send Access Code')}</>}
                     </button>
-                    <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-[var(--vix-text)] transition-all">Not your account?</button>
+                    <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-[var(--vix-text)] transition-all">{t('Not your account?')}</button>
                   </div>
                 </div>
               )}
@@ -508,8 +516,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {step === 'VERIFY' && (
                 <div className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-2">
-                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Identity Check</h3>
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Verify your {authMethod === 'EMAIL' ? 'email' : 'phone'} signal</p>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">{t('Identity Check')}</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{t('Verify your')} {authMethod === 'EMAIL' ? t('email') : t('phone')} {t('signal')}</p>
                   </div>
                   <div className="relative">
                     <input 
@@ -524,7 +532,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                   </div>
                   <div className="space-y-4">
                     <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
-                      {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enter Void'}
+                      {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : t('Enter Void')}
                     </button>
                     <div className="flex items-center justify-center gap-6">
                       <button 
@@ -533,9 +541,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                         className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors flex items-center gap-2"
                       >
                         {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        Resend Code
+                        {t('Resend Code')}
                       </button>
-                      <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors">Change Method</button>
+                      <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors">{t('Change Method')}</button>
                     </div>
                   </div>
                 </div>
@@ -544,8 +552,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
               {step === 'AVATAR' && (
                 <form onSubmit={handleFinalizeIdentity} className="w-full space-y-10 animate-vix-in text-center">
                   <div className="space-y-2">
-                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">Finalize Narrative</h3>
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Choose your handle</p>
+                    <h3 className="text-[var(--vix-text)] font-black text-2xl uppercase tracking-tight">{t('Finalize Narrative')}</h3>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{t('Choose your handle')}</p>
                   </div>
                   <div className="relative w-36 h-36 mx-auto group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
                     <div className="w-full h-full rounded-full border-4 border-[var(--vix-border)] overflow-hidden bg-[var(--vix-bg)] flex items-center justify-center shadow-2xl transition-all group-hover:border-pink-500/30">
@@ -562,16 +570,68 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                       } 
                     }} />
                   </div>
-                  <input 
-                    type="text" 
-                    placeholder="@handle" 
-                    value={username} 
-                    onChange={e => setUsername(e.target.value)} 
-                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 text-center text-lg font-black text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all" 
-                    required 
-                  />
+                  <div className="space-y-4">
+                    <div className="group relative">
+                      <input 
+                        type="text" 
+                        placeholder={t('@handle')} 
+                        value={username} 
+                        onChange={e => setUsername(e.target.value)} 
+                        className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-5 px-6 text-center text-lg font-black text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="space-y-2 text-left">
+                      <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Date of Birth')}</label>
+                      <input 
+                        type="date" 
+                        value={dob} 
+                        onChange={e => setDob(e.target.value)} 
+                        className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2 text-left">
+                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Country')}</label>
+                        <select 
+                          value={selectedCountry}
+                          onChange={e => {
+                            setSelectedCountry(e.target.value);
+                            setSelectedState('');
+                          }}
+                          className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-4 px-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all appearance-none"
+                          required
+                        >
+                          <option value="">{t('Select Country')}</option>
+                          {Object.keys(COUNTRIES_DATA).sort().map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 text-left">
+                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('State/Region')}</label>
+                        <select 
+                          value={selectedState}
+                          onChange={e => setSelectedState(e.target.value)}
+                          disabled={!selectedCountry}
+                          className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-4 px-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all appearance-none disabled:opacity-50"
+                          required
+                        >
+                          <option value="">{t('Select State')}</option>
+                          {selectedCountry && COUNTRIES_DATA[selectedCountry]?.map(state => (
+                            <option key={state} value={state}>{state}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
                   <button type="submit" disabled={loading} className="w-full vix-gradient py-6 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[12px] shadow-2xl shadow-pink-500/20">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Activate Protocol'}
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : t('Activate Protocol')}
                   </button>
                 </form>
               )}
@@ -588,7 +648,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         </div>
 
         <div className="flex items-center justify-center gap-4 text-[10px] text-zinc-700 font-black uppercase tracking-[0.4em]">
-           <ShieldCheck className="w-4 h-4 text-green-500" /> Secure Encryption Active
+           <ShieldCheck className="w-4 h-4 text-green-500" /> {t('Secure Encryption Active')}
         </div>
       </div>
     </div>
