@@ -8,6 +8,7 @@ import {
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
+import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 
@@ -18,8 +19,58 @@ interface PostDetailProps {
   onSelectUser: (user: UserProfile) => void;
 }
 
+const CommentItem: React.FC<{ comment: CommentType, language: string, t: any }> = ({ comment, language, t }) => {
+  const [translated, setTranslated] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const handleTranslate = async () => {
+    if (translated) {
+      setTranslated(null);
+      return;
+    }
+    if (isTranslating) return;
+    setIsTranslating(true);
+    try {
+      const result = await translateContent(comment.content, language);
+      setTranslated(result);
+    } catch (err) {
+      console.error("Comment Translation Error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-4 animate-vix-in">
+      <img 
+        src={comment.user.avatar_url || `https://ui-avatars.com/api/?name=${comment.user.username}`} 
+        className="w-8 h-8 rounded-full object-cover" 
+      />
+      <div className="space-y-1">
+        <p className="text-sm">
+          <span className="font-bold mr-2 text-[var(--vix-text)]">@{comment.user.username}</span>
+          <span className="text-zinc-400 leading-relaxed">{translated || comment.content}</span>
+        </p>
+        <div className="flex items-center gap-4">
+          <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
+            {new Date(comment.created_at).toLocaleDateString()}
+          </span>
+          {language !== 'en' && (
+            <button 
+              onClick={handleTranslate}
+              className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+            >
+              {isTranslating ? t('Translating...') : (translated ? t('Original') : t('See Translation'))}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, onSelectUser }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -31,6 +82,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [showLikeAnim, setShowLikeAnim] = useState(false);
+  const [translatedCaption, setTranslatedCaption] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -105,6 +158,23 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
     } catch (err) {
       console.error("Comment Error:", err);
     } finally { setIsCommenting(false); }
+  };
+
+  const handleTranslate = async () => {
+    if (translatedCaption) {
+      setTranslatedCaption(null);
+      return;
+    }
+    if (!post.caption || isTranslating) return;
+    setIsTranslating(true);
+    try {
+      const result = await translateContent(post.caption, language);
+      setTranslatedCaption(result);
+    } catch (err) {
+      console.error("Translation Error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   return (
@@ -192,31 +262,27 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
               <div className="space-y-1">
                 <p className="text-sm">
                   <span className="font-bold mr-2 text-[var(--vix-text)]">@{post.user.username}</span>
-                  <span className="text-zinc-400 leading-relaxed">{post.caption}</span>
+                  <span className="text-zinc-400 leading-relaxed">{translatedCaption || post.caption}</span>
                 </p>
-                <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
-                  {new Date(post.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
+                    {new Date(post.created_at).toLocaleDateString()}
+                  </span>
+                  {post.caption && language !== 'en' && (
+                    <button 
+                      onClick={handleTranslate}
+                      className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+                    >
+                      {isTranslating ? t('Translating...') : (translatedCaption ? t('Original') : t('See Translation'))}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Real Comments */}
             {comments.map(c => (
-              <div key={c.id} className="flex gap-4 animate-vix-in">
-                <img 
-                  src={c.user.avatar_url || `https://ui-avatars.com/api/?name=${c.user.username}`} 
-                  className="w-8 h-8 rounded-full object-cover" 
-                />
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    <span className="font-bold mr-2 text-[var(--vix-text)]">@{c.user.username}</span>
-                    <span className="text-zinc-400 leading-relaxed">{c.content}</span>
-                  </p>
-                  <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
-                    {new Date(c.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
+              <CommentItem key={c.id} comment={c} language={language} t={t} />
             ))}
           </div>
 

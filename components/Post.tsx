@@ -8,6 +8,7 @@ import {
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
+import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import { useTranslation } from '../lib/translation';
@@ -24,7 +25,7 @@ interface PostProps {
 }
 
 const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -43,6 +44,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
+  const [translatedCaption, setTranslatedCaption] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -218,6 +221,23 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
     }
   };
 
+  const handleTranslate = async () => {
+    if (translatedCaption) {
+      setTranslatedCaption(null);
+      return;
+    }
+    if (!post.caption || isTranslating) return;
+    setIsTranslating(true);
+    try {
+      const result = await translateContent(post.caption, language);
+      setTranslatedCaption(result);
+    } catch (err) {
+      console.error("Translation Error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const renderCaption = (text: string) => {
     if (!text) return null;
     const parts = text.split(/(@\w+)/g);
@@ -382,7 +402,17 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
             <span className="font-bold text-[var(--vix-text)] mr-2 inline-flex items-center gap-1 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
               @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
             </span>
-            {renderCaption(post.caption)}
+            <div className="inline-flex flex-col gap-1">
+              <span>{renderCaption(translatedCaption || post.caption)}</span>
+              {post.caption && language !== 'en' && (
+                <button 
+                  onClick={handleTranslate}
+                  className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors w-fit"
+                >
+                  {isTranslating ? t('Translating...') : (translatedCaption ? t('Original') : t('See Translation'))}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

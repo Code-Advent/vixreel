@@ -8,8 +8,8 @@ import { GoogleGenAI } from "@google/genai";
  */
 export const generateAIText = async (prompt: string): Promise<string> => {
   try {
-    // Initializing the GenAI client using process.env.API_KEY directly as required.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Initializing the GenAI client using process.env.GEMINI_API_KEY directly as required.
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     
     // Using gemini-3-flash-preview for basic text generation tasks.
     const response = await ai.models.generateContent({
@@ -35,7 +35,7 @@ export const generateAIText = async (prompt: string): Promise<string> => {
  */
 export const generateAIImage = async (prompt: string): Promise<string | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: [{ text: prompt }],
@@ -55,5 +55,25 @@ export const generateAIImage = async (prompt: string): Promise<string | null> =>
   } catch (error) {
     console.error("Gemini Image Error:", error);
     return null;
+  }
+};
+
+/**
+ * Translates content (captions or comments) to a target language using Gemini.
+ */
+export const translateContent = async (text: string, targetLanguage: string): Promise<string> => {
+  if (!text || !targetLanguage || targetLanguage === 'en') return text;
+  
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Translate the following social media content to ${targetLanguage}. Maintain the original tone, emojis, and mentions (@username). Return ONLY the translated text.\n\nContent: ${text}`,
+    });
+    
+    return response.text || text;
+  } catch (error) {
+    console.error("Gemini Translation Error:", error);
+    return text;
   }
 };
