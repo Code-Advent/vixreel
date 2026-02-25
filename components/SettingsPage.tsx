@@ -46,7 +46,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   setView,
   onTriggerEditProfile
 }) => {
-  const { t, language, setLanguage, isTranslating, translationProgress } = useTranslation();
+  const { t, language, setLanguage, isTranslating, translationProgress, syncLanguage, isSynced } = useTranslation();
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
@@ -114,7 +114,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           onSelect: (val: string) => setLanguage(val),
           desc: isTranslating 
             ? `${t('Downloading language pack...')}` 
-            : t('Select your preferred narrative language.')
+            : (isSynced ? t('Language pack synchronized.') : t('Language pack update available.'))
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 
@@ -272,6 +272,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                             style={{ width: `${translationProgress}%` }}
                           />
                         </div>
+                      )}
+                      {item.label === t('Language') && !isSynced && !isTranslating && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); syncLanguage(); }}
+                          className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20"
+                        >
+                          {t('Download Pack')}
+                        </button>
                       )}
                     </div>
                   ) : item.isInput ? (

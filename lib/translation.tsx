@@ -8,6 +8,8 @@ interface TranslationContextType {
   t: (text: string) => string;
   isTranslating: boolean;
   translationProgress: number; // 0 to 100
+  syncLanguage: () => Promise<void>;
+  isSynced: boolean;
   setUserId: (id: string | null) => void;
 }
 
@@ -63,7 +65,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Account Settings', 'Edit Profile', 'Update handle, bio, and identity.', 'Linked Accounts',
   'Manage other VixReel identities.', 'Control push alerts and signal pings.', 'Language',
   'Synchronizing language data...', 'Select your preferred narrative language.', 'Currently using',
-  'Downloading language pack...',
+  'Downloading language pack...', 'Language pack synchronized.', 'Language pack update available.', 'Download Pack',
   'mode protocol.', 'Privacy & Narrative', 'Private Account', 'Only followers can view your narrative posts and lists.',
   'Follower Visibility', 'Everyone', 'Only Me', 'Private Location', 'Hide your physical signal from your profile.',
   'Allow Comments', 'Enable others to respond to your signal.', 'Public Following',
@@ -127,6 +129,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
   });
   const [isTranslating, setIsTranslating] = React.useState(false);
   const [translationProgress, setTranslationProgress] = React.useState(0);
+  const [isSynced, setIsSynced] = React.useState(true);
   const activeRequestsRef = React.useRef(0);
   const activeBatches = React.useRef<Set<string>>(new Set());
   
@@ -157,7 +160,6 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     return text;
   }, [language, translations]);
 
-  // Function to translate a batch of strings using Gemini (Whole App Translation)
   const translateBatch = React.useCallback(async (texts: string[], targetLang: string) => {
     if (targetLang === 'en' || activeBatches.current.has(targetLang)) return;
     
@@ -168,7 +170,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     
     console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
 
-    const chunkSize = 20;
+    const chunkSize = 25;
     const totalChunks = Math.ceil(texts.length / chunkSize);
     
     try {
@@ -192,15 +194,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
           model,
           contents: [{ parts: [{ text: prompt }] }],
           config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              description: "A mapping of English strings to their translations",
-              properties: chunk.reduce((acc: any, text) => {
-                acc[text] = { type: Type.STRING };
-                return acc;
-              }, {}),
-            }
+            responseMimeType: "application/json"
           }
         });
 
@@ -234,20 +228,32 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, []);
 
+  const syncLanguage = React.useCallback(async () => {
+    if (language === 'en') return;
+    const currentCache = translations[language] || {};
+    const untranslated = CORE_UI_STRINGS.filter(txt => !currentCache[txt]);
+    
+    if (untranslated.length > 0) {
+      await translateBatch(untranslated, language);
+    }
+  }, [language, translations, translateBatch]);
+
   React.useEffect(() => {
     if (language !== 'en') {
       const currentCache = translations[language] || {};
       const untranslated = CORE_UI_STRINGS.filter(txt => !currentCache[txt]);
+      const synced = untranslated.length === 0;
+      setIsSynced(synced);
       
-      if (untranslated.length > 0) {
+      if (!synced && untranslated.length < 10) {
+        // Auto-sync small updates
         translateBatch(untranslated, language);
-      } else {
-        setTranslationProgress(100);
       }
     } else {
+      setIsSynced(true);
       setTranslationProgress(100);
     }
-  }, [language, translateBatch]); 
+  }, [language, translations, translateBatch]); 
 
   const contextValue = React.useMemo(() => ({
     language,
@@ -255,8 +261,10 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     t,
     isTranslating,
     translationProgress,
+    syncLanguage,
+    isSynced,
     setUserId
-  }), [language, setLanguage, t, isTranslating, translationProgress]);
+  }), [language, setLanguage, t, isTranslating, translationProgress, syncLanguage, isSynced]);
 
   return (
     <TranslationContext.Provider value={contextValue}>
