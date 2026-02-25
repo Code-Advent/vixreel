@@ -113,8 +113,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           options: SUPPORTED_LANGUAGES.map(l => ({ label: l.name, value: l.code })),
           onSelect: (val: string) => setLanguage(val),
           desc: isTranslating 
-            ? `${t('Downloading language pack...')}` 
-            : (isSynced ? t('Language pack synchronized.') : t('Language pack update available.'))
+            ? `${t('Downloading language pack...')} ${translationProgress}%` 
+            : (isSynced ? t('Language pack synchronized.') : t('Initializing download...'))
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 
@@ -272,14 +272,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                             style={{ width: `${translationProgress}%` }}
                           />
                         </div>
-                      )}
-                      {item.label === t('Language') && !isSynced && !isTranslating && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); syncLanguage(); }}
-                          className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20"
-                        >
-                          {t('Download Pack')}
-                        </button>
                       )}
                     </div>
                   ) : item.isInput ? (

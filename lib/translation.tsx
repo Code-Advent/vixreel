@@ -66,6 +66,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Manage other VixReel identities.', 'Control push alerts and signal pings.', 'Language',
   'Synchronizing language data...', 'Select your preferred narrative language.', 'Currently using',
   'Downloading language pack...', 'Language pack synchronized.', 'Language pack update available.', 'Download Pack',
+  'Initializing download...',
   'mode protocol.', 'Privacy & Narrative', 'Private Account', 'Only followers can view your narrative posts and lists.',
   'Follower Visibility', 'Everyone', 'Only Me', 'Private Location', 'Hide your physical signal from your profile.',
   'Allow Comments', 'Enable others to respond to your signal.', 'Public Following',
@@ -245,8 +246,8 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
       const synced = untranslated.length === 0;
       setIsSynced(synced);
       
-      if (!synced && untranslated.length < 10) {
-        // Auto-sync small updates
+      if (!synced) {
+        // Automatically download the full pack when language changes
         translateBatch(untranslated, language);
       }
     } else {
