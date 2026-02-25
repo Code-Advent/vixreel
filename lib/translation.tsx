@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface TranslationContextType {
   language: string;
@@ -150,7 +151,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     return text;
   }, [language, translations]);
 
-  // Function to translate a batch of strings in chunks with retries
+  // Function to translate a batch of strings using Gemini (Whole App Translation)
   const translateBatch = React.useCallback(async (texts: string[], targetLang: string) => {
     if (targetLang === 'en' || activeBatches.current.has(targetLang)) return;
     
@@ -158,80 +159,55 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     activeRequestsRef.current += 1;
     setIsTranslating(true);
     
-    console.log(`VixReel Translation Engine: Initiating resilient batch for ${targetLang}. Total strings: ${texts.length}`);
+    console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
 
     try {
-      const chunkSize = 3; // Smaller chunk size to prevent "Failed to fetch" / Rate limiting
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = "gemini-3-flash-preview";
+
+      const prompt = `Translate the following array of English UI strings into ${targetLang}. 
+      Return the result as a JSON object where the keys are the original English strings and the values are the translations.
+      Maintain the tone and context of a premium social media app for creators.
       
-      for (let i = 0; i < texts.length; i += chunkSize) {
-        const chunk = texts.slice(i, i + chunkSize);
-        console.log(`VixReel Translation Engine: Processing chunk ${Math.floor(i/chunkSize) + 1}/${Math.ceil(texts.length/chunkSize)} for ${targetLang}`);
-        
-        const chunkResults = await Promise.all(chunk.map(async (text) => {
-          // Retry logic: try up to 3 times for each string
-          let lastError = null;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      Strings to translate:
+      ${JSON.stringify(texts)}`;
 
-              const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                  'Authorization': API_KEY,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  text,
-                  target_language: targetLang
-                }),
-                signal: controller.signal
-              });
-              
-              clearTimeout(timeoutId);
-
-              if (!response.ok) {
-                if (response.status === 429) {
-                  // Rate limited - wait longer
-                  await new Promise(r => setTimeout(r, 2000 * attempt));
-                  continue;
-                }
-                throw new Error(`HTTP ${response.status}`);
-              }
-              
-              const data = await response.json();
-              return { original: text, translated: data.translated_text || data.result || text };
-            } catch (e: any) {
-              lastError = e;
-              console.warn(`VixReel Translation: Attempt ${attempt} failed for "${text}" to ${targetLang}`, e.message);
-              // Wait before retrying
-              await new Promise(r => setTimeout(r, 1000 * attempt));
-            }
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            description: "A mapping of English strings to their translations",
+            properties: texts.reduce((acc: any, text) => {
+              acc[text] = { type: Type.STRING };
+              return acc;
+            }, {}),
           }
-          
-          console.error(`VixReel Translation: All attempts failed for "${text}" to ${targetLang}`, lastError?.message);
-          return { original: text, translated: text };
-        }));
+        }
+      });
 
-        // Update state incrementally with proper immutable patterns
-        setTranslations(prev => {
-          const newTranslations = { ...prev };
-          newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}) };
-          
-          chunkResults.forEach(res => {
-            newTranslations[targetLang][res.original] = res.translated;
-          });
-          
-          localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
-          return newTranslations;
-        });
+      const result = JSON.parse(response.text || '{}');
+      
+      // Update state in one go
+      setTranslations(prev => {
+        const newTranslations = { ...prev };
+        newTranslations[targetLang] = { 
+          ...(newTranslations[targetLang] || {}),
+          ...result 
+        };
+        
+        localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+        return newTranslations;
+      });
 
-        // Small delay between chunks to be nice to the API
-        await new Promise(r => setTimeout(r, 500));
-      }
-      console.log(`VixReel Translation Engine: Resilient batch complete for ${targetLang}`);
+      console.log(`VixReel Translation Engine: Whole App Translation complete for ${targetLang}`);
     } catch (err) {
-      console.error("VixReel Translation Engine Critical Error:", err);
+      console.error("VixReel Gemini Translation Error:", err);
+      // Fallback to the old method if Gemini fails
+      console.log("Falling back to legacy chunked translation...");
+      await legacyTranslateBatch(texts, targetLang);
     } finally {
       activeBatches.current.delete(targetLang);
       activeRequestsRef.current -= 1;
@@ -239,7 +215,62 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsTranslating(false);
       }
     }
-  }, []); 
+  }, []);
+
+  // Legacy function kept as fallback
+  const legacyTranslateBatch = async (texts: string[], targetLang: string) => {
+    const chunkSize = 3; 
+    for (let i = 0; i < texts.length; i += chunkSize) {
+      const chunk = texts.slice(i, i + chunkSize);
+      const chunkResults = await Promise.all(chunk.map(async (text) => {
+        let lastError = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); 
+
+            const response = await fetch(API_URL, {
+              method: 'POST',
+              headers: {
+                'Authorization': API_KEY,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                text,
+                target_language: targetLang
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              if (response.status === 429) {
+                await new Promise(r => setTimeout(r, 2000 * attempt));
+                continue;
+              }
+              throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return { original: text, translated: data.translated_text || data.result || text };
+          } catch (e: any) {
+            lastError = e;
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          }
+        }
+        return { original: text, translated: text };
+      }));
+
+      setTranslations(prev => {
+        const newTranslations = { ...prev };
+        newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...chunkResults.reduce((acc: any, res) => { acc[res.original] = res.translated; return acc; }, {}) };
+        localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+        return newTranslations;
+      });
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }; 
 
   React.useEffect(() => {
     if (language !== 'en') {
