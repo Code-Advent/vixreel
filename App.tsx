@@ -15,6 +15,7 @@ import Notifications from './components/Notifications';
 import Explore from './components/Explore';
 import SettingsPage from './components/SettingsPage';
 import Groups from './components/Groups';
+import PostDetail from './components/PostDetail';
 import { TranslationProvider, useTranslation } from './lib/translation';
 
 const AppContent: React.FC = () => {
@@ -31,6 +32,7 @@ const AppContent: React.FC = () => {
   const [duetSource, setDuetSource] = useState<PostType | null>(null);
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
     return (saved as 'light' | 'dark') || 'dark';
@@ -272,6 +274,7 @@ const AppContent: React.FC = () => {
                         onSelectUser={(u) => setView('PROFILE', u)}
                         onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
                         onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
+                        onExpand={(post) => setSelectedPost(post)}
                       />
                     ))
                   ) : (
@@ -283,7 +286,7 @@ const AppContent: React.FC = () => {
                 </div>
               </div>
             )}
-            {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} />}
+            {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} onExpand={(post) => setSelectedPost(post)} />}
             {currentView === 'PROFILE' && viewedUser && (
               <Profile 
                 user={viewedUser} 
@@ -303,6 +306,7 @@ const AppContent: React.FC = () => {
                 onOpenSettings={() => setCurrentView('SETTINGS')}
                 onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
                 onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
+                onExpand={(post) => setSelectedPost(post)}
                 autoEdit={profileAutoEdit}
               />
             )}
@@ -395,6 +399,18 @@ const AppContent: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {selectedPost && (
+          <PostDetail 
+            post={selectedPost} 
+            currentUserId={currentUser.id} 
+            onClose={() => setSelectedPost(null)} 
+            onSelectUser={(u) => {
+              setSelectedPost(null);
+              setView('PROFILE', u);
+            }}
+          />
         )}
       </div>
   );

@@ -20,9 +20,10 @@ interface PostProps {
   onSelectUser?: (user: UserProfile) => void;
   onDuet?: (post: PostType) => void;
   onStitch?: (post: PostType) => void;
+  onExpand?: (post: PostType) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch }) => {
+const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
   const { t } = useTranslation();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -291,7 +292,10 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
         )}
       </div>
 
-      <div className="bg-[var(--vix-card)] aspect-square rounded-3xl overflow-hidden shadow-2xl border border-[var(--vix-border)] relative group">
+      <div 
+        onClick={() => onExpand?.(post)}
+        className="bg-[var(--vix-card)] aspect-square rounded-3xl overflow-hidden shadow-2xl border border-[var(--vix-border)] relative group cursor-pointer"
+      >
         {post.duet_from_id ? (
           <div className="flex w-full h-full">
             <div className="flex-1 border-r border-[var(--vix-border)]">

@@ -9,9 +9,10 @@ import { useTranslation } from '../lib/translation';
 interface ExploreProps {
   currentUserId: string;
   onSelectUser: (user: UserProfile) => void;
+  onExpand?: (post: Post) => void;
 }
 
-const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
+const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand }) => {
   const { t } = useTranslation();
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [explorePosts, setExplorePosts] = useState<Post[]>([]);
@@ -110,6 +111,7 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser }) => {
           ) : explorePosts.map((post, i) => (
             <div 
               key={post.id} 
+              onClick={() => onExpand?.(post)}
               className={`relative aspect-square rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden group shadow-2xl border border-[var(--vix-border)] cursor-pointer ${i % 5 === 0 ? 'md:col-span-2 md:row-span-2' : ''}`}
             >
               {post.media_type === 'video' ? (
