@@ -56,6 +56,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [dob, setDob] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -251,6 +252,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const handleFinalizeIdentity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) { setError("Username required"); return; }
+    if (!agreedToTerms) { setError("You must agree to the Terms and Privacy Policy"); return; }
     setLoading(true);
     setError(null);
     try {
@@ -627,6 +629,20 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                           ))}
                         </select>
                       </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 px-4 py-2">
+                      <input 
+                        type="checkbox" 
+                        id="terms" 
+                        checked={agreedToTerms}
+                        onChange={e => setAgreedToTerms(e.target.checked)}
+                        className="mt-1 w-4 h-4 rounded border-[var(--vix-border)] text-pink-500 focus:ring-pink-500/20"
+                        required
+                      />
+                      <label htmlFor="terms" className="text-[10px] text-zinc-600 font-medium text-left leading-relaxed">
+                        {t('I agree to the')} <a href="#" className="text-pink-500 font-black hover:underline">{t('Terms of Use')}</a> {t('and')} <a href="#" className="text-pink-500 font-black hover:underline">{t('Privacy Policy')}</a>.
+                      </label>
                     </div>
                   </div>
 

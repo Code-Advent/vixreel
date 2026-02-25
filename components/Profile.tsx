@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, Post as PostType, Group } from '../types';
 import { supabase } from '../lib/supabase';
-import { sanitizeFilename } from '../lib/utils';
+import { sanitizeFilename, formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import Post from './Post';
 import { COUNTRIES_DATA } from '../constants';
@@ -415,7 +415,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? 'opacity-30' : ''}`}
             >
               <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
-                {(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.followers}
+                {(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : formatNumber(counts.followers)}
               </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Followers')}</span>
             </div>
@@ -424,12 +424,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? 'opacity-30' : ''}`}
             >
               <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
-                {(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : counts.following}
+                {(!isOwnProfile && (!user.is_following_public || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : formatNumber(counts.following)}
               </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Following')}</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-black text-[var(--vix-text)] text-lg">{counts.likes}</span>
+              <span className="font-black text-[var(--vix-text)] text-lg">{formatNumber(counts.likes)}</span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Likes')}</span>
             </div>
           </div>
@@ -492,7 +492,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                     <h3 className="text-sm font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{group.name}</h3>
                     <div className="flex items-center gap-2">
                       <Users className="w-3 h-3 text-zinc-700" />
-                      <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} {t('Members')}</span>
+                      <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">
+                        {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Members')}
+                      </span>
                     </div>
                   </div>
                 </div>

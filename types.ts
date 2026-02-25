@@ -68,6 +68,9 @@ export interface Group {
   cover_url: string;
   privacy: 'PUBLIC' | 'PRIVATE';
   creator_id: string;
+  only_admin_can_post?: boolean;
+  is_verified?: boolean;
+  boosted_members?: number;
   created_at: string;
   updated_at: string;
   creator?: UserProfile;
@@ -95,6 +98,7 @@ export interface GroupPost {
   likes_count?: number;
   comments_count?: number;
   is_liked?: boolean;
+  reactions?: GroupPostReaction[];
 }
 
 export interface GroupPostLike {
@@ -113,11 +117,31 @@ export interface GroupPostComment {
   user?: UserProfile;
 }
 
+export interface GroupPostReaction {
+  id: string;
+  post_id: string;
+  user_id: string;
+  reaction: string;
+  created_at: string;
+  user?: UserProfile;
+}
+
 export interface Message {
   id: string;
   sender_id: string;
   receiver_id: string;
-  content: string;
+  content: string | null;
+  media_url?: string;
+  media_type?: 'image' | 'video';
+  created_at: string;
+  reactions?: MessageReaction[];
+}
+
+export interface MessageReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  reaction: string;
   created_at: string;
 }
 

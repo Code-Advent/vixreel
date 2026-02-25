@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Plus, Search, Globe, Lock, ArrowLeft, 
   MoreHorizontal, MessageSquare, Image as ImageIcon, 
-  Video, Send, Heart, X, Loader2, Camera
+  Video, Send, Heart, X, Loader2, Camera, Shield, ChevronLeft,
+  Link as LinkIcon, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
-import { sanitizeFilename } from '../lib/utils';
+import { sanitizeFilename, formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 
@@ -31,6 +32,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newPrivacy, setNewPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [onlyAdminCanPost, setOnlyAdminCanPost] = useState(false);
   const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
   const [newCoverPreview, setNewCoverPreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -53,6 +55,12 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       fetchGroupData(initialGroup.id);
     }
   }, [initialGroup]);
+
+  const copyGroupLink = (groupId: string) => {
+    const url = `${window.location.origin}/groups/${groupId}`;
+    navigator.clipboard.writeText(url);
+    alert(t('Community link copied to clipboard!'));
+  };
 
   const fetchGroups = async () => {
     setLoading(true);
@@ -111,6 +119,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
           name: newName.trim(),
           description: newDescription.trim(),
           privacy: newPrivacy,
+          only_admin_can_post: onlyAdminCanPost,
           cover_url: coverUrl,
           creator_id: currentUser.id
         })
@@ -128,6 +137,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
       setNewName('');
       setNewDescription('');
+      setOnlyAdminCanPost(false);
       setNewCoverFile(null);
       setNewCoverPreview(null);
       setView('LIST');
@@ -147,6 +157,15 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
   const fetchGroupData = async (groupId: string) => {
     try {
+      // Fetch group details to get only_admin_can_post
+      const { data: groupDetails } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', groupId)
+        .single();
+      
+      if (groupDetails) setSelectedGroup(groupDetails);
+
       // Check membership
       const { data: memberData } = await supabase
         .from('group_members')
@@ -156,13 +175,15 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         .maybeSingle();
       
       setIsMember(!!memberData);
+      const isGroupAdmin = memberData?.role === 'ADMIN';
 
       // Fetch posts
       const { data: posts, error } = await supabase
         .from('group_posts')
         .select(`
           *,
-          user:profiles(*)
+          user:profiles(*),
+          reactions:group_post_reactions(*, user:profiles(*))
         `)
         .eq('group_id', groupId)
         .order('created_at', { ascending: false });
@@ -276,6 +297,36 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
     }
   };
 
+  const togglePostReaction = async (postId: string, reaction: string) => {
+    try {
+      const { data: existing } = await supabase
+        .from('group_post_reactions')
+        .select('*')
+        .eq('post_id', postId)
+        .eq('user_id', currentUser.id)
+        .eq('reaction', reaction)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('group_post_reactions')
+          .delete()
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('group_post_reactions')
+          .insert({
+            post_id: postId,
+            user_id: currentUser.id,
+            reaction
+          });
+      }
+      if (selectedGroup) fetchGroupData(selectedGroup.id);
+    } catch (err) {
+      console.error("Error toggling post reaction:", err);
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postContent.trim() || !selectedGroup || isPosting) return;
@@ -340,7 +391,16 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         {view === 'LIST' && (
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-8">
+            <div className="relative group">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
+              <input 
+                type="text" 
+                placeholder={t('Search communities...')}
+                className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] py-5 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold shadow-xl"
+              />
+            </div>
+
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
@@ -351,30 +411,52 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No communities found')}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {groups.map(group => (
                   <div 
                     key={group.id} 
                     onClick={() => selectGroup(group)}
-                    className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-xl hover:border-pink-500/30 transition-all cursor-pointer group"
+                    className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] overflow-hidden shadow-2xl hover:border-pink-500/30 transition-all cursor-pointer group relative flex flex-col h-full"
                   >
-                    <div className="h-32 relative">
-                      <img src={group.cover_url} className="w-full h-full object-cover" alt={group.name} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-4 left-6 flex items-center gap-2">
-                        {group.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white/70" /> : <Globe className="w-3 h-3 text-white/70" />}
-                        <span className="text-[9px] text-white/70 font-black uppercase tracking-widest">{t(group.privacy)}</span>
+                    <div className="h-48 relative overflow-hidden">
+                      <img src={group.cover_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={group.name} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
+                          {group.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white" /> : <Globe className="w-3 h-3 text-white" />}
+                          <span className="text-[8px] text-white font-black uppercase tracking-widest">{t(group.privacy)}</span>
+                        </div>
+                        {group.only_admin_can_post && (
+                          <div className="bg-purple-500/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
+                            <Shield className="w-3 h-3 text-white" />
+                            <span className="text-[8px] text-white font-black uppercase tracking-widest">{t('Admin Only')}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="p-6 space-y-2">
-                      <h3 className="text-lg font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{group.name}</h3>
-                      <p className="text-[11px] text-zinc-500 line-clamp-2">{group.description}</p>
-                      <div className="flex items-center justify-between pt-4 border-t border-[var(--vix-border)]">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-zinc-700" />
-                          <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{group.member_count} {t('Members')}</span>
+                    <div className="p-8 flex-1 flex flex-col justify-between space-y-6">
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors leading-tight flex items-center gap-2">
+                          {group.name} {group.is_verified && <VerificationBadge size="w-4 h-4" />}
+                        </h3>
+                        <p className="text-xs text-zinc-500 line-clamp-3 leading-relaxed font-medium">{group.description}</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-6 border-t border-[var(--vix-border)]">
+                        <div className="flex items-center gap-3">
+                          <div className="flex -space-x-2">
+                            {[1,2,3].map(i => (
+                              <div key={i} className="w-6 h-6 rounded-full border-2 border-[var(--vix-card)] bg-[var(--vix-secondary)] overflow-hidden">
+                                <img src={`https://picsum.photos/seed/${group.id}${i}/50/50`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">
+                            {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Members')}
+                          </span>
                         </div>
-                        <span className="text-[9px] text-zinc-800 font-black uppercase tracking-widest bg-[var(--vix-secondary)] px-3 py-1 rounded-full">{t('View')}</span>
+                        <div className="w-10 h-10 rounded-2xl bg-[var(--vix-secondary)] flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition-all shadow-lg">
+                          <ChevronLeft className="w-4 h-4 rotate-180" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -458,6 +540,19 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     <Lock className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">{t('Private')}</span>
                   </button>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Posting Permissions')}</label>
+                    <button 
+                      type="button"
+                      onClick={() => setOnlyAdminCanPost(!onlyAdminCanPost)}
+                      className={`w-full py-4 rounded-2xl border transition-all flex items-center justify-center gap-3 ${onlyAdminCanPost ? 'bg-purple-500 text-white border-purple-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {onlyAdminCanPost ? t('Only Admins Can Post') : t('Everyone Can Post')}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -482,12 +577,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <div className="space-y-1">
                   <h3 className="text-2xl font-black text-white flex items-center gap-2">
                     {selectedGroup.name}
-                    {selectedGroup.creator?.is_verified && <VerificationBadge size="w-5 h-5" />}
+                    {selectedGroup.is_verified && <VerificationBadge size="w-5 h-5" />}
                   </h3>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
                       <Users className="w-3 h-3 text-white/70" />
-                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{selectedGroup.member_count} {t('Members')}</span>
+                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">
+                        {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('Members')}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {selectedGroup.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white/70" /> : <Globe className="w-3 h-3 text-white/70" />}
@@ -495,28 +592,37 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     </div>
                   </div>
                 </div>
-                {isMember ? (
+                <div className="flex gap-3">
                   <button 
-                    onClick={leaveGroup}
-                    disabled={isLeaving}
-                    className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                    onClick={() => copyGroupLink(selectedGroup.id)}
+                    className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-white hover:bg-white/20 transition-all"
+                    title={t('Copy Link')}
                   >
-                    {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Joined')}
+                    <LinkIcon className="w-5 h-5" />
                   </button>
-                ) : (
-                  <button 
-                    onClick={joinGroup}
-                    className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
-                  >
-                    {t('Join')}
-                  </button>
-                )}
+                  {isMember ? (
+                    <button 
+                      onClick={leaveGroup}
+                      disabled={isLeaving}
+                      className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                    >
+                      {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Joined')}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={joinGroup}
+                      className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
+                    >
+                      {t('Join')}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="p-6 space-y-8">
               {/* Post Composer */}
-              {isMember && (
+              {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
                 <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 shadow-xl space-y-4">
                   <div className="flex gap-4">
                     <img src={currentUser.avatar_url} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--vix-border)]" />
@@ -575,7 +681,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     </button>
                   </div>
                 </div>
-              )}
+              ) : isMember && selectedGroup.only_admin_can_post ? (
+                <div className="bg-[var(--vix-secondary)]/30 border border-dashed border-[var(--vix-border)] rounded-[2rem] p-6 text-center">
+                  <Shield className="w-6 h-6 text-zinc-600 mx-auto mb-2" />
+                  <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">
+                    {t('Only administrators can broadcast in this community')}
+                  </p>
+                </div>
+              ) : null}
 
               {/* Group Posts */}
               <div className="space-y-6">
@@ -611,28 +724,62 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                           )}
                         </div>
                       )}
-                      <div className="flex items-center gap-6 pt-2">
-                        <button 
-                          onClick={() => toggleLikePost(post.id)}
-                          className={`flex items-center gap-2 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
-                        >
-                          <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{post.likes_count || 0} {t('Likes')}</span>
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (activeCommentPostId === post.id) {
-                              setActiveCommentPostId(null);
-                            } else {
-                              setActiveCommentPostId(post.id);
-                              fetchComments(post.id);
-                            }
-                          }}
-                          className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors"
-                        >
-                          <MessageSquare className="w-5 h-5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{post.comments_count || 0} {t('Comments')}</span>
-                        </button>
+                      <div className="flex flex-col gap-4 pt-2">
+                        <div className="flex items-center gap-6">
+                          <button 
+                            onClick={() => toggleLikePost(post.id)}
+                            className={`flex items-center gap-2 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
+                          >
+                            <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{formatNumber(post.likes_count || 0)} {t('Likes')}</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (activeCommentPostId === post.id) {
+                                setActiveCommentPostId(null);
+                              } else {
+                                setActiveCommentPostId(post.id);
+                                fetchComments(post.id);
+                              }
+                            }}
+                            className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors"
+                          >
+                            <MessageSquare className="w-5 h-5" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{formatNumber(post.comments_count || 0)} {t('Comments')}</span>
+                          </button>
+                          
+                          <div className="flex items-center gap-2 ml-auto">
+                            {['❤️', '🔥', '🙌', '😂', '😮', '😢'].map(emoji => (
+                              <button
+                                key={emoji}
+                                onClick={() => togglePostReaction(post.id, emoji)}
+                                className="text-lg hover:scale-125 transition-transform"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Reactions Display */}
+                        {post.reactions && post.reactions.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(
+                              post.reactions.reduce((acc: any, r) => {
+                                acc[r.reaction] = (acc[r.reaction] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([emoji, count]: [string, any]) => (
+                              <div 
+                                key={emoji}
+                                className="bg-[var(--vix-secondary)] px-2 py-1 rounded-full flex items-center gap-1.5 border border-[var(--vix-border)]"
+                              >
+                                <span className="text-xs">{emoji}</span>
+                                <span className="text-[9px] font-black text-zinc-600">{formatNumber(count)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Comments Section */}

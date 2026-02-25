@@ -126,9 +126,30 @@ CREATE TABLE IF NOT EXISTS public.messages (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    content TEXT NOT NULL,
+    content TEXT,
+    media_url TEXT,
+    media_type TEXT CHECK (media_type IN ('image', 'video')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration for existing messages
+ALTER TABLE public.messages ALTER COLUMN content DROP NOT NULL;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_type TEXT CHECK (media_type IN ('image', 'video'));
+
+-- 12a. MESSAGE REACTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.message_reactions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    message_id UUID NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    reaction TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_message FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE,
+    UNIQUE(message_id, user_id, reaction)
+);
+
+-- Ensure index for performance and relationship detection
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON public.message_reactions(message_id);
 
 -- 13. STORIES TABLE
 CREATE TABLE IF NOT EXISTS public.stories (
@@ -148,9 +169,17 @@ CREATE TABLE IF NOT EXISTS public.groups (
     cover_url TEXT,
     privacy TEXT DEFAULT 'PUBLIC' CHECK (privacy IN ('PUBLIC', 'PRIVATE')),
     creator_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    only_admin_can_post BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    boosted_members INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration for existing groups
+ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS only_admin_can_post BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS boosted_members INTEGER DEFAULT 0;
 
 -- 15. GROUP MEMBERS TABLE
 CREATE TABLE IF NOT EXISTS public.group_members (
@@ -191,6 +220,16 @@ CREATE TABLE IF NOT EXISTS public.group_post_comments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 16c. GROUP POST REACTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.group_post_reactions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    reaction TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(post_id, user_id, reaction)
+);
+
 -- 17. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -203,12 +242,14 @@ ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_post_reactions ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -262,6 +303,17 @@ CREATE POLICY "Users can delete own follows" ON public.follows FOR DELETE USING 
 CREATE POLICY "Messages are viewable by participants" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 CREATE POLICY "Users can insert own messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
+-- Message Reactions
+CREATE POLICY "Message reactions are viewable by participants" ON public.message_reactions FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.messages m
+        WHERE m.id = message_reactions.message_id
+        AND (auth.uid() = m.sender_id OR auth.uid() = m.receiver_id)
+    )
+);
+CREATE POLICY "Users can insert own message reactions" ON public.message_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own message reactions" ON public.message_reactions FOR DELETE USING (auth.uid() = user_id);
+
 -- Stories
 CREATE POLICY "Stories are viewable by everyone" ON public.stories FOR SELECT USING (true);
 CREATE POLICY "Users can insert own stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -295,10 +347,16 @@ CREATE POLICY "Users can delete own group post likes" ON public.group_post_likes
 CREATE POLICY "Group post comments are viewable by everyone" ON public.group_post_comments FOR SELECT USING (true);
 CREATE POLICY "Users can insert own group post comments" ON public.group_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Group Post Reactions
+CREATE POLICY "Group post reactions are viewable by everyone" ON public.group_post_reactions FOR SELECT USING (true);
+CREATE POLICY "Users can insert own group post reactions" ON public.group_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own group post reactions" ON public.group_post_reactions FOR DELETE USING (auth.uid() = user_id);
+
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public) VALUES ('messages', 'messages', true) ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- 21. CLEANUP OLD STORAGE POLICIES
 DO $$ 
@@ -323,3 +381,7 @@ CREATE POLICY "Owner Delete from Avatars" ON storage.objects FOR DELETE USING (b
 CREATE POLICY "Public Access to Stories" ON storage.objects FOR SELECT USING (bucket_id = 'stories');
 CREATE POLICY "Authenticated Upload to Stories" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'stories' AND auth.role() = 'authenticated');
 CREATE POLICY "Owner Delete from Stories" ON storage.objects FOR DELETE USING (bucket_id = 'stories' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Public Access to Messages" ON storage.objects FOR SELECT USING (bucket_id = 'messages');
+CREATE POLICY "Authenticated Upload to Messages" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'messages' AND auth.role() = 'authenticated');
+CREATE POLICY "Owner Delete from Messages" ON storage.objects FOR DELETE USING (bucket_id = 'messages' AND auth.uid()::text = (storage.foldername(name))[1]);

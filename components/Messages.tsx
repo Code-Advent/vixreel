@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X } from 'lucide-react';
+import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X, Image as ImageIcon, Smile, Heart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { UserProfile, Message } from '../types';
+import { UserProfile, Message, MessageReaction } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import { sanitizeFilename } from '../lib/utils';
 
 interface MessagesProps {
   currentUser: UserProfile;
@@ -28,8 +29,19 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const [isSearching, setIsSearching] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   
+  // Media State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // Reactions State
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const REACTION_OPTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
 
   // Initialize and Real-time Subscription
   useEffect(() => {
@@ -130,11 +142,26 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .select(`
+          *,
+          reactions:message_reactions(*)
+        `)
         .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching messages:", error);
+        // Fallback: fetch without reactions if join fails
+        if (error.code === 'PGRST200') {
+          const { data: fallbackData } = await supabase
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
+            .order('created_at', { ascending: true });
+          if (fallbackData) setMessages(fallbackData);
+        }
+        return;
+      }
       if (data) setMessages(data);
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -164,41 +191,98 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setMediaPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const toggleReaction = async (messageId: string, reaction: string) => {
+    try {
+      const { data: existing } = await supabase
+        .from('message_reactions')
+        .select('*')
+        .eq('message_id', messageId)
+        .eq('user_id', currentUser.id)
+        .eq('reaction', reaction)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('message_reactions')
+          .delete()
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('message_reactions')
+          .insert({
+            message_id: messageId,
+            user_id: currentUser.id,
+            reaction
+          });
+      }
+      
+      setShowReactionPicker(null);
+      fetchMessages(); // Refresh to show reactions
+    } catch (err) {
+      console.error("Reaction failure:", err);
+    }
+  };
+
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!text.trim() || !activeChat) return;
+    if ((!text.trim() && !selectedFile) || !activeChat || isUploading) return;
     
     const msgContent = text.trim();
+    const fileToUpload = selectedFile;
+    
     setText('');
-
-    // Optimistic UI Update: Show it instantly
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMsg: Message = {
-      id: tempId,
-      sender_id: currentUser.id,
-      receiver_id: activeChat.id,
-      content: msgContent,
-      created_at: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, optimisticMsg]);
+    setSelectedFile(null);
+    setMediaPreview(null);
+    setIsUploading(true);
 
     try {
+      let mediaUrl = null;
+      let mediaType = null;
+
+      if (fileToUpload) {
+        const safeName = sanitizeFilename(fileToUpload.name);
+        const path = `messages/${currentUser.id}/${Date.now()}-${safeName}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('messages')
+          .upload(path, fileToUpload);
+        
+        if (uploadErr) throw uploadErr;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('messages')
+          .getPublicUrl(path);
+        
+        mediaUrl = publicUrl;
+        mediaType = fileToUpload.type.startsWith('video') ? 'video' : 'image';
+      }
+
       const { data, error } = await supabase.from('messages').insert({
         sender_id: currentUser.id,
         receiver_id: activeChat.id,
-        content: msgContent
+        content: msgContent || null,
+        media_url: mediaUrl,
+        media_type: mediaType
       }).select().single();
       
       if (error) throw error;
 
-      // Replace optimistic message with the real one from DB
-      setMessages(prev => prev.map(m => m.id === tempId ? data : m));
+      setMessages(prev => [...prev, data]);
       fetchChats();
     } catch (err) {
       console.error("Transmission failure:", err);
-      // Remove failed message and restore text for retry
-      setMessages(prev => prev.filter(m => m.id !== tempId));
       setText(msgContent);
+      setSelectedFile(fileToUpload);
+      if (fileToUpload) setMediaPreview(URL.createObjectURL(fileToUpload));
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -304,7 +388,50 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                           ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
                           : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]/50 backdrop-blur-md shadow-sm'
                       }`}>
+                        {m.media_url && (
+                          <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 shadow-inner">
+                            {m.media_type === 'video' ? (
+                              <video src={m.media_url} controls className="w-full max-h-60 object-cover" />
+                            ) : (
+                              <img src={m.media_url} className="w-full max-h-60 object-cover" />
+                            )}
+                          </div>
+                        )}
                         {m.content}
+
+                        {/* Reaction Picker Trigger */}
+                        <button 
+                          onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
+                          className={`absolute ${isOwn ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500`}
+                        >
+                          <Smile className="w-4 h-4" />
+                        </button>
+
+                        {/* Reaction Picker */}
+                        {showReactionPicker === m.id && (
+                          <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-2 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
+                            {REACTION_OPTIONS.map(emoji => (
+                              <button 
+                                key={emoji}
+                                onClick={() => toggleReaction(m.id, emoji)}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-lg"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Display Reactions */}
+                        {m.reactions && m.reactions.length > 0 && (
+                          <div className={`absolute -bottom-3 ${isOwn ? 'right-4' : 'left-4'} flex gap-1`}>
+                            {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
+                              <div key={emoji} className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full px-2 py-0.5 text-[10px] shadow-lg flex items-center gap-1">
+                                {emoji} <span className="text-[8px] text-zinc-500">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -313,23 +440,56 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-[var(--vix-secondary)]/20 border-t border-[var(--vix-border)] flex gap-4 backdrop-blur-2xl">
-              <div className="flex-1 relative">
+            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-[var(--vix-secondary)]/20 border-t border-[var(--vix-border)] flex flex-col gap-4 backdrop-blur-2xl">
+              {mediaPreview && (
+                <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-[var(--vix-border)] shadow-xl animate-vix-in">
+                  <button 
+                    type="button"
+                    onClick={() => { setSelectedFile(null); setMediaPreview(null); }}
+                    className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 transition-all z-10"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  {selectedFile?.type.startsWith('video') ? (
+                    <video src={mediaPreview} className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={mediaPreview} className="w-full h-full object-cover" />
+                  )}
+                </div>
+              )}
+              
+              <div className="flex gap-4">
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-lg active:scale-90"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
                 <input 
-                  ref={messageInputRef}
-                  value={text} 
-                  onChange={e => setText(e.target.value)} 
-                  placeholder={t('Type your message...')}
-                  className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
+                  ref={fileInputRef}
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*,video/*"
+                  onChange={handleFileSelect}
                 />
+                <div className="flex-1 relative">
+                  <input 
+                    ref={messageInputRef}
+                    value={text} 
+                    onChange={e => setText(e.target.value)} 
+                    placeholder={selectedFile ? t('Add a caption...') : t('Type your message...')}
+                    className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={(!text.trim() && !selectedFile) || isUploading}
+                  className="vix-gradient p-5 rounded-full shadow-2xl shadow-pink-500/20 active:scale-90 transition-all disabled:opacity-20 shrink-0 flex items-center justify-center group"
+                >
+                  {isUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}
+                </button>
               </div>
-              <button 
-                type="submit" 
-                disabled={!text.trim()}
-                className="vix-gradient p-5 rounded-full shadow-2xl shadow-pink-500/20 active:scale-90 transition-all disabled:opacity-20 shrink-0 flex items-center justify-center group"
-              >
-                <Send className="w-5 h-5 text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </button>
             </form>
           </>
         ) : (
