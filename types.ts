@@ -42,6 +42,10 @@ export interface Post {
   duet_from?: Post;
   stitch_from_id?: string;
   stitch_from?: Post;
+  location_name?: string;
+  feeling?: string;
+  privacy?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+  allow_comments?: boolean;
 }
 
 export interface Comment {

@@ -47,6 +47,8 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Post Details', 'Write a caption... Use @username to mention creators.', 'AI Caption Helper',
   'Post Settings', 'Max 50MB allowed.', 'Failed to share post.', 'Replace Media',
   'Select Media', 'High Resolution Photo or Video (max 50MB)', 'CHOOSE FILE',
+  'Add Location', 'Feeling / Activity', 'Privacy', 'Allow Comments', 'Public', 'Followers', 'Private',
+  'AI Image Generator', 'Create media from your caption', 'feeling', 'Creative Tools',
 
   // Profile
   'Edit Profile', 'Follow', 'Following', 'Followers', 'Likes', 'Message', 'Posts', 'Liked',

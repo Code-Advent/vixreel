@@ -1,8 +1,13 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Wand2, Loader2, Image as ImageIcon, Video, UploadCloud, ChevronRight, Columns2, Scissors } from 'lucide-react';
+import { 
+  X, Wand2, Loader2, Image as ImageIcon, Video, 
+  UploadCloud, ChevronRight, Columns2, Scissors,
+  MapPin, Lock, MessageSquare, Smile, Sparkles,
+  Globe, EyeOff, Check
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { generateAIText } from '../services/geminiService';
+import { generateAIText, generateAIImage } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
 import { Post } from '../types';
 import { useTranslation } from '../lib/translation';
@@ -20,8 +25,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
+  const [location, setLocation] = useState('');
+  const [privacy, setPrivacy] = useState<'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'>('PUBLIC');
+  const [allowComments, setAllowComments] = useState(true);
+  const [feeling, setFeeling] = useState('');
   const [isPosting, setIsPosting] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +58,28 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
     } finally { setIsGeneratingCaption(false); }
   };
 
+  const handleGenerateAIImage = async () => {
+    if (isGeneratingImage || !caption) {
+      alert("Please write a description in the caption first to guide the AI.");
+      return;
+    }
+    setIsGeneratingImage(true);
+    try {
+      const imageUrl = await generateAIImage(caption);
+      if (imageUrl) {
+        // Convert base64 to File object
+        const res = await fetch(imageUrl);
+        const blob = await res.blob();
+        const generatedFile = new File([blob], `ai-gen-${Date.now()}.png`, { type: 'image/png' });
+        setFile(generatedFile);
+        setPreview(imageUrl);
+        setMediaType('image');
+      } else {
+        alert("Failed to generate image. Please try a different description.");
+      }
+    } finally { setIsGeneratingImage(false); }
+  };
+
   const handlePost = async () => {
     if (!file || isPosting) return;
     setIsPosting(true);
@@ -71,6 +103,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
         media_url: publicUrl, 
         media_type: mediaType, 
         caption: caption.trim(),
+        location_name: location, // Assuming we add location_name or just use location_id
+        privacy,
+        allow_comments: allowComments,
+        feeling,
         duet_from_id: duetSource?.id,
         stitch_from_id: stitchSource?.id
       }).select().single();
@@ -195,10 +231,76 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
             </button>
           </div>
 
-          <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl">
+          <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-8 space-y-6 shadow-2xl">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600 px-2">{t('Creative Tools')}</h3>
+            
+            <div className="space-y-4">
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <input 
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder={t('Add Location')}
+                  className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/30 transition-all"
+                />
+              </div>
+
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                  <Smile className="w-4 h-4" />
+                </div>
+                <input 
+                  value={feeling}
+                  onChange={e => setFeeling(e.target.value)}
+                  placeholder={t('Feeling / Activity')}
+                  className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/30 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[var(--vix-border)] space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                  <Lock className="w-4 h-4 text-zinc-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{t('Privacy')}</span>
+                </div>
+                <select 
+                  value={privacy}
+                  onChange={e => setPrivacy(e.target.value as any)}
+                  className="bg-transparent text-[10px] font-black uppercase tracking-widest text-pink-500 outline-none cursor-pointer"
+                >
+                  <option value="PUBLIC">{t('Public')}</option>
+                  <option value="FOLLOWERS">{t('Followers')}</option>
+                  <option value="PRIVATE">{t('Private')}</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                  <MessageSquare className="w-4 h-4 text-zinc-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{t('Allow Comments')}</span>
+                </div>
+                <button 
+                  onClick={() => setAllowComments(!allowComments)}
+                  className={`w-10 h-5 rounded-full relative transition-all ${allowComments ? 'bg-pink-500' : 'bg-zinc-800'}`}
+                >
+                  <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${allowComments ? 'right-1' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl group cursor-pointer hover:border-pink-500/30 transition-all" onClick={handleGenerateAIImage}>
              <div className="flex items-center gap-4">
-                <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl"><ImageIcon className="w-4 h-4 text-zinc-600" /></div>
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{t('Post Settings')}</span>
+                <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl group-hover:bg-pink-500/10 transition-colors">
+                  {isGeneratingImage ? <Loader2 className="w-4 h-4 text-pink-500 animate-spin" /> : <Sparkles className="w-4 h-4 text-pink-500" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-[var(--vix-text)] uppercase tracking-widest">{t('AI Image Generator')}</span>
+                  <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">{t('Create media from your caption')}</span>
+                </div>
              </div>
              <ChevronRight className="w-4 h-4 text-zinc-800" />
           </div>

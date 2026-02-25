@@ -1,6 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Download, Bookmark, Trash2, X, Volume2, VolumeX, Loader2, MessageSquareOff, Lock, Repeat2, Columns2, Scissors } from 'lucide-react';
+import { 
+  Heart, MessageCircle, Download, Bookmark, Trash2, X, 
+  Volume2, VolumeX, Loader2, MessageSquareOff, Lock, 
+  Repeat2, Columns2, Scissors, MapPin, Smile
+} from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { formatNumber } from '../lib/utils';
@@ -264,6 +268,20 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
               {post.user.is_private && <Lock className="w-3 h-3 text-zinc-600" />}
             </span>
+            {(post.location_name || post.feeling) && (
+              <div className="flex items-center gap-2 mt-0.5">
+                {post.location_name && (
+                  <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                    <MapPin className="w-2.5 h-2.5" /> {post.location_name}
+                  </span>
+                )}
+                {post.feeling && (
+                  <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                    <Smile className="w-2.5 h-2.5" /> {t('feeling')} {post.feeling}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
         {post.user.id === currentUserId && (
