@@ -7,6 +7,7 @@ interface TranslationContextType {
   setLanguage: (lang: string) => void;
   t: (text: string) => string;
   isTranslating: boolean;
+  translationProgress: number; // 0 to 100
   setUserId: (id: string | null) => void;
 }
 
@@ -62,6 +63,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Account Settings', 'Edit Profile', 'Update handle, bio, and identity.', 'Linked Accounts',
   'Manage other VixReel identities.', 'Control push alerts and signal pings.', 'Language',
   'Synchronizing language data...', 'Select your preferred narrative language.', 'Currently using',
+  'Downloading language pack...',
   'mode protocol.', 'Privacy & Narrative', 'Private Account', 'Only followers can view your narrative posts and lists.',
   'Follower Visibility', 'Everyone', 'Only Me', 'Private Location', 'Hide your physical signal from your profile.',
   'Allow Comments', 'Enable others to respond to your signal.', 'Public Following',
@@ -124,6 +126,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : {};
   });
   const [isTranslating, setIsTranslating] = React.useState(false);
+  const [translationProgress, setTranslationProgress] = React.useState(0);
   const activeRequestsRef = React.useRef(0);
   const activeBatches = React.useRef<Set<string>>(new Set());
   
@@ -161,119 +164,75 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     activeBatches.current.add(targetLang);
     activeRequestsRef.current += 1;
     setIsTranslating(true);
+    setTranslationProgress(0);
     
     console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
 
+    const chunkSize = 20;
+    const totalChunks = Math.ceil(texts.length / chunkSize);
+    
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       const model = "gemini-3-flash-preview";
 
-      const prompt = `Translate the following array of English UI strings into ${targetLang}. 
-      Return the result as a JSON object where the keys are the original English strings and the values are the translations.
-      Maintain the tone and context of a premium social media app for creators.
-      
-      Strings to translate:
-      ${JSON.stringify(texts)}`;
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{ parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            description: "A mapping of English strings to their translations",
-            properties: texts.reduce((acc: any, text) => {
-              acc[text] = { type: Type.STRING };
-              return acc;
-            }, {}),
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || '{}');
-      
-      // Update state in one go
-      setTranslations(prev => {
-        const newTranslations = { ...prev };
-        newTranslations[targetLang] = { 
-          ...(newTranslations[targetLang] || {}),
-          ...result 
-        };
+      for (let i = 0; i < texts.length; i += chunkSize) {
+        const chunk = texts.slice(i, i + chunkSize);
+        const chunkIndex = Math.floor(i / chunkSize) + 1;
         
-        localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
-        return newTranslations;
-      });
+        console.log(`VixReel Translation Engine: Translating chunk ${chunkIndex}/${totalChunks} for ${targetLang}`);
+
+        const prompt = `Translate the following array of English UI strings into ${targetLang}. 
+        Return the result as a JSON object where the keys are the original English strings and the values are the translations.
+        Maintain the tone and context of a premium social media app for creators.
+        
+        Strings to translate:
+        ${JSON.stringify(chunk)}`;
+
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ parts: [{ text: prompt }] }],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              description: "A mapping of English strings to their translations",
+              properties: chunk.reduce((acc: any, text) => {
+                acc[text] = { type: Type.STRING };
+                return acc;
+              }, {}),
+            }
+          }
+        });
+
+        const result = JSON.parse(response.text || '{}');
+        
+        // Update state and localStorage after each chunk
+        setTranslations(prev => {
+          const newTranslations = { ...prev };
+          newTranslations[targetLang] = { 
+            ...(newTranslations[targetLang] || {}),
+            ...result 
+          };
+          
+          localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+          return newTranslations;
+        });
+
+        setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
+      }
 
       console.log(`VixReel Translation Engine: Whole App Translation complete for ${targetLang}`);
     } catch (err) {
       console.error("VixReel Gemini Translation Error:", err);
-      // Fallback to the old method if Gemini fails
-      console.log("Falling back to legacy chunked translation...");
-      await legacyTranslateBatch(texts, targetLang);
     } finally {
       activeBatches.current.delete(targetLang);
       activeRequestsRef.current -= 1;
       if (activeRequestsRef.current <= 0) {
         setIsTranslating(false);
+        setTranslationProgress(100);
       }
     }
   }, []);
-
-  // Legacy function kept as fallback
-  const legacyTranslateBatch = async (texts: string[], targetLang: string) => {
-    const chunkSize = 3; 
-    for (let i = 0; i < texts.length; i += chunkSize) {
-      const chunk = texts.slice(i, i + chunkSize);
-      const chunkResults = await Promise.all(chunk.map(async (text) => {
-        let lastError = null;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); 
-
-            const response = await fetch(API_URL, {
-              method: 'POST',
-              headers: {
-                'Authorization': API_KEY,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                text,
-                target_language: targetLang
-              }),
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              if (response.status === 429) {
-                await new Promise(r => setTimeout(r, 2000 * attempt));
-                continue;
-              }
-              throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            return { original: text, translated: data.translated_text || data.result || text };
-          } catch (e: any) {
-            lastError = e;
-            await new Promise(r => setTimeout(r, 1000 * attempt));
-          }
-        }
-        return { original: text, translated: text };
-      }));
-
-      setTranslations(prev => {
-        const newTranslations = { ...prev };
-        newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...chunkResults.reduce((acc: any, res) => { acc[res.original] = res.translated; return acc; }, {}) };
-        localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
-        return newTranslations;
-      });
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }; 
 
   React.useEffect(() => {
     if (language !== 'en') {
@@ -282,7 +241,11 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
       
       if (untranslated.length > 0) {
         translateBatch(untranslated, language);
+      } else {
+        setTranslationProgress(100);
       }
+    } else {
+      setTranslationProgress(100);
     }
   }, [language, translateBatch]); 
 
@@ -291,8 +254,9 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     setLanguage,
     t,
     isTranslating,
+    translationProgress,
     setUserId
-  }), [language, setLanguage, t, isTranslating]);
+  }), [language, setLanguage, t, isTranslating, translationProgress]);
 
   return (
     <TranslationContext.Provider value={contextValue}>

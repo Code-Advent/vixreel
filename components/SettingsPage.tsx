@@ -46,7 +46,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   setView,
   onTriggerEditProfile
 }) => {
-  const { t, language, setLanguage, isTranslating } = useTranslation();
+  const { t, language, setLanguage, isTranslating, translationProgress } = useTranslation();
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
@@ -112,7 +112,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           value: language,
           options: SUPPORTED_LANGUAGES.map(l => ({ label: l.name, value: l.code })),
           onSelect: (val: string) => setLanguage(val),
-          desc: isTranslating ? t('Synchronizing language data...') : t('Select your preferred narrative language.')
+          desc: isTranslating 
+            ? `${t('Downloading language pack...')}` 
+            : t('Select your preferred narrative language.')
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 
@@ -253,15 +255,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                     </button>
                   ) : item.isSelect ? (
-                    <select 
-                      value={item.value} 
-                      onChange={(e) => item.onSelect?.(e.target.value)}
-                      className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none text-[var(--vix-text)]"
-                    >
-                      {item.options?.map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <div className="flex flex-col items-end gap-2">
+                      <select 
+                        value={item.value} 
+                        onChange={(e) => item.onSelect?.(e.target.value)}
+                        className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none text-[var(--vix-text)]"
+                      >
+                        {item.options?.map((opt: any) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      {item.label === t('Language') && isTranslating && (
+                        <div className="w-32 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-500 transition-all duration-500" 
+                            style={{ width: `${translationProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : item.isInput ? (
                     <div className="relative">
                       <input 
