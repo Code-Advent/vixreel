@@ -295,6 +295,12 @@ CREATE POLICY "Posts are viewable by everyone" ON public.posts FOR SELECT USING 
 CREATE POLICY "Users can insert own posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own posts" ON public.posts FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own posts" ON public.posts FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Admins can manage all posts" ON public.posts FOR ALL USING (
+    EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid() AND is_admin = true
+    )
+);
 
 -- Reposts, Duets, Stitches
 CREATE POLICY "Reposts viewable by everyone" ON public.reposts FOR SELECT USING (true);
@@ -303,6 +309,9 @@ CREATE POLICY "Duets viewable by everyone" ON public.duets FOR SELECT USING (tru
 CREATE POLICY "Users can insert own duets" ON public.duets FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Stitches viewable by everyone" ON public.stitches FOR SELECT USING (true);
 CREATE POLICY "Users can insert own stitches" ON public.stitches FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can manage all interactions" ON public.reposts FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can manage all duets" ON public.duets FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can manage all stitches" ON public.stitches FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- Likes & Comments
 CREATE POLICY "Likes are viewable by everyone" ON public.likes FOR SELECT USING (true);
