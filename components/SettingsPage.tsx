@@ -113,9 +113,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           value: language,
           options: SUPPORTED_LANGUAGES.map(l => ({ label: l.name, value: l.code })),
           onSelect: (val: string) => setLanguage(val),
-          desc: isTranslating 
-            ? `${t('Downloading language pack...')} ${translationProgress}%` 
-            : (isSynced ? t('Language pack synchronized.') : t('Select your preferred narrative language.'))
+          desc: !process.env.GEMINI_API_KEY 
+            ? <span className="text-red-500 font-bold">{t('Translation API Key Missing')}</span>
+            : (isTranslating 
+                ? `${t('Downloading language pack...')} ${translationProgress}%` 
+                : (isSynced ? t('Language pack synchronized.') : t('Select your preferred narrative language.')))
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 

@@ -66,7 +66,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Manage other VixReel identities.', 'Control push alerts and signal pings.', 'Language',
   'Synchronizing language data...', 'Select your preferred narrative language.', 'Currently using',
   'Downloading language pack...', 'Language pack synchronized.', 'Language pack update available.', 'Download Pack',
-  'Initializing download...',
+  'Initializing download...', 'Translation API Key Missing',
   'mode protocol.', 'Privacy & Narrative', 'Private Account', 'Only followers can view your narrative posts and lists.',
   'Follower Visibility', 'Everyone', 'Only Me', 'Private Location', 'Hide your physical signal from your profile.',
   'Allow Comments', 'Enable others to respond to your signal.', 'Public Following',
@@ -170,6 +170,15 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     setTranslationProgress(0);
     
     console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("VixReel Translation Error: GEMINI_API_KEY is not defined. Please set it in your environment variables.");
+      setIsTranslating(false);
+      setTranslationProgress(0);
+      activeBatches.current.delete(targetLang);
+      activeRequestsRef.current -= 1;
+      return;
+    }
 
     const chunkSize = 15; // Smaller chunks for more progress steps
     const totalChunks = Math.ceil(texts.length / chunkSize);
