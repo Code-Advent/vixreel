@@ -59,8 +59,8 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
     setIsUploading(true);
     const safeFilename = sanitizeFilename(file.name);
-    const fileName = `${currentUser.id}-${Date.now()}-${safeFilename}`;
-    const filePath = `active/${fileName}`;
+    const fileName = `${Date.now()}-${safeFilename}`;
+    const filePath = `${currentUser.id}/${fileName}`;
     const mType = file.type.startsWith('video') ? 'video' : 'image';
 
     try {

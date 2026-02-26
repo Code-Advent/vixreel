@@ -300,6 +300,11 @@ CREATE POLICY "Admins can manage all posts" ON public.posts FOR ALL USING (
         SELECT 1 FROM public.profiles
         WHERE id = auth.uid() AND is_admin = true
     )
+) WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid() AND is_admin = true
+    )
 );
 
 -- Reposts, Duets, Stitches
@@ -309,9 +314,9 @@ CREATE POLICY "Duets viewable by everyone" ON public.duets FOR SELECT USING (tru
 CREATE POLICY "Users can insert own duets" ON public.duets FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Stitches viewable by everyone" ON public.stitches FOR SELECT USING (true);
 CREATE POLICY "Users can insert own stitches" ON public.stitches FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Admins can manage all interactions" ON public.reposts FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins can manage all duets" ON public.duets FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins can manage all stitches" ON public.stitches FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can manage all interactions" ON public.reposts FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can manage all duets" ON public.duets FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can manage all stitches" ON public.stitches FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- Likes & Comments
 CREATE POLICY "Likes are viewable by everyone" ON public.likes FOR SELECT USING (true);
@@ -328,6 +333,7 @@ CREATE POLICY "Users can delete own follows" ON public.follows FOR DELETE USING 
 -- Messages
 CREATE POLICY "Messages are viewable by participants" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 CREATE POLICY "Users can insert own messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "Admins can view all messages" ON public.messages FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- Message Reactions
 CREATE POLICY "Message reactions are viewable by participants" ON public.message_reactions FOR SELECT USING (

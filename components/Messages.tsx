@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X, Image as ImageIcon, Smile, Heart, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, Image as ImageIcon, Smile, MoreVertical, Trash2 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message, MessageReaction } from '../types';
@@ -16,6 +16,7 @@ interface MessagesProps {
 interface ChatPreview extends UserProfile {
   last_message?: string;
   last_message_at?: string;
+  unread_count?: number;
 }
 
 const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => {
@@ -35,11 +36,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Reactions State
-  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  // UI State
   const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
-  const [emojiPickerTarget, setEmojiPickerTarget] = useState<'MESSAGE' | 'REACTION'>('MESSAGE');
-  const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -47,78 +46,20 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
   const REACTION_OPTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
 
-  // Initialize and Real-time Subscription
-  useEffect(() => {
-    fetchChats();
-    
-    const channel = supabase
-      .channel('vix-messages-realtime-v3')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const newMsg = payload.new as Message;
-          
-          // Check if this message belongs to the current open conversation
-          if (activeChat && (
-            (newMsg.sender_id === activeChat.id && newMsg.receiver_id === currentUser.id) ||
-            (newMsg.sender_id === currentUser.id && newMsg.receiver_id === activeChat.id)
-          )) {
-            setMessages(prev => {
-              // Prevent duplicates if optimistic update already added it
-              const exists = prev.some(m => m.id === newMsg.id || (m.content === newMsg.content && m.sender_id === newMsg.sender_id && Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 1000));
-              if (exists) return prev;
-              return [...prev, newMsg];
-            });
-          }
-          
-          // Refresh chat list to update previews and order
-          fetchChats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeChat?.id, currentUser.id]);
-
-  // Handle active chat changes
-  useEffect(() => {
-    if (activeChat) {
-      setMessages([]); // Clear previous messages to ensure fresh load
-      fetchMessages();
-      messageInputRef.current?.focus();
-    } else {
-      setMessages([]);
-    }
-  }, [activeChat?.id]);
-
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // 1. Fetch Chat List
   const fetchChats = async () => {
     try {
-      // Fetch latest messages for each conversation - limit to 500 for performance
       const { data: msgs, error } = await supabase
         .from('messages')
         .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
         .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false })
-        .limit(500);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       if (!msgs) return;
 
       const uniqueUsersMap = new Map<string, ChatPreview>();
       
-      // If we were directed here with an initial user, make sure they're in the list
       if (initialChatUser && !uniqueUsersMap.has(initialChatUser.id)) {
         uniqueUsersMap.set(initialChatUser.id, { ...initialChatUser });
       }
@@ -128,7 +69,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
         if (otherUser && !uniqueUsersMap.has(otherUser.id)) {
           uniqueUsersMap.set(otherUser.id, {
             ...otherUser,
-            last_message: m.content,
+            last_message: m.content || (m.media_url ? '📷 Media' : ''),
             last_message_at: m.created_at
           });
         }
@@ -136,63 +77,76 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       
       setChats(Array.from(uniqueUsersMap.values()));
     } catch (err) {
-      console.error("Error fetching chats:", err);
+      console.error("Chat fetch error:", err);
     }
   };
 
+  // 2. Fetch Messages for Active Chat
   const fetchMessages = async () => {
     if (!activeChat) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          reactions:message_reactions(*)
-        `)
+        .select('*, reactions:message_reactions(*)')
         .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
       
-      if (error) {
-        console.error("Error fetching messages:", error);
-        // Fallback: fetch without reactions if join fails
-        if (error.code === 'PGRST200') {
-          const { data: fallbackData } = await supabase
-            .from('messages')
-            .select('*')
-            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChat.id}),and(sender_id.eq.${activeChat.id},receiver_id.eq.${currentUser.id})`)
-            .order('created_at', { ascending: true });
-          if (fallbackData) setMessages(fallbackData);
-        }
-        return;
-      }
-      if (data) setMessages(data);
+      if (error) throw error;
+      setMessages(data || []);
     } catch (err) {
-      console.error("Error fetching messages:", err);
+      console.error("Message fetch error:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  // 3. Real-time Subscriptions
+  useEffect(() => {
+    fetchChats();
+    
+    const channel = supabase
+      .channel(`vix-messages-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newMsg = payload.new as Message;
+          if (activeChat && (
+            (newMsg.sender_id === activeChat.id && newMsg.receiver_id === currentUser.id) ||
+            (newMsg.sender_id === currentUser.id && newMsg.receiver_id === activeChat.id)
+          )) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        }
+        fetchChats();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [activeChat?.id, currentUser.id]);
+
+  useEffect(() => {
+    if (activeChat) fetchMessages();
+  }, [activeChat?.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // 4. Actions
   const handleSearchUsers = async (val: string) => {
     setSearchQuery(val);
-    if (val.length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    if (val.length < 2) { return setSearchResults([]); }
     setIsSearching(true);
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .neq('id', currentUser.id)
-        .ilike('username', `%${val}%`)
-        .limit(8);
-      
-      if (data) setSearchResults(data as UserProfile[]);
-    } finally {
-      setIsSearching(false);
-    }
+      const { data } = await supabase.from('profiles').select('*').neq('id', currentUser.id).ilike('username', `%${val}%`).limit(10);
+      setSearchResults(data || []);
+    } finally { setIsSearching(false); }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,43 +159,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
   const toggleReaction = async (messageId: string, reaction: string) => {
     try {
-      const { data: existing } = await supabase
-        .from('message_reactions')
-        .select('*')
-        .eq('message_id', messageId)
-        .eq('user_id', currentUser.id)
-        .eq('reaction', reaction)
-        .maybeSingle();
-
+      const { data: existing } = await supabase.from('message_reactions').select('*').eq('message_id', messageId).eq('user_id', currentUser.id).eq('reaction', reaction).maybeSingle();
       if (existing) {
-        await supabase
-          .from('message_reactions')
-          .delete()
-          .eq('id', existing.id);
+        await supabase.from('message_reactions').delete().eq('id', existing.id);
       } else {
-        await supabase
-          .from('message_reactions')
-          .insert({
-            message_id: messageId,
-            user_id: currentUser.id,
-            reaction
-          });
+        await supabase.from('message_reactions').insert({ message_id: messageId, user_id: currentUser.id, reaction });
       }
-      
       setShowReactionPicker(null);
-      fetchMessages(); // Refresh to show reactions
-    } catch (err) {
-      console.error("Reaction failure:", err);
-    }
-  };
-
-  const onEmojiClick = (emojiData: EmojiClickData) => {
-    if (emojiPickerTarget === 'MESSAGE') {
-      setText(prev => prev + emojiData.emoji);
-    } else if (emojiPickerTarget === 'REACTION' && reactionMessageId) {
-      toggleReaction(reactionMessageId, emojiData.emoji);
-    }
-    setShowFullEmojiPicker(false);
+    } catch (err) { console.error("Reaction error:", err); }
   };
 
   const sendMessage = async (e?: React.FormEvent) => {
@@ -262,17 +187,10 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
       if (fileToUpload) {
         const safeName = sanitizeFilename(fileToUpload.name);
-        const path = `messages/${currentUser.id}/${Date.now()}-${safeName}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('messages')
-          .upload(path, fileToUpload);
-        
+        const path = `${currentUser.id}/${Date.now()}-${safeName}`;
+        const { error: uploadErr } = await supabase.storage.from('messages').upload(path, fileToUpload);
         if (uploadErr) throw uploadErr;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('messages')
-          .getPublicUrl(path);
-        
+        const { data: { publicUrl } } = supabase.storage.from('messages').getPublicUrl(path);
         mediaUrl = publicUrl;
         mediaType = fileToUpload.type.startsWith('video') ? 'video' : 'image';
       }
@@ -286,175 +204,114 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       }).select().single();
       
       if (error) throw error;
-
       setMessages(prev => [...prev, data]);
-      fetchChats();
     } catch (err) {
-      console.error("Transmission failure:", err);
+      console.error("Send error:", err);
       setText(msgContent);
-      setSelectedFile(fileToUpload);
-      if (fileToUpload) setMediaPreview(URL.createObjectURL(fileToUpload));
-    } finally {
-      setIsUploading(false);
-    }
+    } finally { setIsUploading(false); }
   };
 
   return (
-    <div className="max-w-[1000px] mx-auto h-[88vh] border border-[var(--vix-border)] rounded-[3rem] flex overflow-hidden mt-4 bg-[var(--vix-bg)] shadow-2xl relative ring-1 ring-white/5">
+    <div className="max-w-[1100px] mx-auto h-[90vh] flex flex-col md:flex-row bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl mt-4 animate-vix-in">
       
-      {/* Sidebar - Chat Previews */}
+      {/* Sidebar */}
       <div className={`w-full md:w-80 border-r border-[var(--vix-border)] flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-8 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/10">
-          <div className="flex flex-col">
-            <span className="font-black uppercase text-[10px] tracking-[0.4em] text-zinc-500">{t('Narrative')}</span>
-            <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest mt-1">{t('Direct Encrypted')}</span>
-          </div>
-          <button 
-            onClick={() => setShowNewChatModal(true)}
-            className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)] shadow-lg hover:shadow-pink-500/10 active:scale-95"
-          >
+          <h2 className="text-xl font-black uppercase tracking-tighter text-[var(--vix-text)]">{t('Messages')}</h2>
+          <button onClick={() => setShowNewChatModal(true)} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-pink-500 hover:scale-110 transition-all shadow-lg active:scale-95">
             <Plus className="w-5 h-5" />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] divide-y divide-[var(--vix-border)]/20">
+        <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/20">
           {chats.length > 0 ? chats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
-              className={`flex items-center gap-4 p-5 cursor-pointer transition-all duration-300 relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
+              className={`flex items-center gap-4 p-6 cursor-pointer transition-all relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
             >
               {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1 vix-gradient"></div>}
-              <div className="relative shrink-0">
-                <img 
-                  src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
-                  className={`w-12 h-12 rounded-full border border-[var(--vix-border)] object-cover shadow-lg transition-transform group-hover:scale-105 ${u.is_verified ? 'ring-2 ring-pink-500/20' : ''}`} 
-                />
-              </div>
+              <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full border border-[var(--vix-border)] object-cover shadow-md" />
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start mb-0.5">
-                  <span className="font-black text-[13px] truncate flex items-center gap-1.5 text-[var(--vix-text)] opacity-80 group-hover:opacity-100">
-                    {u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
-                  </span>
-                  {u.last_message_at && (
-                    <span className="text-[8px] text-zinc-500 font-bold uppercase shrink-0">
-                      {new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-sm truncate text-[var(--vix-text)]">@{u.username}</span>
+                  {u.last_message_at && <span className="text-[9px] text-zinc-500 font-bold">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
-                <p className={`text-[10px] font-medium truncate max-w-[150px] ${activeChat?.id === u.id ? 'text-zinc-500' : 'text-zinc-600'}`}>
-                  {u.last_message || t('Start signal exchange...')}
-                </p>
+                <p className="text-[11px] text-zinc-500 truncate">{u.last_message || t('New conversation')}</p>
               </div>
             </div>
           )) : (
-            <div className="p-16 text-center opacity-30 flex flex-col items-center justify-center h-full space-y-6">
-              <div className="w-16 h-16 rounded-[1.5rem] bg-[var(--vix-secondary)] flex items-center justify-center border border-[var(--vix-border)] border-dashed">
-                <MessageCircle className="w-8 h-8 text-zinc-500" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--vix-text)]">{t('No narratives active')}</p>
-              <button onClick={() => setShowNewChatModal(true)} className="px-8 py-3 vix-gradient rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-pink-500/10 active:scale-95 transition-all">{t('Initialize Comms')}</button>
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-30">
+              <MessageCircle className="w-12 h-12 mb-4" />
+              <p className="text-xs font-bold uppercase tracking-widest">{t('No messages yet')}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main Messaging Window */}
-      <div className={`flex-1 flex flex-col bg-[var(--vix-bg)]/40 backdrop-blur-3xl ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
+      {/* Chat Area */}
+      <div className={`flex-1 flex flex-col relative ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
         {activeChat ? (
           <>
-            <div className="p-6 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/30 backdrop-blur-xl z-20">
+            {/* Chat Header */}
+            <div className="p-6 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-bg)]/80 backdrop-blur-xl z-20">
               <div className="flex items-center gap-4">
-                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500 hover:text-[var(--vix-text)] transition-colors"><ChevronLeft className="w-6 h-6" /></button>
-                <div className="relative">
-                  <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-[var(--vix-border)] object-cover shadow-xl" />
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[var(--vix-bg)] rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-                </div>
+                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500"><ChevronLeft className="w-6 h-6" /></button>
+                <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-[var(--vix-border)] object-cover" />
                 <div>
-                  <div className="font-black text-[15px] flex items-center gap-1.5 text-[var(--vix-text)]">
+                  <h3 className="font-black text-sm flex items-center gap-1.5">
                     {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
-                  </div>
-                  <span className="text-[8px] text-zinc-600 font-black uppercase tracking-[0.2em]">{activeChat.full_name || t('Individual Creator')}</span>
+                  </h3>
+                  <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest">{t('Online')}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 p-6 sm:p-10 overflow-y-auto space-y-6 no-scrollbar relative" dir="ltr">
-              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--vix-bg)]/80 to-transparent pointer-events-none z-10"></div>
-              
+            {/* Messages List */}
+            <div className="flex-1 p-6 overflow-y-auto space-y-6 no-scrollbar" dir="ltr">
               {loading && messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-zinc-800 animate-spin" /></div>
+                <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-zinc-800" /></div>
               ) : (
                 messages.map((m, i) => {
                   const isOwn = m.sender_id === currentUser.id;
-                  const showTime = i === 0 || Math.abs(new Date(m.created_at).getTime() - new Date(messages[i-1].created_at).getTime()) > 600000;
-                  
                   return (
                     <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
-                      {showTime && (
-                        <span className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.4em] my-6 w-full text-center">
-                          {new Date(m.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
                       <div 
                         dir="auto"
-                        className={`group relative max-w-[85%] sm:max-w-[70%] p-5 px-7 rounded-[2.5rem] text-[13px] font-medium shadow-2xl transition-all ${
-                        isOwn 
-                          ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
-                          : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]/50 backdrop-blur-md shadow-sm'
+                        className={`group relative max-w-[80%] p-4 px-6 rounded-[2rem] text-[13px] font-medium shadow-xl transition-all ${
+                        isOwn ? 'vix-gradient text-white rounded-tr-none' : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]'
                       }`}>
                         {m.media_url && (
-                          <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 shadow-inner">
-                            {m.media_type === 'video' ? (
-                              <video src={m.media_url} controls className="w-full max-h-60 object-cover" />
-                            ) : (
-                              <img src={m.media_url} className="w-full max-h-60 object-cover" />
-                            )}
+                          <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+                            {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-60" /> : <img src={m.media_url} className="max-h-60" />}
                           </div>
                         )}
                         {m.content}
-
-                        {/* Reaction Picker Trigger */}
+                        
+                        {/* Reaction Trigger */}
                         <button 
                           onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
-                          className={`absolute ${isOwn ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500`}
+                          className={`absolute ${isOwn ? '-left-8' : '-right-8'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500`}
                         >
                           <Smile className="w-4 h-4" />
                         </button>
 
-                        {/* Reaction Picker */}
-                        {showReactionPicker === m.id && (
-                          <div className={`absolute ${isOwn ? '-left-64' : '-right-64'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-2 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
-                            {REACTION_OPTIONS.map(emoji => (
-                              <button 
-                                key={emoji}
-                                onClick={() => toggleReaction(m.id, emoji)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-lg"
-                              >
-                                {emoji}
-                              </button>
+                        {/* Reactions Display */}
+                        {m.reactions && m.reactions.length > 0 && (
+                          <div className={`absolute -bottom-3 ${isOwn ? 'right-2' : 'left-2'} flex gap-1`}>
+                            {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
+                              <div key={emoji} className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full px-1.5 py-0.5 text-[10px] shadow-lg">
+                                {emoji} <span className="text-[8px] opacity-50">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
+                              </div>
                             ))}
-                            <button 
-                              onClick={() => {
-                                setEmojiPickerTarget('REACTION');
-                                setReactionMessageId(m.id);
-                                setShowFullEmojiPicker(true);
-                                setShowReactionPicker(null);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-zinc-500"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
                           </div>
                         )}
 
-                        {/* Display Reactions */}
-                        {m.reactions && m.reactions.length > 0 && (
-                          <div className={`absolute -bottom-3 ${isOwn ? 'right-4' : 'left-4'} flex gap-1`}>
-                            {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
-                              <div key={emoji} className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full px-2 py-0.5 text-[10px] shadow-lg flex items-center gap-1">
-                                {emoji} <span className="text-[8px] text-zinc-500">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
-                              </div>
+                        {/* Reaction Picker */}
+                        {showReactionPicker === m.id && (
+                          <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-1.5 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
+                            {REACTION_OPTIONS.map(emoji => (
+                              <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="w-7 h-7 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-base">{emoji}</button>
                             ))}
                           </div>
                         )}
@@ -466,168 +323,84 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            <form onSubmit={sendMessage} className="p-6 sm:p-8 bg-[var(--vix-secondary)]/20 border-t border-[var(--vix-border)] flex flex-col gap-4 backdrop-blur-2xl">
+            {/* Input Area */}
+            <form onSubmit={sendMessage} className="p-6 bg-[var(--vix-secondary)]/10 border-t border-[var(--vix-border)] flex flex-col gap-4">
               {mediaPreview && (
-                <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-[var(--vix-border)] shadow-xl animate-vix-in">
-                  <button 
-                    type="button"
-                    onClick={() => { setSelectedFile(null); setMediaPreview(null); }}
-                    className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 transition-all z-10"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  {selectedFile?.type.startsWith('video') ? (
-                    <video src={mediaPreview} className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={mediaPreview} className="w-full h-full object-cover" />
-                  )}
+                <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--vix-border)] shadow-lg animate-vix-in">
+                  <button type="button" onClick={() => { setSelectedFile(null); setMediaPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full"><X className="w-3 h-3" /></button>
+                  {selectedFile?.type.startsWith('video') ? <video src={mediaPreview} className="w-full h-full object-cover" /> : <img src={mediaPreview} className="w-full h-full object-cover" />}
                 </div>
               )}
               
-              <div className="flex gap-4">
-                <button 
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-lg active:scale-90"
-                >
-                  <ImageIcon className="w-5 h-5" />
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setEmojiPickerTarget('MESSAGE');
-                    setShowFullEmojiPicker(!showFullEmojiPicker);
-                  }}
-                  className={`p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-lg active:scale-90 ${showFullEmojiPicker && emojiPickerTarget === 'MESSAGE' ? 'text-pink-500 border-pink-500/30' : 'text-zinc-500 hover:text-pink-500'}`}
-                >
-                  <Smile className="w-5 h-5" />
-                </button>
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  className="hidden" 
-                  accept="image/*,video/*"
-                  onChange={handleFileSelect}
-                />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-md"><ImageIcon className="w-5 h-5" /></button>
+                <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
+                
                 <div className="flex-1 relative">
                   <input 
                     ref={messageInputRef}
                     value={text} 
                     onChange={e => setText(e.target.value)} 
-                    placeholder={selectedFile ? t('Add a caption...') : t('Type your message...')}
+                    placeholder={t('Type your message...')}
                     dir="auto"
-                    className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
+                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full px-6 py-4 text-sm focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner" 
                   />
                 </div>
-                <button 
-                  type="submit" 
-                  disabled={(!text.trim() && !selectedFile) || isUploading}
-                  className="vix-gradient p-5 rounded-full shadow-2xl shadow-pink-500/20 active:scale-90 transition-all disabled:opacity-20 shrink-0 flex items-center justify-center group"
-                >
-                  {isUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />}
+                
+                <button type="submit" disabled={(!text.trim() && !selectedFile) || isUploading} className="vix-gradient p-4 rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center">
+                  {isUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white" />}
                 </button>
               </div>
             </form>
-
-            {/* Global Emoji Picker Overlay */}
-            {showFullEmojiPicker && (
-              <div className="absolute bottom-32 right-8 z-[1000] animate-vix-in shadow-2xl rounded-3xl overflow-hidden border border-[var(--vix-border)]">
-                <div className="bg-[var(--vix-card)] p-2 flex justify-between items-center border-b border-[var(--vix-border)]">
-                  <span className="text-[10px] font-black uppercase tracking-widest px-3 text-zinc-500">
-                    {emojiPickerTarget === 'REACTION' ? t('Choose Reaction') : t('Choose Emoji')}
-                  </span>
-                  <button onClick={() => setShowFullEmojiPicker(false)} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
-                    <X className="w-4 h-4 text-zinc-500" />
-                  </button>
-                </div>
-                <EmojiPicker 
-                  onEmojiClick={onEmojiClick}
-                  autoFocusSearch={false}
-                  theme={EmojiTheme.DARK}
-                  width={350}
-                  height={400}
-                />
-              </div>
-            )}
           </>
         ) : (
-          <div className="text-center space-y-12 animate-vix-in p-12 max-w-sm">
-            <div className="relative">
-              <div className="absolute inset-0 bg-pink-500/10 blur-3xl rounded-full"></div>
-              <div className="w-28 h-28 rounded-[3rem] bg-[var(--vix-secondary)]/30 flex items-center justify-center mx-auto border border-[var(--vix-border)] border-dashed shadow-2xl relative z-10">
-                <MessageCircle className="w-12 h-12 text-zinc-500" />
-              </div>
+          <div className="text-center space-y-6 max-w-xs animate-vix-in">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-[var(--vix-secondary)]/30 flex items-center justify-center mx-auto border border-[var(--vix-border)] border-dashed">
+              <MessageCircle className="w-10 h-10 text-zinc-500" />
             </div>
-            <div className="space-y-6">
-              <h3 className="text-2xl font-black uppercase tracking-[0.4em] text-[var(--vix-text)]">{t('Encrypted Signal')}</h3>
-              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">
-                {t('Initialize a secure narrative protocol to begin private signal exchange between creators.')}
-              </p>
-              <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-12 py-4 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">{t('Select Creator')}</button>
-            </div>
+            <h3 className="text-xl font-black uppercase tracking-widest">{t('Select a narrative')}</h3>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed">{t('Initiate a secure signal exchange with another creator.')}</p>
+            <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-10 py-3 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl">{t('Start Chat')}</button>
           </div>
         )}
       </div>
 
-      {/* New Conversation Discovery Modal */}
+      {/* New Chat Modal */}
       {showNewChatModal && (
-        <div className="absolute inset-0 z-[100] bg-[var(--vix-bg)]/98 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-2xl animate-vix-in">
-          <button 
-            onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
-            className="absolute top-12 right-12 p-3 text-zinc-700 hover:text-[var(--vix-text)] transition-colors bg-[var(--vix-secondary)]/50 rounded-full border border-[var(--vix-border)]"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          
-          <div className="w-full max-w-md space-y-10">
-            <div className="text-center space-y-3">
-               <h3 className="text-3xl font-black text-[var(--vix-text)] uppercase tracking-widest">{t('Signal Search')}</h3>
-               <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">{t('Establish new narrative connection')}</p>
+        <div className="fixed inset-0 z-[100] bg-[var(--vix-bg)]/95 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-xl animate-vix-in">
+          <button onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }} className="absolute top-10 right-10 p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)]"><X className="w-6 h-6" /></button>
+          <div className="w-full max-w-md space-y-8">
+            <div className="text-center">
+               <h3 className="text-2xl font-black uppercase tracking-widest">{t('Creator Search')}</h3>
+               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-2">{t('Establish new signal connection')}</p>
             </div>
-
-            <div className="relative group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
+            <div className="relative">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
               <input 
                 type="text" 
-                placeholder={t('Search @handle...')} 
+                placeholder={t('Search @username...')} 
                 value={searchQuery}
                 onChange={e => handleSearchUsers(e.target.value)}
                 autoFocus
-                className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-[2rem] py-6 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold"
+                className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-full py-5 pl-14 pr-6 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] font-bold"
               />
             </div>
-
-            <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar">
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto no-scrollbar">
               {isSearching ? (
-                <div className="flex flex-col items-center py-10 gap-4">
-                  <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
-                  <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">{t('Scanning Registry...')}</span>
-                </div>
-              ) : searchResults.length > 0 ? (
-                searchResults.map(u => (
-                  <div 
-                    key={u.id}
-                    onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
-                    className="flex items-center gap-4 p-5 rounded-[2rem] bg-[var(--vix-card)] border border-[var(--vix-border)]/50 hover:bg-[var(--vix-secondary)] hover:border-pink-500/20 cursor-pointer transition-all group"
-                  >
-                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)] shadow-xl" />
-                    <div className="flex-1">
-                      <p className="font-black text-sm text-[var(--vix-text)] flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
-                        @{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
-                      </p>
-                      <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest truncate">{u.full_name || t('Individual Creator')}</p>
-                    </div>
-                    <div className="bg-[var(--vix-secondary)] p-3 rounded-2xl text-zinc-600 group-hover:text-pink-500 transition-colors">
-                      <ChevronLeft className="w-4 h-4 rotate-180" />
-                    </div>
+                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-pink-500" /></div>
+              ) : searchResults.map(u => (
+                <div 
+                  key={u.id}
+                  onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
+                  className="flex items-center gap-4 p-4 rounded-3xl bg-[var(--vix-card)] border border-[var(--vix-border)] hover:border-pink-500/30 cursor-pointer transition-all group"
+                >
+                  <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)]" />
+                  <div className="flex-1">
+                    <p className="font-black text-sm text-[var(--vix-text)]">@{u.username}</p>
+                    <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{u.full_name || t('Creator')}</p>
                   </div>
-                ))
-              ) : searchQuery.length >= 2 && (
-                <div className="text-center py-20 opacity-30">
-                  <Search className="w-10 h-10 text-zinc-500 mx-auto mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('No identity match found')}</p>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </div>
