@@ -35,6 +35,28 @@ export const SUPPORTED_LANGUAGES = [
   { name: 'Vietnamese', code: 'vi' },
   { name: 'Thai', code: 'th' },
   { name: 'Indonesian', code: 'id' },
+  { name: 'Dutch', code: 'nl' },
+  { name: 'Polish', code: 'pl' },
+  { name: 'Swedish', code: 'sv' },
+  { name: 'Danish', code: 'da' },
+  { name: 'Norwegian', code: 'no' },
+  { name: 'Finnish', code: 'fi' },
+  { name: 'Greek', code: 'el' },
+  { name: 'Czech', code: 'cs' },
+  { name: 'Romanian', code: 'ro' },
+  { name: 'Hungarian', code: 'hu' },
+  { name: 'Ukrainian', code: 'uk' },
+  { name: 'Hebrew', code: 'he' },
+  { name: 'Malay', code: 'ms' },
+  { name: 'Filipino', code: 'tl' },
+  { name: 'Bengali', code: 'bn' },
+  { name: 'Punjabi', code: 'pa' },
+  { name: 'Tamil', code: 'ta' },
+  { name: 'Telugu', code: 'te' },
+  { name: 'Marathi', code: 'mr' },
+  { name: 'Urdu', code: 'ur' },
+  { name: 'Persian', code: 'fa' },
+  { name: 'Swahili', code: 'sw' },
 ];
 
 const CORE_UI_STRINGS = Array.from(new Set([
@@ -121,7 +143,12 @@ const CORE_UI_STRINGS = Array.from(new Set([
   'Story file is too large (max 50MB).', 'Story upload failed: ',
 
   // Feed & Posts
-  'Add a comment...'
+  'Add a comment...', 'Delete', 'Edit', 'Save', 'Cancel', 'Confirm', 'Are you sure?',
+  'Loading...', 'Error', 'Success', 'Warning', 'Info',
+  'Followers', 'Following', 'Posts', 'Likes', 'Bio', 'Handle',
+  'Narrative Bio', 'Identity Registry', 'Signal Search',
+  'Choose Reaction', 'Choose Emoji', 'Search Emoji...',
+  'Recent', 'Smileys & People', 'Animals & Nature', 'Food & Drink', 'Activities', 'Travel & Places', 'Objects', 'Symbols', 'Flags'
 ])).sort();
 
 export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
