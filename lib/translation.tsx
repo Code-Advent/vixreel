@@ -153,12 +153,17 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const t = React.useCallback((text: string): string => {
     if (!text) return '';
-    if (language === 'en') return text;
-    const translated = translations[language]?.[text];
+    const key = text.trim();
+    if (language === 'en') return key;
+    const translated = translations[language]?.[key];
     if (translated) return translated;
     
-    // If not translated yet, return English but ensure we don't have a missing key issue
-    return text;
+    // Fallback to case-insensitive match if direct match fails
+    const langCache = translations[language] || {};
+    const caseInsensitiveKey = Object.keys(langCache).find(k => k.toLowerCase() === key.toLowerCase());
+    if (caseInsensitiveKey) return langCache[caseInsensitiveKey];
+
+    return key;
   }, [language, translations]);
 
   const translateBatch = React.useCallback(async (texts: string[], targetLang: string) => {
@@ -199,9 +204,15 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
 
           const result = JSON.parse(response.text || '{}');
           
+          // Trim keys in result
+          const trimmedResult: Record<string, string> = {};
+          Object.entries(result).forEach(([k, v]) => {
+            trimmedResult[k.trim()] = String(v);
+          });
+
           setTranslations(prev => {
             const newTranslations = { ...prev };
-            newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...result };
+            newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...trimmedResult };
             localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
             return newTranslations;
           });
@@ -211,7 +222,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
       } else {
         // Use translateapi.ai as primary if Gemini is missing
-        console.log("Gemini API Key missing, using dedicated Translation API...");
+        console.log("VixReel: Using dedicated Translation API...");
         for (let i = 0; i < texts.length; i += chunkSize) {
           const chunk = texts.slice(i, i + chunkSize);
           const chunkIndex = Math.floor(i / chunkSize) + 1;
@@ -227,17 +238,25 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
                 body: JSON.stringify({ text, target_language: targetLang })
               });
               const data = await response.json();
-              return { original: text, translated: data.translated_text || data.result || text };
+              // Handle multiple possible response formats from translateapi.ai
+              const translated = data.translated_text || data.result || data.translation || data.translatedText || text;
+              return { original: text.trim(), translated: String(translated) };
             } catch (e) {
-              return { original: text, translated: text };
+              console.error(`VixReel: Translation failed for "${text}":`, e);
+              return { original: text.trim(), translated: text };
             }
           }));
 
           setTranslations(prev => {
             const newTranslations = { ...prev };
+            const batchUpdate = chunkResults.reduce((acc: any, res) => { 
+              acc[res.original] = res.translated; 
+              return acc; 
+            }, {});
+            
             newTranslations[targetLang] = { 
               ...(newTranslations[targetLang] || {}), 
-              ...chunkResults.reduce((acc: any, res) => { acc[res.original] = res.translated; return acc; }, {}) 
+              ...batchUpdate 
             };
             localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
             return newTranslations;
