@@ -396,7 +396,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                           {new Date(m.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       )}
-                      <div className={`group relative max-w-[85%] sm:max-w-[70%] p-5 px-7 rounded-[2.5rem] text-[13px] font-medium shadow-2xl transition-all ${
+                      <div 
+                        dir="auto"
+                        className={`group relative max-w-[85%] sm:max-w-[70%] p-5 px-7 rounded-[2.5rem] text-[13px] font-medium shadow-2xl transition-all ${
                         isOwn 
                           ? 'vix-gradient text-white rounded-tr-none border border-white/10' 
                           : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]/50 backdrop-blur-md shadow-sm'
@@ -513,6 +515,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     value={text} 
                     onChange={e => setText(e.target.value)} 
                     placeholder={selectedFile ? t('Add a caption...') : t('Type your message...')}
+                    dir="auto"
                     className="w-full bg-[var(--vix-bg)]/60 border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-sm focus:border-pink-500/40 focus:ring-4 focus:ring-pink-500/5 outline-none transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-semibold shadow-inner" 
                   />
                 </div>

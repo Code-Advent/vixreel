@@ -29,7 +29,7 @@ export const SUPPORTED_LANGUAGES = [
   { name: 'Chinese', code: 'zh' },
   { name: 'Japanese', code: 'ja' },
   { name: 'Korean', code: 'ko' },
-  { name: 'Arabic', code: 'ar' },
+  { name: 'Arabic', code: 'ar', dir: 'rtl' },
   { name: 'Turkish', code: 'tr' },
   { name: 'Hindi', code: 'hi' },
   { name: 'Vietnamese', code: 'vi' },
@@ -46,7 +46,7 @@ export const SUPPORTED_LANGUAGES = [
   { name: 'Romanian', code: 'ro' },
   { name: 'Hungarian', code: 'hu' },
   { name: 'Ukrainian', code: 'uk' },
-  { name: 'Hebrew', code: 'he' },
+  { name: 'Hebrew', code: 'he', dir: 'rtl' },
   { name: 'Malay', code: 'ms' },
   { name: 'Filipino', code: 'tl' },
   { name: 'Bengali', code: 'bn' },
@@ -54,8 +54,8 @@ export const SUPPORTED_LANGUAGES = [
   { name: 'Tamil', code: 'ta' },
   { name: 'Telugu', code: 'te' },
   { name: 'Marathi', code: 'mr' },
-  { name: 'Urdu', code: 'ur' },
-  { name: 'Persian', code: 'fa' },
+  { name: 'Urdu', code: 'ur', dir: 'rtl' },
+  { name: 'Persian', code: 'fa', dir: 'rtl' },
   { name: 'Swahili', code: 'sw' },
 ];
 
@@ -172,13 +172,22 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     const storageKey = userId ? `vixreel_lang_${userId}` : 'vixreel_lang';
     const savedLang = localStorage.getItem(storageKey) || 'en';
     setLanguageState(savedLang);
+    
+    // Set initial direction
+    const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === savedLang);
+    document.documentElement.dir = langConfig?.dir || 'ltr';
   }, [userId]);
 
   const setLanguage = React.useCallback((lang: string) => {
     setLanguageState(lang);
     const storageKey = userIdRef.current ? `vixreel_lang_${userIdRef.current}` : 'vixreel_lang';
     localStorage.setItem(storageKey, lang);
-    console.log(`VixReel Translation: Language set to ${lang} for user ${userIdRef.current || 'global'}`);
+    
+    // Update document direction
+    const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
+    document.documentElement.dir = langConfig?.dir || 'ltr';
+    
+    console.log(`VixReel Translation: Language set to ${lang} (${document.documentElement.dir}) for user ${userIdRef.current || 'global'}`);
   }, []);
 
   const t = React.useCallback((text: string): string => {
