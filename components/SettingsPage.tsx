@@ -106,6 +106,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           desc: t('Control push alerts and signal pings.') 
         },
         { 
+          id: 'language',
           icon: Globe, 
           label: t('Language'), 
           isSelect: true,
@@ -114,7 +115,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           onSelect: (val: string) => setLanguage(val),
           desc: isTranslating 
             ? `${t('Downloading language pack...')} ${translationProgress}%` 
-            : (isSynced ? t('Language pack synchronized.') : t('Initializing download...'))
+            : (isSynced ? t('Language pack synchronized.') : t('Select your preferred narrative language.'))
         },
         { 
           icon: theme === 'dark' ? Moon : Sun, 
@@ -255,20 +256,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                     </button>
                   ) : item.isSelect ? (
-                    <div className="flex flex-col items-end gap-2">
-                      <select 
-                        value={item.value} 
-                        onChange={(e) => item.onSelect?.(e.target.value)}
-                        className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none text-[var(--vix-text)]"
-                      >
-                        {item.options?.map((opt: any) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                      {item.label === t('Language') && isTranslating && (
-                        <div className="w-32 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="flex flex-col items-end gap-3">
+                      <div className="flex items-center gap-3">
+                        {item.id === 'language' && isTranslating && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
+                            <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                            <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{translationProgress}%</span>
+                          </div>
+                        )}
+                        <select 
+                          value={item.value} 
+                          onChange={(e) => item.onSelect?.(e.target.value)}
+                          className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none text-[var(--vix-text)] focus:border-blue-500/50 transition-colors"
+                        >
+                          {item.options?.map((opt: any) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {item.id === 'language' && isTranslating && (
+                        <div className="w-48 h-1.5 bg-zinc-800/50 rounded-full overflow-hidden border border-white/5">
                           <div 
-                            className="h-full bg-blue-500 transition-all duration-500" 
+                            className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
                             style={{ width: `${translationProgress}%` }}
                           />
                         </div>

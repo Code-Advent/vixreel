@@ -171,7 +171,7 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     
     console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
 
-    const chunkSize = 25;
+    const chunkSize = 15; // Smaller chunks for more progress steps
     const totalChunks = Math.ceil(texts.length / chunkSize);
     
     try {
@@ -195,7 +195,14 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
           model,
           contents: [{ parts: [{ text: prompt }] }],
           config: {
-            responseMimeType: "application/json"
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: chunk.reduce((acc: any, text) => {
+                acc[text] = { type: Type.STRING };
+                return acc;
+              }, {}),
+            }
           }
         });
 
@@ -214,6 +221,9 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
         });
 
         setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
+        
+        // Small delay to make progress visible and respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       console.log(`VixReel Translation Engine: Whole App Translation complete for ${targetLang}`);
