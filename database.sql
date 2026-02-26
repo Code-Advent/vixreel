@@ -234,6 +234,18 @@ CREATE TABLE IF NOT EXISTS public.group_post_reactions (
     UNIQUE(post_id, user_id, reaction)
 );
 
+-- 16d. NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL, -- Target user
+    actor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL, -- User who triggered the notification
+    type TEXT CHECK (type IN ('LIKE', 'COMMENT', 'FOLLOW', 'MENTION', 'REPOST', 'DUET', 'STITCH')) NOT NULL,
+    post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE,
+    content TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 17. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -254,6 +266,7 @@ ALTER TABLE public.group_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -355,6 +368,11 @@ CREATE POLICY "Users can insert own group post comments" ON public.group_post_co
 CREATE POLICY "Group post reactions are viewable by everyone" ON public.group_post_reactions FOR SELECT USING (true);
 CREATE POLICY "Users can insert own group post reactions" ON public.group_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own group post reactions" ON public.group_post_reactions FOR DELETE USING (auth.uid() = user_id);
+
+-- Notifications
+CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;

@@ -12,6 +12,7 @@ import VerificationBadge from './VerificationBadge';
 import Post from './Post';
 import { COUNTRIES_DATA } from '../constants';
 import { useTranslation } from '../lib/translation';
+import { createNotification } from '../lib/notifications';
 
 interface ProfileProps {
   user: UserProfile;
@@ -231,7 +232,10 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setIsFollowing(!wasFollowing);
     try {
       if (wasFollowing) await supabase.from('follows').delete().eq('follower_id', session.user.id).eq('following_id', user.id);
-      else await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
+      else {
+        await supabase.from('follows').insert({ follower_id: session.user.id, following_id: user.id });
+        await createNotification(user.id, session.user.id, 'FOLLOW');
+      }
       fetchUserContent();
     } catch (err) { setIsFollowing(wasFollowing); }
   };

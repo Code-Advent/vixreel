@@ -11,6 +11,7 @@ import { generateAIText, generateAIImage } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
 import { Post } from '../types';
 import { useTranslation } from '../lib/translation';
+import { createNotification } from '../lib/notifications';
 
 interface CreatePostProps {
   userId: string;
@@ -119,6 +120,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           original_post_id: duetSource.id,
           duet_post_id: newPost.id
         });
+        await createNotification(duetSource.user_id, userId, 'DUET', newPost.id);
       }
 
       if (stitchSource && newPost) {
@@ -127,6 +129,21 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           original_post_id: stitchSource.id,
           stitch_post_id: newPost.id
         });
+        await createNotification(stitchSource.user_id, userId, 'STITCH', newPost.id);
+      }
+
+      // Handle mentions in caption
+      if (newPost) {
+        const mentions = caption.match(/@\w+/g);
+        if (mentions) {
+          for (const mention of mentions) {
+            const username = mention.slice(1);
+            const { data: mentionedUser } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
+            if (mentionedUser) {
+              await createNotification(mentionedUser.id, userId, 'MENTION', newPost.id, caption);
+            }
+          }
+        }
       }
 
       onPostSuccess();

@@ -333,7 +333,22 @@ const AppContent: React.FC = () => {
             {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
             {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
-            {currentView === 'NOTIFICATIONS' && <Notifications currentUser={currentUser} onOpenAdmin={() => setCurrentView('ADMIN')} isAdminUnlocked={currentUser.is_admin} />}
+            {currentView === 'NOTIFICATIONS' && (
+              <Notifications 
+                currentUser={currentUser} 
+                onSelectUser={(u) => setView('PROFILE', u)}
+                onSelectPost={(postId) => {
+                  const post = posts.find(p => p.id === postId);
+                  if (post) setSelectedPost(post);
+                  else {
+                    // Fetch post if not in current feed
+                    supabase.from('posts').select('*, user:profiles(*)').eq('id', postId).single().then(({ data }) => {
+                      if (data) setSelectedPost(data as any);
+                    });
+                  }
+                }}
+              />
+            )}
             {currentView === 'SETTINGS' && (
               <SettingsPage 
                 user={currentUser} 

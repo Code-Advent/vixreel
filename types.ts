@@ -156,4 +156,17 @@ export interface AccountSession {
   session_data: any; 
 }
 
+export interface Notification {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: 'LIKE' | 'COMMENT' | 'FOLLOW' | 'MENTION' | 'REPOST' | 'DUET' | 'STITCH';
+  post_id?: string;
+  content?: string;
+  is_read: boolean;
+  created_at: string;
+  actor?: UserProfile;
+  post?: Post;
+}
+
 export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS';

@@ -12,6 +12,7 @@ import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import { useTranslation } from '../lib/translation';
+import { createNotification } from '../lib/notifications';
 
 interface PostProps {
   post: PostType;
@@ -137,7 +138,10 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
     setLikesOffset(prev => wasLiked ? prev - 1 : prev + 1);
     try {
       if (wasLiked) await supabase.from('likes').delete().match({ post_id: post.id, user_id: currentUserId });
-      else await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+      else {
+        await supabase.from('likes').insert({ post_id: post.id, user_id: currentUserId });
+        await createNotification(post.user_id, currentUserId, 'LIKE', post.id);
+      }
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
     } catch (err) {
       setLiked(wasLiked);
@@ -208,6 +212,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
           user_id: currentUserId,
           post_id: post.id
         });
+        await createNotification(post.user_id, currentUserId, 'REPOST', post.id);
       }
 
       setReposted(true);
@@ -445,7 +450,22 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               e.preventDefault();
               if (!newComment.trim()) return;
               setIsCommenting(true);
-              await supabase.from('comments').insert({ post_id: post.id, user_id: currentUserId, content: newComment });
+              const { error: commentErr } = await supabase.from('comments').insert({ post_id: post.id, user_id: currentUserId, content: newComment });
+              if (!commentErr) {
+                await createNotification(post.user_id, currentUserId, 'COMMENT', post.id, newComment);
+                
+                // Handle mentions in comment
+                const mentions = newComment.match(/@\w+/g);
+                if (mentions) {
+                  for (const mention of mentions) {
+                    const username = mention.slice(1);
+                    const { data: mentionedUser } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
+                    if (mentionedUser) {
+                      await createNotification(mentionedUser.id, currentUserId, 'MENTION', post.id, newComment);
+                    }
+                  }
+                }
+              }
               setNewComment('');
               fetchComments(); fetchCommentsCount();
               setIsCommenting(false);

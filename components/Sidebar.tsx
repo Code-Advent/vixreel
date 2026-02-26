@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ViewType, UserProfile } from '../types';
 import VerificationBadge from './VerificationBadge';
-import { ShieldAlert, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { ShieldAlert, LogOut, Settings as SettingsIcon, Bell } from 'lucide-react';
 import { useTranslation } from '../lib/translation';
+import { supabase } from '../lib/supabase';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -15,12 +16,45 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked }) => {
   const { t } = useTranslation();
+  const [unreadCount, setUnreadCount] = useState(0);
   const isActuallyAdmin = isAdminUnlocked || currentUser?.email === 'davidhen498@gmail.com';
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchUnreadCount = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id)
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnreadCount();
+
+    const channel = supabase
+      .channel('sidebar-notifications')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        fetchUnreadCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
   
   const navItems = [
     { id: 'FEED' as ViewType, label: t('Home'), icon: 'fa-solid fa-house' },
     { id: 'SEARCH' as ViewType, label: t('Search'), icon: 'fa-solid fa-magnifying-glass' },
     { id: 'EXPLORE' as ViewType, label: t('Explore'), icon: 'fa-solid fa-compass' },
+    { id: 'NOTIFICATIONS' as ViewType, label: t('Notifications'), icon: 'fa-solid fa-bell', badge: unreadCount },
     { id: 'CREATE' as ViewType, label: t('Create'), icon: 'fa-solid fa-square-plus' },
     { id: 'MESSAGES' as ViewType, label: t('Messages'), icon: 'fa-solid fa-paper-plane' },
     { id: 'GROUPS' as ViewType, label: t('Groups'), icon: 'fa-solid fa-users' },
@@ -53,8 +87,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
                   isActive ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-sm' : 'text-zinc-500 hover:bg-[var(--vix-secondary)] hover:text-[var(--vix-text)]'
                 }`}
               >
-                <div className={`w-6 h-6 flex items-center justify-center transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                <div className={`w-6 h-6 flex items-center justify-center transition-transform relative ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
                   <i className={`${item.icon} text-lg`}></i>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center border border-[var(--vix-bg)]">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
                 </div>
                 <span className={`ml-4 hidden lg:block font-bold text-sm ${isActive ? 'text-[var(--vix-text)]' : 'text-zinc-400'}`}>
                   {item.label}
@@ -110,9 +149,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <button
               key={item.id}
               onClick={() => setView(item.id)}
-              className={`p-3 transition-all ${isActive ? 'text-blue-500 scale-125' : 'text-zinc-400'}`}
+              className={`p-3 transition-all relative ${isActive ? 'text-blue-500 scale-125' : 'text-zinc-400'}`}
             >
               <i className={`${item.icon} text-xl`}></i>
+              {item.badge !== undefined && item.badge > 0 && (
+                <span className="absolute top-2 right-2 bg-red-500 text-white text-[8px] font-black px-1 min-w-[12px] h-[12px] rounded-full flex items-center justify-center border border-[var(--vix-bg)]">
+                  {item.badge > 9 ? '9+' : item.badge}
+                </span>
+              )}
             </button>
           );
         })}
