@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X, Image as ImageIcon, Smile, Heart } from 'lucide-react';
+import { Send, User, ChevronLeft, MessageCircle, Loader2, ArrowLeft, Search, Plus, X, Image as ImageIcon, Smile, Heart, MoreHorizontal } from 'lucide-react';
+import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message, MessageReaction } from '../types';
 import VerificationBadge from './VerificationBadge';
@@ -36,6 +37,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   
   // Reactions State
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
+  const [emojiPickerTarget, setEmojiPickerTarget] = useState<'MESSAGE' | 'REACTION'>('MESSAGE');
+  const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -231,6 +235,15 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
     }
   };
 
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    if (emojiPickerTarget === 'MESSAGE') {
+      setText(prev => prev + emojiData.emoji);
+    } else if (emojiPickerTarget === 'REACTION' && reactionMessageId) {
+      toggleReaction(reactionMessageId, emojiData.emoji);
+    }
+    setShowFullEmojiPicker(false);
+  };
+
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!text.trim() && !selectedFile) || !activeChat || isUploading) return;
@@ -409,7 +422,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
                         {/* Reaction Picker */}
                         {showReactionPicker === m.id && (
-                          <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-2 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
+                          <div className={`absolute ${isOwn ? '-left-64' : '-right-64'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-2 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
                             {REACTION_OPTIONS.map(emoji => (
                               <button 
                                 key={emoji}
@@ -419,6 +432,17 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                                 {emoji}
                               </button>
                             ))}
+                            <button 
+                              onClick={() => {
+                                setEmojiPickerTarget('REACTION');
+                                setReactionMessageId(m.id);
+                                setShowFullEmojiPicker(true);
+                                setShowReactionPicker(null);
+                              }}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-zinc-500"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
                           </div>
                         )}
 
@@ -466,6 +490,16 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 >
                   <ImageIcon className="w-5 h-5" />
                 </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setEmojiPickerTarget('MESSAGE');
+                    setShowFullEmojiPicker(!showFullEmojiPicker);
+                  }}
+                  className={`p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-lg active:scale-90 ${showFullEmojiPicker && emojiPickerTarget === 'MESSAGE' ? 'text-pink-500 border-pink-500/30' : 'text-zinc-500 hover:text-pink-500'}`}
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
                 <input 
                   ref={fileInputRef}
                   type="file" 
@@ -491,6 +525,27 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 </button>
               </div>
             </form>
+
+            {/* Global Emoji Picker Overlay */}
+            {showFullEmojiPicker && (
+              <div className="absolute bottom-32 right-8 z-[1000] animate-vix-in shadow-2xl rounded-3xl overflow-hidden border border-[var(--vix-border)]">
+                <div className="bg-[var(--vix-card)] p-2 flex justify-between items-center border-b border-[var(--vix-border)]">
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 text-zinc-500">
+                    {emojiPickerTarget === 'REACTION' ? t('Choose Reaction') : t('Choose Emoji')}
+                  </span>
+                  <button onClick={() => setShowFullEmojiPicker(false)} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+                    <X className="w-4 h-4 text-zinc-500" />
+                  </button>
+                </div>
+                <EmojiPicker 
+                  onEmojiClick={onEmojiClick}
+                  autoFocusSearch={false}
+                  theme={EmojiTheme.DARK}
+                  width={350}
+                  height={400}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center space-y-12 animate-vix-in p-12 max-w-sm">

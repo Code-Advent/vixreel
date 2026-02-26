@@ -19,7 +19,9 @@ import {
   MapPin,
   Users2,
   Loader2,
-  Globe
+  Globe,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { UserProfile, ViewType } from '../types';
 import { supabase } from '../lib/supabase';
@@ -55,6 +57,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showFollowersTo, setShowFollowersTo] = useState(user.show_followers_to || 'EVERYONE');
   const [saving, setSaving] = useState<string | null>(null);
   const [infoModal, setInfoModal] = useState<{title: string, content: string} | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const toggleSetting = async (key: keyof UserProfile, value: any) => {
     setSaving(key);
@@ -80,6 +84,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       if (!error) onUpdateProfile({ location });
     } finally {
       setTimeout(() => setSaving(null), 500);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      // 1. Delete profile (this makes them unsearchable)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+      
+      if (profileError) throw profileError;
+
+      // 2. Sign out
+      await supabase.auth.signOut();
+      
+      // 3. Clean up local storage for saved accounts
+      const saved = localStorage.getItem('vixreel_saved_accounts');
+      if (saved) {
+        const list = JSON.parse(saved);
+        const updated = list.filter((acc: any) => acc.id !== user.id);
+        localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
+      }
+
+      // 4. Trigger logout callback to reset app state
+      onLogout();
+    } catch (err) {
+      console.error("Identity Termination Failure:", err);
+      alert("Failed to terminate identity. Please contact core support.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -213,6 +250,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           desc: t('Terms, conditions, and privacy policy.') 
         },
       ]
+    },
+    {
+      title: t('Danger Zone'),
+      items: [
+        { 
+          icon: Trash2, 
+          label: t('Delete Account'), 
+          action: () => setShowDeleteConfirm(true), 
+          desc: t('Permanently remove your identity and all associated signals from the VixReel registry. This action is irreversible.') 
+        },
+      ]
     }
   ];
 
@@ -313,6 +361,38 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
            </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[10001] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-[var(--vix-card)] border border-red-500/20 rounded-[3rem] p-10 space-y-8 shadow-[0_0_50px_rgba(239,68,68,0.1)] animate-vix-in">
+             <div className="flex flex-col items-center text-center space-y-4">
+                <div className="w-20 h-20 bg-red-500/10 rounded-[2rem] flex items-center justify-center border border-red-500/20 mb-2">
+                   <AlertTriangle className="w-10 h-10 text-red-500" />
+                </div>
+                <h3 className="text-2xl font-black uppercase text-red-500 tracking-widest">{t('Terminate Identity')}</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">{t('Are you absolutely certain? This will permanently erase your creator profile and remove you from all search results.')}</p>
+             </div>
+             
+             <div className="flex flex-col gap-3">
+                <button 
+                  disabled={isDeleting}
+                  onClick={handleDeleteAccount}
+                  className="w-full py-5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Delete Account')}
+                </button>
+                <button 
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-5 bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all"
+                >
+                  {t('Cancel')}
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* Info Modal */}
       {infoModal && (
