@@ -15,7 +15,7 @@ interface TranslationContextType {
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
-const API_KEY = 'ta_0e7597611f2614afdc0567b8dcbe0535893fdcca3fd621bb075d7cae';
+const API_KEY = 'ta_bc0aaf5f206a55a3276b63f1d733bfa2c887e061c4c8c4a7fd457bac';
 const API_URL = 'https://api.translateapi.ai/api/v1/translate/';
 
 export const SUPPORTED_LANGUAGES = [
@@ -169,75 +169,88 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     setIsTranslating(true);
     setTranslationProgress(0);
     
-    console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang} using Gemini. Total strings: ${texts.length}`);
+    console.log(`VixReel Translation Engine: Initiating Whole App Translation for ${targetLang}. Total strings: ${texts.length}`);
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("VixReel Translation Error: GEMINI_API_KEY is not defined. Please set it in your environment variables.");
-      setIsTranslating(false);
-      setTranslationProgress(0);
-      activeBatches.current.delete(targetLang);
-      activeRequestsRef.current -= 1;
-      return;
-    }
-
-    const chunkSize = 15; // Smaller chunks for more progress steps
+    const chunkSize = 15;
     const totalChunks = Math.ceil(texts.length / chunkSize);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const model = "gemini-3-flash-preview";
+      // Try Gemini first if available
+      if (process.env.GEMINI_API_KEY) {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const model = "gemini-3-flash-preview";
 
-      for (let i = 0; i < texts.length; i += chunkSize) {
-        const chunk = texts.slice(i, i + chunkSize);
-        const chunkIndex = Math.floor(i / chunkSize) + 1;
-        
-        console.log(`VixReel Translation Engine: Translating chunk ${chunkIndex}/${totalChunks} for ${targetLang}`);
-
-        const prompt = `Translate the following array of English UI strings into ${targetLang}. 
-        Return the result as a JSON object where the keys are the original English strings and the values are the translations.
-        Maintain the tone and context of a premium social media app for creators.
-        
-        Strings to translate:
-        ${JSON.stringify(chunk)}`;
-
-        const response = await ai.models.generateContent({
-          model,
-          contents: [{ parts: [{ text: prompt }] }],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: chunk.reduce((acc: any, text) => {
-                acc[text] = { type: Type.STRING };
-                return acc;
-              }, {}),
-            }
-          }
-        });
-
-        const result = JSON.parse(response.text || '{}');
-        
-        // Update state and localStorage after each chunk
-        setTranslations(prev => {
-          const newTranslations = { ...prev };
-          newTranslations[targetLang] = { 
-            ...(newTranslations[targetLang] || {}),
-            ...result 
-          };
+        for (let i = 0; i < texts.length; i += chunkSize) {
+          const chunk = texts.slice(i, i + chunkSize);
+          const chunkIndex = Math.floor(i / chunkSize) + 1;
           
-          localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
-          return newTranslations;
-        });
+          const prompt = `Translate the following array of English UI strings into ${targetLang}. 
+          Return the result as a JSON object where the keys are the original English strings and the values are the translations.
+          Maintain the tone and context of a premium social media app for creators.
+          
+          Strings to translate:
+          ${JSON.stringify(chunk)}`;
 
-        setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
-        
-        // Small delay to make progress visible and respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 300));
+          const response = await ai.models.generateContent({
+            model,
+            contents: [{ parts: [{ text: prompt }] }],
+            config: { responseMimeType: "application/json" }
+          });
+
+          const result = JSON.parse(response.text || '{}');
+          
+          setTranslations(prev => {
+            const newTranslations = { ...prev };
+            newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...result };
+            localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+            return newTranslations;
+          });
+
+          setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      } else {
+        // Use translateapi.ai as primary if Gemini is missing
+        console.log("Gemini API Key missing, using dedicated Translation API...");
+        for (let i = 0; i < texts.length; i += chunkSize) {
+          const chunk = texts.slice(i, i + chunkSize);
+          const chunkIndex = Math.floor(i / chunkSize) + 1;
+          
+          const chunkResults = await Promise.all(chunk.map(async (text) => {
+            try {
+              const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                  'Authorization': API_KEY,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text, target_language: targetLang })
+              });
+              const data = await response.json();
+              return { original: text, translated: data.translated_text || data.result || text };
+            } catch (e) {
+              return { original: text, translated: text };
+            }
+          }));
+
+          setTranslations(prev => {
+            const newTranslations = { ...prev };
+            newTranslations[targetLang] = { 
+              ...(newTranslations[targetLang] || {}), 
+              ...chunkResults.reduce((acc: any, res) => { acc[res.original] = res.translated; return acc; }, {}) 
+            };
+            localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+            return newTranslations;
+          });
+
+          setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
       console.log(`VixReel Translation Engine: Whole App Translation complete for ${targetLang}`);
     } catch (err) {
-      console.error("VixReel Gemini Translation Error:", err);
+      console.error("VixReel Translation Error:", err);
     } finally {
       activeBatches.current.delete(targetLang);
       activeRequestsRef.current -= 1;
