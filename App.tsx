@@ -150,14 +150,26 @@ const AppContent: React.FC = () => {
     setLoading(true);
     setIsAccountMenuOpen(false);
     try {
-      const { error } = await supabase.auth.setSession({
+      // Use setSession to restore the session from saved tokens
+      const { data, error } = await supabase.auth.setSession({
         access_token: account.session_data.access_token,
         refresh_token: account.session_data.refresh_token
       });
-      if (error) throw error;
+      
+      if (error) {
+        // If tokens are invalid/expired, try to refresh explicitly
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession({
+          refresh_token: account.session_data.refresh_token
+        });
+        if (refreshError) throw refreshError;
+      }
+      
       await init();
     } catch (err) {
-      removeAccount(account.id);
+      console.error("Switch Account Error:", err);
+      // Don't immediately remove the account, just go to auth screen
+      setCurrentUser(null);
+      setIsAddingAccount(false); // Show picker
     } finally {
       setLoading(false);
     }
@@ -174,7 +186,9 @@ const AppContent: React.FC = () => {
 
   const handleLogout = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
+    // Use 'local' scope to clear browser session without revoking tokens on server
+    // This allows the "Saved Accounts" feature to work reliably without "Session Expired"
+    await supabase.auth.signOut({ scope: 'local' });
     setCurrentUser(null);
     setIsAccountMenuOpen(false);
     setLoading(false);

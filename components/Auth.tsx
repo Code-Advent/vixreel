@@ -85,12 +85,19 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
     setLoading(true);
     setError(null);
     try {
-      const { error: sessionErr } = await supabase.auth.setSession({
+      // Attempt to set session with existing tokens
+      const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
         access_token: account.session_data.access_token,
         refresh_token: account.session_data.refresh_token
       });
       
-      if (sessionErr) throw sessionErr;
+      if (sessionErr) {
+        // If setSession fails, try an explicit refresh
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession({
+          refresh_token: account.session_data.refresh_token
+        });
+        if (refreshError) throw refreshError;
+      }
 
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error("Narrative session expired.");
@@ -99,11 +106,11 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
       if (profile) onAuthSuccess(profile as any);
       else throw new Error("Identity profile mismatch.");
     } catch (err: any) {
-      setError("Session expired. Please log in manually.");
-      const updated = savedAccounts.filter(acc => acc.id !== account.id);
-      setSavedAccounts(updated);
-      localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
+      console.error("Auth Switch Error:", err);
+      setError(t("Session expired. Please log in manually."));
+      // We don't remove the account automatically anymore to give user a chance to re-login
       setMode('LOGIN');
+      if (account.session_data.user?.email) setEmail(account.session_data.user.email);
     } finally {
       setLoading(false);
     }
