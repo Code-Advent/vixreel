@@ -63,41 +63,42 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 
   return (
     <>
-      <div className="fixed left-0 top-0 h-screen w-16 lg:w-64 border-r border-[var(--vix-border)] bg-[var(--vix-bg)] hidden sm:flex flex-col p-6 z-50 transition-colors duration-300">
-        <div className="mb-10 px-2">
+      <div className="sticky top-0 h-screen w-20 lg:w-64 border-r border-[var(--vix-border)] bg-[var(--vix-bg)] hidden sm:flex flex-col py-8 px-4 z-50 transition-all duration-300 shrink-0">
+        <div className="mb-10 px-4">
           <h1 
-            className="logo-font text-3xl vix-text-gradient hidden lg:block cursor-pointer"
+            className="logo-font text-3xl vix-text-gradient hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => setView('FEED')}
           >
             VixReel
           </h1>
-          <div className="lg:hidden w-8 h-8 vix-gradient rounded-xl flex items-center justify-center">
-            <span className="logo-font text-xl text-white">V</span>
+          <div className="lg:hidden w-12 h-12 vix-gradient rounded-2xl flex items-center justify-center shadow-lg shadow-pink-500/20 mx-auto">
+            <span className="logo-font text-2xl text-white">V</span>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                className={`w-full flex items-center p-3 rounded-2xl transition-all group ${
-                  isActive ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)] shadow-sm' : 'text-zinc-500 hover:bg-[var(--vix-secondary)] hover:text-[var(--vix-text)]'
+                className={`w-full flex items-center justify-center lg:justify-start p-3 lg:p-4 rounded-2xl transition-all group relative ${
+                  isActive ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'
                 }`}
               >
-                <div className={`w-6 h-6 flex items-center justify-center transition-transform relative ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-                  <i className={`${item.icon} text-lg`}></i>
+                <div className={`w-6 h-6 flex items-center justify-center transition-all duration-300 ${isActive ? 'scale-110 text-pink-500' : 'group-hover:scale-110 group-hover:text-pink-400'}`}>
+                  <i className={`${item.icon} text-xl`}></i>
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center border border-[var(--vix-bg)]">
+                    <span className="absolute -top-1 -right-1 lg:-top-2 lg:-right-2 bg-pink-500 text-white text-[8px] font-black px-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center border-2 border-[var(--vix-bg)] shadow-lg">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
                 </div>
-                <span className={`ml-4 hidden lg:block font-bold text-sm ${isActive ? 'text-[var(--vix-text)]' : 'text-zinc-400'}`}>
+                <span className={`ml-4 hidden lg:block font-bold text-sm tracking-tight ${isActive ? 'text-[var(--vix-text)]' : 'text-zinc-500'}`}>
                   {item.label}
                 </span>
+                {isActive && <div className="absolute right-0 w-1 h-5 vix-gradient rounded-l-full hidden lg:block" />}
               </button>
             );
           })}
@@ -117,43 +118,49 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
           )}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-[var(--vix-border)] space-y-4">
+        <div className="mt-auto pt-6 border-t border-[var(--vix-border)] space-y-2">
+          <button 
+            onClick={() => setView('SETTINGS')}
+            className={`w-full flex items-center justify-center lg:justify-start p-3 lg:p-4 rounded-2xl transition-all group ${currentView === 'SETTINGS' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'}`}
+          >
+            <div className={`w-6 h-6 flex items-center justify-center transition-all ${currentView === 'SETTINGS' ? 'text-pink-500 scale-110' : 'group-hover:text-pink-400'}`}>
+              <SettingsIcon className="w-5 h-5" />
+            </div>
+            <span className={`ml-4 hidden lg:block font-bold text-sm tracking-tight ${currentView === 'SETTINGS' ? 'text-[var(--vix-text)]' : 'text-zinc-500'}`}>{t('Settings')}</span>
+          </button>
+
           {currentUser && (
-            <div className="hidden lg:flex items-center gap-3 p-3 rounded-2xl bg-[var(--vix-card)] border border-[var(--vix-border)] cursor-pointer hover:bg-[var(--vix-secondary)] transition-colors" onClick={() => setView('PROFILE')}>
-               <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover" />
-               <div className="flex flex-col min-w-0">
+            <div className="flex items-center justify-center lg:justify-start gap-3 p-3 lg:p-4 rounded-2xl cursor-pointer hover:bg-[var(--vix-secondary)]/40 transition-all group" onClick={() => setView('PROFILE')}>
+               <div className="relative shrink-0">
+                 <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover border border-[var(--vix-border)] group-hover:border-pink-500 transition-all" />
+                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[var(--vix-bg)]" />
+               </div>
+               <div className="hidden lg:flex flex-col min-w-0">
                  <span className="font-bold text-xs truncate flex items-center gap-1 text-[var(--vix-text)]">
                    @{currentUser.username}
                    {currentUser.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                  </span>
-                 <span className="text-[8px] text-zinc-600 font-bold uppercase">{currentUser.is_admin ? t('Admin') : t('Member')}</span>
+                 <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{currentUser.is_admin ? t('Admin') : t('Member')}</span>
                </div>
             </div>
           )}
-          <button 
-            onClick={() => setView('SETTINGS')}
-            className={`w-full flex items-center p-3 rounded-2xl transition-all group ${currentView === 'SETTINGS' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)] hover:text-[var(--vix-text)]'}`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center">
-              <SettingsIcon className="w-5 h-5" />
-            </div>
-            <span className="ml-4 hidden lg:block font-bold text-sm">{t('Settings')}</span>
-          </button>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-[var(--vix-bg)] border-t border-[var(--vix-border)] sm:hidden flex items-center justify-around z-50 transition-colors duration-300">
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-[var(--vix-bg)]/80 backdrop-blur-xl border-t border-[var(--vix-border)] sm:hidden flex items-center justify-around px-4 z-50 transition-all duration-300">
         {navItems.map((item) => {
           const isActive = currentView === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setView(item.id)}
-              className={`p-3 transition-all relative ${isActive ? 'text-pink-500 scale-125' : 'text-zinc-400'}`}
+              className={`p-2 transition-all relative flex flex-col items-center ${isActive ? 'text-pink-500' : 'text-zinc-500'}`}
             >
-              <i className={`${item.icon} text-xl`}></i>
+              <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`}>
+                <i className={`${item.icon} text-xl`}></i>
+              </div>
               {item.badge !== undefined && item.badge > 0 && (
-                <span className="absolute top-2 right-2 bg-red-500 text-white text-[8px] font-black px-1 min-w-[12px] h-[12px] rounded-full flex items-center justify-center border border-[var(--vix-bg)]">
+                <span className="absolute top-1 right-1 bg-pink-500 text-white text-[8px] font-black px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center border border-[var(--vix-bg)] shadow-lg">
                   {item.badge > 9 ? '9+' : item.badge}
                 </span>
               )}
