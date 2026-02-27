@@ -102,7 +102,7 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
           <label className="cursor-pointer">
             <div className={`w-16 h-16 rounded-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] flex items-center justify-center relative group-hover:border-zinc-700 transition-all ${isUploading ? 'animate-pulse' : ''}`}>
               {isUploading ? (
-                <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
+                <Loader2 className="w-6 h-6 animate-spin vix-loader" />
               ) : (
                 <>
                   <div className="absolute bottom-0 right-0 bg-[#0095f6] rounded-full p-1 border-2 border-[var(--vix-bg)] z-10 shadow-lg">

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, MessageCircle, Download, Bookmark, Trash2, X, 
   Volume2, VolumeX, Loader2, MessageSquareOff, Lock, 
-  Repeat2, Columns2, Scissors, MapPin, Smile
+  Repeat2, Columns2, Scissors, MapPin, Smile, Sticker as StickerIcon
 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -13,10 +13,12 @@ import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
+import StickerPicker from './StickerPicker';
+import EmojiPicker from './EmojiPicker';
 
 interface PostProps {
   post: PostType;
-  currentUserId: string;
+  currentUser: UserProfile;
   onDelete?: (id: string) => void;
   onUpdate?: () => void;
   onSelectUser?: (user: UserProfile) => void;
@@ -25,8 +27,9 @@ interface PostProps {
   onExpand?: (post: PostType) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
+const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
   const { t, language } = useTranslation();
+  const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -47,6 +50,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
   const [isVisible, setIsVisible] = useState(false);
   const [translatedCaption, setTranslatedCaption] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -250,13 +255,13 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
       if (part.startsWith('@')) {
         const username = part.slice(1);
         return (
-          <button
+            <button
             key={i}
             onClick={async () => {
               const { data } = await supabase.from('profiles').select('*').eq('username', username).maybeSingle();
               if (data && onSelectUser) onSelectUser(data as UserProfile);
             }}
-            className="text-blue-500 hover:underline font-bold"
+            className="text-pink-500 hover:underline font-bold"
           >
             {part}
           </button>
@@ -276,8 +281,8 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
       )}
       {post.duet_from_id && (
         <div className="flex items-center gap-2 mb-2 px-1">
-          <Columns2 className="w-3 h-3 text-blue-500" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">{t('Duet')}</span>
+          <Columns2 className="w-3 h-3 text-pink-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-pink-500">{t('Duet')}</span>
         </div>
       )}
       {post.stitch_from_id && (
@@ -312,7 +317,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
         </div>
         {post.user.id === currentUserId && (
           <button onClick={handleDelete} className="text-zinc-500 hover:text-red-500 transition-colors p-2">
-            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : <Trash2 className="w-4 h-4" />}
           </button>
         )}
       </div>
@@ -382,12 +387,12 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               disabled={isReposting || reposted} 
               className={`${reposted ? 'text-green-500' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all flex items-center gap-1.5`}
             >
-              {isReposting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Repeat2 className={`w-7 h-7 ${reposted ? 'stroke-[3px]' : ''}`} />}
+              {isReposting ? <Loader2 className="w-6 h-6 animate-spin vix-loader" /> : <Repeat2 className={`w-7 h-7 ${reposted ? 'stroke-[3px]' : ''}`} />}
               <span className="text-xs font-bold">{formatNumber(repostsCount)}</span>
             </button>
             {post.media_type === 'video' && !post.duet_from_id && !post.stitch_from_id && (
               <>
-                <button onClick={() => onDuet?.(post)} className="text-zinc-500 hover:text-blue-500 transition-all">
+                <button onClick={() => onDuet?.(post)} className="text-zinc-500 hover:text-pink-500 transition-all">
                   <Columns2 className="w-7 h-7" />
                 </button>
                 <button onClick={() => onStitch?.(post)} className="text-zinc-500 hover:text-purple-500 transition-all">
@@ -412,7 +417,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               {post.caption && language !== 'en' && (
                 <button 
                   onClick={handleTranslate}
-                  className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors w-fit"
+                  className="text-[9px] font-black uppercase tracking-widest text-pink-500 hover:text-blue-400 transition-colors w-fit"
                 >
                   {isTranslating ? t('Translating...') : (translatedCaption ? t('Original') : t('See Translation'))}
                 </button>
@@ -437,7 +442,14 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
                     <p className="font-bold text-xs text-[var(--vix-text)] flex items-center gap-1">
                       @{c.user.username} {c.user.is_verified && <VerificationBadge size="w-3 h-3" />}
                     </p>
-                    <p className="text-zinc-500 text-sm leading-relaxed">{c.content}</p>
+                    <div className="text-zinc-500 text-sm leading-relaxed">
+                      {c.sticker_url && (
+                        <div className="w-24 h-24 mb-2">
+                          <img src={c.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
+                        </div>
+                      )}
+                      {renderCaption(c.content)}
+                    </div>
                   </div>
                 </div>
               )) : (
@@ -448,7 +460,7 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();
-              if (!newComment.trim()) return;
+              if (!newComment.trim() && !showStickerPicker) return;
               setIsCommenting(true);
               const { error: commentErr } = await supabase.from('comments').insert({ post_id: post.id, user_id: currentUserId, content: newComment });
               if (!commentErr) {
@@ -469,9 +481,36 @@ const Post: React.FC<PostProps> = ({ post, currentUserId, onDelete, onUpdate, on
               setNewComment('');
               fetchComments(); fetchCommentsCount();
               setIsCommenting(false);
-            }} className="p-6 border-t border-[var(--vix-border)] flex gap-4">
-              <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={t('Add a comment...')} className="flex-1 bg-[var(--vix-secondary)] rounded-xl px-6 py-3 text-sm outline-none border border-[var(--vix-border)] text-[var(--vix-text)]" />
-              <button disabled={isCommenting} className="font-bold text-xs text-pink-500 uppercase tracking-widest">{t('Post')}</button>
+            }} className="p-6 border-t border-[var(--vix-border)] flex flex-col gap-4 relative">
+              {showEmojiPicker && (
+                <EmojiPicker 
+                  onSelect={(emoji) => {
+                    setNewComment(prev => prev + emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  onClose={() => setShowEmojiPicker(false)}
+                />
+              )}
+              {showStickerPicker && (
+                <StickerPicker 
+                  currentUser={currentUser} 
+                  onSelect={async (url) => {
+                    setIsCommenting(true);
+                    await supabase.from('comments').insert({ post_id: post.id, user_id: currentUserId, content: '', sticker_url: url });
+                    await createNotification(post.user_id, currentUserId, 'COMMENT', post.id, 'Sent a sticker');
+                    fetchComments(); fetchCommentsCount();
+                    setIsCommenting(false);
+                    setShowStickerPicker(false);
+                  }}
+                  onClose={() => setShowStickerPicker(false)}
+                />
+              )}
+              <div className="flex gap-4 items-center">
+                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-zinc-500 hover:text-pink-500"><Smile className="w-5 h-5" /></button>
+                <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className="text-zinc-500 hover:text-pink-500"><StickerIcon className="w-5 h-5" /></button>
+                <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={t('Add a comment...')} className="flex-1 bg-[var(--vix-secondary)] rounded-xl px-6 py-3 text-sm outline-none border border-[var(--vix-border)] text-[var(--vix-text)]" />
+                <button disabled={isCommenting} className="font-bold text-xs text-pink-500 uppercase tracking-widest">{t('Post')}</button>
+              </div>
             </form>
           </div>
         </div>

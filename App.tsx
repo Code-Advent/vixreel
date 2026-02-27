@@ -200,7 +200,12 @@ const AppContent: React.FC = () => {
       .select('*, user:profiles(*)')
       .gte('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: false });
-    if (data) setPosts(data as any);
+    
+    if (data) {
+      // Shuffle the posts to provide a fresh experience each time
+      const shuffled = [...data].sort(() => Math.random() - 0.5);
+      setPosts(shuffled as any);
+    }
   };
 
   const setView = (view: ViewType, explicitUser?: UserProfile) => {
@@ -268,7 +273,7 @@ const AppContent: React.FC = () => {
                       <Post 
                         key={p.id} 
                         post={p} 
-                        currentUserId={currentUser.id} 
+                        currentUser={currentUser} 
                         onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
                         onUpdate={fetchPosts} 
                         onSelectUser={(u) => setView('PROFILE', u)}
@@ -389,21 +394,21 @@ const AppContent: React.FC = () => {
                         </div>
                         <div className="flex flex-col">
                           <p className="font-bold text-sm text-[var(--vix-text)]">@{acc.username}</p>
-                          {acc.id === currentUser.id && <span className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">{t('Active')}</span>}
+                          {acc.id === currentUser.id && <span className="text-[9px] text-pink-500 font-black uppercase tracking-widest mt-0.5 animate-pulse">{t('Active')}</span>}
                         </div>
                      </div>
                      {acc.id !== currentUser.id ? (
                        <button onClick={(e) => { e.stopPropagation(); removeAccount(acc.id); }} className="p-3 text-zinc-700 hover:text-red-500 transition-all">
                          <Trash2 className="w-4 h-4" />
                        </button>
-                     ) : <CheckCircle className="w-4 h-4 text-blue-500" />}
+                     ) : <CheckCircle className="w-4 h-4 text-pink-500" />}
                   </div>
                 ))}
                 <button 
                   onClick={() => { setIsAccountMenuOpen(false); setIsAddingAccount(true); }}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all group border border-dashed border-[var(--vix-border)] hover:border-blue-500/30"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all group border border-dashed border-[var(--vix-border)] hover:border-pink-500/30"
                 >
-                  <div className="w-12 h-12 rounded-full bg-[var(--vix-secondary)] flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:bg-blue-500/5 transition-all">
+                  <div className="w-12 h-12 rounded-full bg-[var(--vix-secondary)] flex items-center justify-center text-zinc-600 group-hover:text-pink-500 group-hover:bg-pink-500/5 transition-all">
                     <Plus className="w-6 h-6" />
                   </div>
                   <span className="font-bold text-sm text-zinc-500 group-hover:text-[var(--vix-text)]">{t('Add Account')}</span>
@@ -419,7 +424,7 @@ const AppContent: React.FC = () => {
         {selectedPost && (
           <PostDetail 
             post={selectedPost} 
-            currentUserId={currentUser.id} 
+            currentUser={currentUser} 
             onClose={() => setSelectedPost(null)} 
             onSelectUser={(u) => {
               setSelectedPost(null);

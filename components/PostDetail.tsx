@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Heart, MessageCircle, Download, Bookmark, 
   Repeat2, Columns2, Scissors, Volume2, VolumeX, 
-  Loader2, MapPin, Smile, MoreHorizontal, ChevronLeft, ChevronRight
+  Loader2, MapPin, Smile, MoreHorizontal, ChevronLeft, ChevronRight,
+  Sticker as StickerIcon
 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -11,17 +12,35 @@ import { formatNumber } from '../lib/utils';
 import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import StickerPicker from './StickerPicker';
+import EmojiPicker from './EmojiPicker';
+import { createNotification } from '../lib/notifications';
 
 interface PostDetailProps {
   post: PostType;
-  currentUserId: string;
+  currentUser: UserProfile;
   onClose: () => void;
   onSelectUser: (user: UserProfile) => void;
 }
 
-const CommentItem: React.FC<{ comment: CommentType, language: string, t: any }> = ({ comment, language, t }) => {
+const CommentItem: React.FC<{ comment: CommentType, language: string, t: any, onSelectUser: any }> = ({ comment, language, t, onSelectUser }) => {
   const [translated, setTranslated] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+
+  const renderContent = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(@\w+|#\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1);
+        return <button key={i} onClick={(e) => { e.stopPropagation(); onSelectUser({ username } as any); }} className="text-pink-500 font-bold hover:underline">{part}</button>;
+      }
+      if (part.startsWith('#')) {
+        return <span key={i} className="text-blue-400 font-bold">{part}</span>;
+      }
+      return part;
+    });
+  };
 
   const handleTranslate = async () => {
     if (translated) {
@@ -46,10 +65,17 @@ const CommentItem: React.FC<{ comment: CommentType, language: string, t: any }> 
         src={comment.user.avatar_url || `https://ui-avatars.com/api/?name=${comment.user.username}`} 
         className="w-8 h-8 rounded-full object-cover" 
       />
-      <div className="space-y-1">
+      <div className="space-y-1 flex-1">
         <p className="text-sm">
           <span className="font-bold mr-2 text-[var(--vix-text)]">@{comment.user.username}</span>
-          <span className="text-zinc-400 leading-relaxed">{translated || comment.content}</span>
+          <span className="text-zinc-400 leading-relaxed">
+            {comment.sticker_url && (
+              <div className="w-24 h-24 mb-2">
+                <img src={comment.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
+              </div>
+            )}
+            {renderContent(translated || comment.content)}
+          </span>
         </p>
         <div className="flex items-center gap-4">
           <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
@@ -58,7 +84,7 @@ const CommentItem: React.FC<{ comment: CommentType, language: string, t: any }> 
           {language !== 'en' && (
             <button 
               onClick={handleTranslate}
-              className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+              className="text-[10px] font-black uppercase tracking-widest text-pink-500 hover:text-blue-400 transition-colors"
             >
               {isTranslating ? t('Translating...') : (translated ? t('Original') : t('See Translation'))}
             </button>
@@ -69,8 +95,9 @@ const CommentItem: React.FC<{ comment: CommentType, language: string, t: any }> 
   );
 };
 
-const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, onSelectUser }) => {
+const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onSelectUser }) => {
   const { t, language } = useTranslation();
+  const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -84,7 +111,24 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
   const [showLikeAnim, setShowLikeAnim] = useState(false);
   const [translatedCaption, setTranslatedCaption] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const renderCaption = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(@\w+|#\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1);
+        return <button key={i} onClick={(e) => { e.stopPropagation(); onSelectUser({ username } as any); }} className="text-pink-500 font-bold hover:underline">{part}</button>;
+      }
+      if (part.startsWith('#')) {
+        return <span key={i} className="text-blue-400 font-bold">{part}</span>;
+      }
+      return part;
+    });
+  };
 
   useEffect(() => {
     checkStatus();
@@ -260,10 +304,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
                 className="w-8 h-8 rounded-full object-cover" 
               />
               <div className="space-y-1">
-                <p className="text-sm">
+                <div className="text-sm">
                   <span className="font-bold mr-2 text-[var(--vix-text)]">@{post.user.username}</span>
-                  <span className="text-zinc-400 leading-relaxed">{translatedCaption || post.caption}</span>
-                </p>
+                  <span className="text-zinc-400 leading-relaxed">{renderCaption(translatedCaption || post.caption)}</span>
+                </div>
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">
                     {new Date(post.created_at).toLocaleDateString()}
@@ -271,7 +315,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
                   {post.caption && language !== 'en' && (
                     <button 
                       onClick={handleTranslate}
-                      className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+                      className="text-[10px] font-black uppercase tracking-widest text-pink-500 hover:text-blue-400 transition-colors"
                     >
                       {isTranslating ? t('Translating...') : (translatedCaption ? t('Original') : t('See Translation'))}
                     </button>
@@ -282,7 +326,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
 
             {/* Real Comments */}
             {comments.map(c => (
-              <CommentItem key={c.id} comment={c} language={language} t={t} />
+              <CommentItem key={c.id} comment={c} language={language} t={t} onSelectUser={onSelectUser} />
             ))}
           </div>
 
@@ -310,19 +354,54 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUserId, onClose, o
               <p className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">{t('Signal Broadcasted')} {new Date(post.created_at).toLocaleTimeString()}</p>
             </div>
 
-            <form onSubmit={handleComment} className="flex gap-4 pt-4 border-t border-white/5">
-              <input 
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder={t('Add a comment...')}
-                className="flex-1 bg-transparent text-sm outline-none text-[var(--vix-text)] placeholder:text-zinc-700"
-              />
-              <button 
-                disabled={!newComment.trim() || isCommenting}
-                className="text-xs font-black uppercase tracking-widest text-pink-500 disabled:opacity-20 transition-opacity"
-              >
-                {isCommenting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Post')}
-              </button>
+            <form onSubmit={handleComment} className="flex flex-col gap-4 pt-4 border-t border-white/5 relative">
+              {showEmojiPicker && (
+                <EmojiPicker 
+                  onSelect={(emoji) => {
+                    setNewComment(prev => prev + emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  onClose={() => setShowEmojiPicker(false)}
+                />
+              )}
+              {showStickerPicker && (
+                <StickerPicker 
+                  currentUser={currentUser}
+                  onSelect={async (url) => {
+                    setIsCommenting(true);
+                    const { data, error } = await supabase.from('comments').insert({
+                      post_id: post.id,
+                      user_id: currentUserId,
+                      content: '',
+                      sticker_url: url
+                    }).select('*, user:profiles(*)').single();
+                    if (!error && data) {
+                      setComments(prev => [...prev, data as any]);
+                      setCommentsCount(prev => prev + 1);
+                      await createNotification(post.user_id, currentUserId, 'COMMENT', post.id, 'Sent a sticker');
+                    }
+                    setIsCommenting(false);
+                    setShowStickerPicker(false);
+                  }}
+                  onClose={() => setShowStickerPicker(false)}
+                />
+              )}
+              <div className="flex gap-4 items-center">
+                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-zinc-500 hover:text-pink-500"><Smile className="w-5 h-5" /></button>
+                <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className="text-zinc-500 hover:text-pink-500"><StickerIcon className="w-5 h-5" /></button>
+                <input 
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  placeholder={t('Add a comment...')}
+                  className="flex-1 bg-transparent text-sm outline-none text-[var(--vix-text)] placeholder:text-zinc-700"
+                />
+                <button 
+                  disabled={(!newComment.trim() && !showStickerPicker) || isCommenting}
+                  className="text-xs font-black uppercase tracking-widest text-pink-500 disabled:opacity-20 transition-opacity"
+                >
+                  {isCommenting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Post')}
+                </button>
+              </div>
             </form>
           </div>
         </div>

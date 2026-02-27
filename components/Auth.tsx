@@ -427,8 +427,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
         )}
       </div>
 
-      <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
-        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+      <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+        {loading ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : (
           <>{mode === 'LOGIN' ? t('Access Void') : t('Begin Narrative')} <ArrowRight className="w-4 h-4" /></>
         )}
       </button>
@@ -478,7 +478,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                       />
                     </div>
                     <button type="submit" disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Search className="w-4 h-4" /> {t('Locate Account')}</>}
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : <><Search className="w-4 h-4" /> {t('Locate Account')}</>}
                     </button>
                   </form>
                 </div>
@@ -506,7 +506,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                   </div>
                   <div className="space-y-4">
                     <button onClick={() => handleSendRecoveryCode()} disabled={loading} className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3">
-                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Key className="w-4 h-4" /> {t('Send Access Code')}</>}
+                       {loading ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : <><Key className="w-4 h-4" /> {t('Send Access Code')}</>}
                     </button>
                     <button onClick={() => setStep('DETAILS')} className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest hover:text-[var(--vix-text)] transition-all">{t('Not your account?')}</button>
                   </div>
@@ -533,16 +533,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                     />
                   </div>
                   <div className="space-y-4">
-                    <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl active:scale-95 transition-all">
-                      {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : t('Enter Void')}
+                    <button onClick={handleVerifySignal} disabled={loading || otpCode.length < 6} className="w-full vix-gradient py-6 rounded-[2rem] text-white font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl shadow-pink-500/20 active:scale-95 transition-all">
+                      {loading ? <Loader2 className="w-6 h-6 animate-spin vix-loader mx-auto" /> : t('Enter Void')}
                     </button>
                     <div className="flex items-center justify-center gap-6">
                       <button 
                         onClick={() => handleSendRecoveryCode(true)} 
                         disabled={resending}
-                        className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors flex items-center gap-2"
+                        className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-pink-500 transition-colors flex items-center gap-2"
                       >
-                        {resending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        {resending ? <Loader2 className="w-3 h-3 animate-spin vix-loader" /> : <RefreshCw className="w-3 h-3" />}
                         {t('Resend Code')}
                       </button>
                       <button onClick={() => { setStep('DETAILS'); setError(null); setSuccessMsg(null); }} className="text-[10px] text-zinc-700 font-bold uppercase tracking-[0.3em] hover:text-[var(--vix-text)] transition-colors">{t('Change Method')}</button>
@@ -647,7 +647,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                   </div>
 
                   <button type="submit" disabled={loading} className="w-full vix-gradient py-6 rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[12px] shadow-2xl shadow-pink-500/20">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : t('Activate Protocol')}
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin vix-loader mx-auto" /> : t('Activate Protocol')}
                   </button>
                 </form>
               )}

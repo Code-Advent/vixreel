@@ -53,6 +53,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
   const [location, setLocation] = useState(user.location || '');
+  const [website, setWebsite] = useState(user.website || '');
   const [isLocationPrivate, setIsLocationPrivate] = useState(user.is_location_private || false);
   const [showFollowersTo, setShowFollowersTo] = useState(user.show_followers_to || 'EVERYONE');
   const [saving, setSaving] = useState<string | null>(null);
@@ -82,6 +83,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     try {
       const { error } = await supabase.from('profiles').update({ location }).eq('id', user.id);
       if (!error) onUpdateProfile({ location });
+    } finally {
+      setTimeout(() => setSaving(null), 500);
+    }
+  };
+
+  const updateWebsite = async () => {
+    setSaving('website');
+    try {
+      const { error } = await supabase.from('profiles').update({ website }).eq('id', user.id);
+      if (!error) onUpdateProfile({ website });
     } finally {
       setTimeout(() => setSaving(null), 500);
     }
@@ -225,6 +236,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           onChange: (val: string) => setLocation(val),
           onBlur: updateLocation,
           desc: t('Broadcast your current sector.')
+        },
+        {
+          icon: Globe,
+          label: t('Website Link'),
+          isInput: true,
+          value: website,
+          onChange: (val: string) => setWebsite(val),
+          onBlur: updateWebsite,
+          desc: t('External narrative link.')
         }
       ]
     },
@@ -283,7 +303,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   onClick={!item.isToggle ? item.action : undefined}
                 >
                   <div className="flex items-center gap-5">
-                    <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-500 group-hover:text-blue-500 transition-colors">
+                    <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-500 group-hover:text-pink-500 transition-colors">
                       <item.icon className="w-5 h-5" />
                     </div>
                     <div className="flex flex-col">
@@ -295,11 +315,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   {item.isToggle ? (
                     <button 
                       onClick={(e) => { e.stopPropagation(); item.onToggle?.(); }}
-                      className={`w-14 h-8 rounded-full p-1 transition-all flex items-center relative ${item.active ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-800'}`}
+                      className={`w-14 h-8 rounded-full p-1 transition-all flex items-center relative ${item.active ? 'vix-gradient' : 'bg-zinc-300 dark:bg-zinc-800'}`}
                     >
                       <div className={`w-6 h-6 bg-white rounded-full shadow-lg transition-transform ${item.active ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
                         {saving === (item.label.toLowerCase().replace(' ', '_')) ? (
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></div>
+                          <div className="w-2 h-2 rounded-full bg-pink-600 animate-ping"></div>
                         ) : null}
                       </div>
                     </button>
@@ -307,9 +327,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <div className="flex flex-col items-end gap-3">
                       <div className="flex items-center gap-3">
                         {item.id === 'language' && isTranslating && (
-                          <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
-                            <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                            <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{translationProgress}%</span>
+                          <div className="flex items-center gap-2 px-3 py-1 bg-pink-500/10 rounded-full border border-pink-500/20">
+                            <Loader2 className="w-3 h-3 animate-spin vix-loader" />
+                            <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">{translationProgress}%</span>
                           </div>
                         )}
                         <select 
@@ -339,12 +359,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         onChange={(e) => item.onChange?.(e.target.value)}
                         onBlur={item.onBlur}
                         className="bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-xs font-bold outline-none text-[var(--vix-text)] w-40"
-                        placeholder="Location..."
+                        placeholder={item.label === t('Website Link') ? "https://..." : "Location..."}
                       />
-                      {saving === 'location' && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-blue-500" />}
+                      {saving === (item.label === t('Website Link') ? 'website' : 'location') && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin vix-loader" />}
                     </div>
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-zinc-800 group-hover:text-blue-500 transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-zinc-800 group-hover:text-pink-500 transition-colors" />
                   )}
                 </div>
               ))}
@@ -380,7 +400,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   onClick={handleDeleteAccount}
                   className="w-full py-5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
                 >
-                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Delete Account')}
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Delete Account')}
                 </button>
                 <button 
                   disabled={isDeleting}

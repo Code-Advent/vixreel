@@ -93,7 +93,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
   if (loading) {
     return (
       <div className="flex items-center justify-center py-40">
-        <Loader2 className="w-10 h-10 animate-spin text-zinc-800" />
+        <Loader2 className="w-10 h-10 animate-spin vix-loader" />
       </div>
     );
   }
@@ -108,7 +108,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
               await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id);
               setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             }}
-            className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+            className="text-[9px] font-black uppercase tracking-widest text-pink-500 hover:text-blue-400 transition-colors"
           >
             {t('Mark all as read')}
           </button>
@@ -124,7 +124,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
               className={`flex items-center gap-4 p-4 rounded-[2rem] border transition-all group cursor-pointer ${
                 n.is_read 
                   ? 'bg-[var(--vix-card)] border-[var(--vix-border)] opacity-60' 
-                  : 'bg-[var(--vix-secondary)] border-blue-500/20 shadow-lg shadow-blue-500/5'
+                  : 'bg-[var(--vix-secondary)] border-pink-500/20 shadow-lg shadow-pink-500/5'
               }`}
             >
               <div className="relative" onClick={(e) => { e.stopPropagation(); if (n.actor) onSelectUser?.(n.actor); }}>

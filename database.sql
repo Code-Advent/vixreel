@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     location TEXT,
     date_of_birth DATE,
     is_location_private BOOLEAN DEFAULT FALSE,
+    website TEXT,
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS location TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_location_private BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME'));
 
 -- 3. LOCATIONS TABLE
@@ -246,6 +248,18 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 16e. STICKERS TABLE
+CREATE TABLE IF NOT EXISTS public.stickers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    url TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add sticker_url to messages and comments
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sticker_url TEXT;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
+
 -- 17. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -267,6 +281,7 @@ ALTER TABLE public.group_post_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stickers ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -389,11 +404,17 @@ CREATE POLICY "Users can view own notifications" ON public.notifications FOR SEL
 CREATE POLICY "Users can update own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+-- Stickers
+CREATE POLICY "Stickers are viewable by everyone" ON public.stickers FOR SELECT USING (true);
+CREATE POLICY "Users can insert own stickers" ON public.stickers FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own stickers" ON public.stickers FOR DELETE USING (auth.uid() = user_id);
+
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('messages', 'messages', true) ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public) VALUES ('stickers', 'stickers', true) ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- 21. CLEANUP OLD STORAGE POLICIES
 DO $$ 
@@ -422,3 +443,7 @@ CREATE POLICY "Owner Delete from Stories" ON storage.objects FOR DELETE USING (b
 CREATE POLICY "Public Access to Messages" ON storage.objects FOR SELECT USING (bucket_id = 'messages');
 CREATE POLICY "Authenticated Upload to Messages" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'messages' AND auth.role() = 'authenticated');
 CREATE POLICY "Owner Delete from Messages" ON storage.objects FOR DELETE USING (bucket_id = 'messages' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Public Access to Stickers" ON storage.objects FOR SELECT USING (bucket_id = 'stickers');
+CREATE POLICY "Authenticated Upload to Stickers" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'stickers' AND auth.role() = 'authenticated');
+CREATE POLICY "Owner Delete from Stickers" ON storage.objects FOR DELETE USING (bucket_id = 'stickers' AND auth.uid()::text = (storage.foldername(name))[1]);

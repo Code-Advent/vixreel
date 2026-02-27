@@ -163,7 +163,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           {duetSource ? t('New Duet') : stitchSource ? t('New Stitch') : t('New Post')}
         </span>
         <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
-          {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Share')}
+          {isPosting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Share')}
         </button>
       </div>
 
@@ -171,9 +171,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
         {/* Upload Area */}
         <div className="flex-1 bg-[var(--vix-card)] flex flex-col items-center justify-center rounded-[3rem] border border-[var(--vix-border)] min-h-[400px] relative p-8 shadow-2xl">
           {duetSource && (
-            <div className="absolute top-6 left-6 flex items-center gap-2 bg-blue-500/10 px-4 py-2 rounded-full border border-blue-500/20 z-10">
-              <Columns2 className="w-3 h-3 text-blue-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{t('Duet with')} @{duetSource.user.username}</span>
+            <div className="absolute top-6 left-6 flex items-center gap-2 bg-pink-500/10 px-4 py-2 rounded-full border border-pink-500/20 z-10">
+              <Columns2 className="w-3 h-3 text-pink-500" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-pink-500">{t('Duet with')} @{duetSource.user.username}</span>
             </div>
           )}
           {stitchSource && (
@@ -241,7 +241,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
               className="w-full py-5 border border-[var(--vix-border)] rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:bg-[var(--vix-secondary)] hover:text-[var(--vix-text)] transition-all group"
             >
               {isGeneratingCaption ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin vix-loader" />
               ) : (
                 <><Wand2 className="w-4 h-4 group-hover:text-pink-500" /> {t('AI Caption Helper')}</>
               )}
@@ -312,7 +312,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
           <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl group cursor-pointer hover:border-pink-500/30 transition-all" onClick={handleGenerateAIImage}>
              <div className="flex items-center gap-4">
                 <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl group-hover:bg-pink-500/10 transition-colors">
-                  {isGeneratingImage ? <Loader2 className="w-4 h-4 text-pink-500 animate-spin" /> : <Sparkles className="w-4 h-4 text-pink-500" />}
+                  {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : <Sparkles className="w-4 h-4 text-pink-500" />}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black text-[var(--vix-text)] uppercase tracking-widest">{t('AI Image Generator')}</span>

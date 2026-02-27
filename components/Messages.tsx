@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, Image as ImageIcon, Smile, MoreVertical, Trash2 } from 'lucide-react';
+import { Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, Image as ImageIcon, Smile, MoreVertical, Trash2, Sticker as StickerIcon } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message, MessageReaction } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 import { sanitizeFilename } from '../lib/utils';
+import StickerPicker from './StickerPicker';
 
 interface MessagesProps {
   currentUser: UserProfile;
@@ -38,10 +39,11 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   
   // UI State
   const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const REACTION_OPTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
@@ -98,6 +100,22 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       console.error("Message fetch error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendSticker = async (url: string) => {
+    if (!activeChat) return;
+    setShowStickerPicker(false);
+    try {
+      const { data, error } = await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: activeChat.id,
+        sticker_url: url
+      }).select().single();
+      if (error) throw error;
+      setMessages(prev => [...prev, data]);
+    } catch (err) {
+      console.error("Sticker send error:", err);
     }
   };
 
@@ -270,7 +288,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             {/* Messages List */}
             <div className="flex-1 p-6 overflow-y-auto space-y-6 no-scrollbar" dir="ltr">
               {loading && messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-zinc-800" /></div>
+                <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin vix-loader" /></div>
               ) : (
                 messages.map((m, i) => {
                   const isOwn = m.sender_id === currentUser.id;
@@ -278,12 +296,17 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
                       <div 
                         dir="auto"
-                        className={`group relative max-w-[80%] p-4 px-6 rounded-[2rem] text-[13px] font-medium shadow-xl transition-all ${
+                        className={`group relative max-w-[80%] p-4 px-6 rounded-[2rem] text-[13px] font-medium shadow-xl transition-all whitespace-pre-wrap break-words ${
                         isOwn ? 'vix-gradient text-white rounded-tr-none' : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]'
                       }`}>
                         {m.media_url && (
                           <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
                             {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-60" /> : <img src={m.media_url} className="max-h-60" />}
+                          </div>
+                        )}
+                        {m.sticker_url && (
+                          <div className="mb-2 w-32 h-32">
+                            <img src={m.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
                           </div>
                         )}
                         {m.content}
@@ -324,7 +347,25 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
 
             {/* Input Area */}
-            <form onSubmit={sendMessage} className="p-6 bg-[var(--vix-secondary)]/10 border-t border-[var(--vix-border)] flex flex-col gap-4">
+            <form onSubmit={sendMessage} className="p-6 bg-[var(--vix-secondary)]/10 border-t border-[var(--vix-border)] flex flex-col gap-4 relative">
+              {showFullEmojiPicker && (
+                <div className="absolute bottom-full left-6 mb-4 z-50">
+                  <EmojiPicker 
+                    onEmojiClick={(emojiData) => {
+                      setText(prev => prev + emojiData.emoji);
+                      setShowFullEmojiPicker(false);
+                    }}
+                    theme={EmojiTheme.DARK}
+                  />
+                </div>
+              )}
+              {showStickerPicker && (
+                <StickerPicker 
+                  currentUser={currentUser}
+                  onSelect={sendSticker}
+                  onClose={() => setShowStickerPicker(false)}
+                />
+              )}
               {mediaPreview && (
                 <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--vix-border)] shadow-lg animate-vix-in">
                   <button type="button" onClick={() => { setSelectedFile(null); setMediaPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full"><X className="w-3 h-3" /></button>
@@ -332,23 +373,34 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 </div>
               )}
               
-              <div className="flex gap-3">
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-md"><ImageIcon className="w-5 h-5" /></button>
+              <div className="flex gap-3 items-end">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-md"><ImageIcon className="w-5 h-5" /></button>
+                  <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className={`p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-md ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}><StickerIcon className="w-5 h-5" /></button>
+                  <button type="button" onClick={() => setShowFullEmojiPicker(!showFullEmojiPicker)} className={`p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-md ${showFullEmojiPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}><Smile className="w-5 h-5" /></button>
+                </div>
                 <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
                 
                 <div className="flex-1 relative">
-                  <input 
+                  <textarea 
                     ref={messageInputRef}
                     value={text} 
                     onChange={e => setText(e.target.value)} 
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
                     placeholder={t('Type your message...')}
                     dir="auto"
-                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full px-6 py-4 text-sm focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner" 
+                    rows={1}
+                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2rem] px-6 py-4 text-sm focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner resize-none max-h-32 no-scrollbar" 
                   />
                 </div>
                 
                 <button type="submit" disabled={(!text.trim() && !selectedFile) || isUploading} className="vix-gradient p-4 rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center">
-                  {isUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white" />}
+                  {isUploading ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : <Send className="w-5 h-5 text-white" />}
                 </button>
               </div>
             </form>
@@ -387,7 +439,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
             <div className="space-y-2 max-h-[50vh] overflow-y-auto no-scrollbar">
               {isSearching ? (
-                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-pink-500" /></div>
+                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin vix-loader" /></div>
               ) : searchResults.map(u => (
                 <div 
                   key={u.id}

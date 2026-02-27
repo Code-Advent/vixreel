@@ -78,7 +78,7 @@ const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-6">
             <div className="w-16 h-16 rounded-[1.5rem] bg-[var(--vix-secondary)] flex items-center justify-center animate-pulse border border-[var(--vix-border)]">
-               <Loader2 className="w-8 h-8 text-pink-500 animate-spin" />
+               <Loader2 className="w-8 h-8 animate-spin vix-loader" />
             </div>
             <span className="text-[11px] font-black uppercase tracking-[0.5em] text-zinc-700 animate-pulse">{t('Searching...')}</span>
           </div>

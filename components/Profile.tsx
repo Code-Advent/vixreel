@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Grid, Heart, Camera, Settings, User as UserIcon, Loader2, X,
   ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2,
-  MessageSquare, UserCheck, Image as ImageIcon, MapPin
+  MessageSquare, UserCheck, Image as ImageIcon, MapPin, Plus, Play, Pause
 } from 'lucide-react';
-import { UserProfile, Post as PostType, Group } from '../types';
+import { UserProfile, Post as PostType, Group, Story } from '../types';
 import { supabase } from '../lib/supabase';
 import { sanitizeFilename, formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -32,6 +32,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
   const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES' | 'GROUPS'>('POSTS');
   const [counts, setCounts] = useState({ followers: 0, following: 0, likes: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
@@ -50,12 +51,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
   const [editDob, setEditDob] = useState(user.date_of_birth || '');
+  const [editWebsite, setEditWebsite] = useState(user.website || '');
   const [editCountry, setEditCountry] = useState('');
   const [editState, setEditState] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingStory, setIsUploadingStory] = useState(false);
+  const [showStoryViewer, setShowStoryViewer] = useState(false);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const storyInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user.location) {
@@ -156,6 +162,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setUserGroups(groupsWithCounts);
       }
 
+      // Fetch active stories
+      const now = new Date().toISOString();
+      const { data: sData } = await supabase
+        .from('stories')
+        .select('*, user:profiles(*)')
+        .eq('user_id', user.id)
+        .gt('expires_at', now)
+        .order('created_at', { ascending: true });
+      
+      if (sData) setStories(sData as any);
+
       // CORRECTED: Count followers (people following this user)
       const { count: fCount } = await supabase
         .from('follows')
@@ -247,6 +264,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     setEditAvatarUrl(user.avatar_url);
     setEditCoverUrl(user.cover_url);
     setEditDob(user.date_of_birth || '');
+    setEditWebsite(user.website || '');
     if (user.location) {
       const parts = user.location.split(', ');
       if (parts.length === 2) {
@@ -282,21 +300,19 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       let finalCoverUrl = editCoverUrl;
 
       // Helper for uploading
-      const uploadMedia = async (file: File, type: 'avatar' | 'cover') => {
+      const uploadMedia = async (file: File, type: 'avatar' | 'cover' | 'story') => {
         // Validation
-        if (file.size > 10 * 1024 * 1024) {
-          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} file is too large (max 10MB).`);
+        if (file.size > 20 * 1024 * 1024) {
+          throw new Error(`${type === 'avatar' ? 'Avatar' : type === 'cover' ? 'Cover' : 'Story'} file is too large (max 20MB).`);
         }
-        if (!file.type.startsWith('image/')) {
-          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} must be an image.`);
-        }
-
+        
+        const bucket = type === 'story' ? 'stories' : 'avatars';
         const ext = file.name.split('.').pop() || 'png';
         const safeName = sanitizeFilename(file.name);
         const path = `${activeUid}/${type}-${Date.now()}-${safeName}`;
         
         const { error: uploadErr } = await supabase.storage
-          .from('avatars')
+          .from(bucket)
           .upload(path, file, { 
             upsert: true,
             contentType: file.type
@@ -304,11 +320,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         
         if (uploadErr) {
           console.error(`${type} Upload Fail:`, uploadErr);
-          throw new Error(`${type === 'avatar' ? 'Avatar' : 'Cover'} Sync: ${uploadErr.message}`);
+          throw new Error(`${type} Sync: ${uploadErr.message}`);
         }
         
         const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
+          .from(bucket)
           .getPublicUrl(path);
           
         return publicUrl;
@@ -330,6 +346,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           avatar_url: finalAvatarUrl,
           cover_url: finalCoverUrl,
           date_of_birth: editDob || null,
+          website: editWebsite.trim() || null,
           location: editCountry ? (editState ? `${editState}, ${editCountry}` : editCountry) : null,
           updated_at: new Date().toISOString()
         })
@@ -343,6 +360,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         avatar_url: finalAvatarUrl, 
         cover_url: finalCoverUrl,
         date_of_birth: editDob || null,
+        website: editWebsite.trim() || null,
         location: editCountry ? (editState ? `${editState}, ${editCountry}` : editCountry) : null
       });
       
@@ -369,8 +387,120 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
     }
   };
 
+  const handleStoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingStory(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Not authenticated");
+
+      const activeUid = authUser.id;
+      const bucket = 'stories';
+      const safeName = sanitizeFilename(file.name);
+      const path = `${activeUid}/story-${Date.now()}-${safeName}`;
+      
+      const { error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .upload(path, file, { contentType: file.type });
+      
+      if (uploadErr) throw uploadErr;
+      
+      const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+      
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      
+      const { error: dbErr } = await supabase
+        .from('stories')
+        .insert({
+          user_id: activeUid,
+          media_url: publicUrl,
+          media_type: file.type.startsWith('video/') ? 'video' : 'image',
+          expires_at: expiresAt
+        });
+
+      if (dbErr) throw dbErr;
+
+      fetchUserContent();
+      alert(t('Story uploaded successfully!'));
+    } catch (err: any) {
+      alert(t('Failed to upload story: ') + err.message);
+    } finally {
+      setIsUploadingStory(false);
+    }
+  };
+
+  const renderStoryViewer = () => {
+    if (!showStoryViewer || stories.length === 0) return null;
+    const currentStory = stories[currentStoryIndex];
+
+    return (
+      <div className="fixed inset-0 z-[20000] bg-black flex flex-col items-center justify-center p-4">
+        <div className="absolute top-6 left-0 right-0 px-6 flex gap-1 z-50">
+          {stories.map((_, i) => (
+            <div key={i} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className={`h-full bg-white transition-all duration-[5000ms] ease-linear ${i < currentStoryIndex ? 'w-full' : i === currentStoryIndex ? 'w-full' : 'w-0'}`}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="absolute top-12 left-6 flex items-center gap-3 z-50">
+          <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-10 h-10 rounded-full border border-white/20" />
+          <span className="text-white font-bold text-sm">@{user.username}</span>
+          <span className="text-white/60 text-xs">{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+
+        <button 
+          onClick={() => setShowStoryViewer(false)}
+          className="absolute top-12 right-6 p-2 text-white/80 hover:text-white z-50"
+        >
+          <X className="w-8 h-8" />
+        </button>
+
+        <div className="relative w-full max-w-lg aspect-[9/16] bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl">
+          {currentStory.media_type === 'video' ? (
+            <video 
+              src={currentStory.media_url} 
+              autoPlay 
+              className="w-full h-full object-cover"
+              onEnded={() => {
+                if (currentStoryIndex < stories.length - 1) {
+                  setCurrentStoryIndex(prev => prev + 1);
+                } else {
+                  setShowStoryViewer(false);
+                }
+              }}
+            />
+          ) : (
+            <img src={currentStory.media_url} className="w-full h-full object-cover" />
+          )}
+
+          <div className="absolute inset-0 flex">
+            <div 
+              className="w-1/2 h-full cursor-pointer" 
+              onClick={() => {
+                if (currentStoryIndex > 0) setCurrentStoryIndex(prev => prev - 1);
+              }}
+            />
+            <div 
+              className="w-1/2 h-full cursor-pointer" 
+              onClick={() => {
+                if (currentStoryIndex < stories.length - 1) setCurrentStoryIndex(prev => prev + 1);
+                else setShowStoryViewer(false);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-[935px] mx-auto animate-vix-in pb-32">
+      {renderStoryViewer()}
       <div className="relative h-48 sm:h-64 w-full bg-[var(--vix-secondary)] group">
         {user.cover_url ? (
           <img src={user.cover_url} className="w-full h-full object-cover" />
@@ -383,9 +513,35 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         
         <div className="absolute -bottom-12 left-6 sm:left-12 flex items-end gap-6 sm:gap-8">
            <div className="relative">
-              <div className="w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden">
-                <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-secondary)]" />
+              <div 
+                onClick={() => stories.length > 0 && setShowStoryViewer(true)}
+                className={`w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden cursor-pointer relative group/avatar ${stories.length > 0 ? 'ring-pink-500 ring-offset-2 ring-offset-[var(--vix-bg)]' : ''}`}
+              >
+                <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-secondary)] group-hover/avatar:scale-110 transition-transform duration-500" />
+                {stories.length > 0 && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                    <Play className="w-8 h-8 text-white fill-white" />
+                  </div>
+                )}
               </div>
+              {isOwnProfile && (
+                <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2">
+                  <button 
+                    onClick={() => storyInputRef.current?.click()}
+                    disabled={isUploadingStory}
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-110 active:scale-90 transition-all border-4 border-[var(--vix-bg)]"
+                  >
+                    {isUploadingStory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  </button>
+                  <input 
+                    ref={storyInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*"
+                    onChange={handleStoryUpload}
+                  />
+                </div>
+              )}
            </div>
            <div className="pb-4 hidden sm:block">
               <h2 className="text-2xl font-black text-white flex items-center gap-1.5 drop-shadow-md">
@@ -410,6 +566,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                 {user.location}
               </div>
             )}
+            {user.website && (
+              <a 
+                href={user.website.startsWith('http') ? user.website : `https://${user.website}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-center sm:justify-start gap-1 text-[10px] font-black uppercase tracking-widest text-pink-500 hover:text-blue-500 transition-colors hover:underline"
+              >
+                <Globe className="w-3 h-3" />
+                {user.website.replace(/^https?:\/\//, '')}
+              </a>
+            )}
             <p className="text-zinc-500 text-sm whitespace-pre-wrap leading-relaxed">{user.bio || 'Initial bio signal pending...'}</p>
           </div>
           
@@ -418,7 +585,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               onClick={() => handleOpenSocial('FOLLOWERS')} 
               className={`flex flex-col items-center cursor-pointer group ${(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? 'opacity-30' : ''}`}
             >
-              <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-blue-500 transition-colors">
+              <span className="font-black text-[var(--vix-text)] text-lg group-hover:text-pink-500 transition-colors">
                 {(!isOwnProfile && (user.show_followers_to === 'ONLY_ME' || (user.show_followers_to === 'FOLLOWERS' && !isFollowing) || (user.is_private && !isFollowing))) ? <Lock className="w-3 h-3" /> : formatNumber(counts.followers)}
               </span>
               <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{t('Followers')}</span>
@@ -531,14 +698,14 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
               <button onClick={() => setIsSocialModalOpen(false)}><X className="w-6 h-6 text-zinc-700 hover:text-[var(--vix-text)]" /></button>
             </div>
             <div className="p-4 space-y-2 overflow-y-auto max-h-[60vh] no-scrollbar">
-              {socialLoading ? <Loader2 className="w-8 h-8 text-zinc-800 animate-spin mx-auto my-12" /> : socialUsers.map(u => (
+              {socialLoading ? <Loader2 className="w-8 h-8 vix-loader animate-spin mx-auto my-12" /> : socialUsers.map(u => (
                 <div key={u.id} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-[var(--vix-secondary)]/50 transition-colors cursor-pointer group" onClick={() => { setIsSocialModalOpen(false); if (u.id !== user.id) onMessageUser?.(u); }}>
                   <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)]" />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[var(--vix-text)] flex items-center gap-1.5 truncate">@{u.username} {u.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}</p>
                     <p className="text-[9px] text-zinc-600 font-black uppercase truncate tracking-tighter">{u.full_name || t('Individual Creator')}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-800 group-hover:text-blue-500" />
+                  <ChevronRight className="w-4 h-4 text-zinc-800 group-hover:text-pink-500" />
                 </div>
               ))}
             </div>
@@ -636,8 +803,20 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                   </div>
 
                   <textarea value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full h-32 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-blue-500/50 transition-all" placeholder={t('Narrative bio...')} />
-                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-3">
-                    {isSavingProfile ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('Transmitting...')}</> : t('Synchronize Identity')}
+                  
+                  <div className="space-y-2 text-left">
+                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Website Link')}</label>
+                    <input 
+                      type="text" 
+                      value={editWebsite} 
+                      onChange={e => setEditWebsite(e.target.value)} 
+                      placeholder="https://..."
+                      className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl px-6 py-4 text-sm text-[var(--vix-text)] outline-none focus:border-blue-500/50 transition-all" 
+                    />
+                  </div>
+
+                  <button onClick={saveProfileChanges} disabled={isSavingProfile} className="w-full vix-gradient py-5 rounded-[2rem] font-black text-white text-[11px] uppercase tracking-widest disabled:opacity-50 shadow-2xl shadow-pink-500/20 active:scale-95 transition-all flex items-center justify-center gap-3">
+                    {isSavingProfile ? <><Loader2 className="w-5 h-5 vix-loader animate-spin" /> {t('Transmitting...')}</> : t('Synchronize Identity')}
                   </button>
                </div>
             </div>

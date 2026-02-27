@@ -18,6 +18,7 @@ export interface UserProfile {
   boosted_followers?: number; 
   location?: string;
   is_location_private?: boolean;
+  website?: string;
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
   created_at?: string;
   updated_at?: string;
@@ -51,6 +52,7 @@ export interface Post {
 export interface Comment {
   id: string;
   content: string;
+  sticker_url?: string;
   created_at: string;
   user: UserProfile;
 }
@@ -137,6 +139,7 @@ export interface Message {
   content: string | null;
   media_url?: string;
   media_type?: 'image' | 'video';
+  sticker_url?: string;
   created_at: string;
   reactions?: MessageReaction[];
 }
@@ -154,6 +157,13 @@ export interface AccountSession {
   username: string;
   avatar_url?: string;
   session_data: any; 
+}
+
+export interface Sticker {
+  id: string;
+  user_id: string;
+  url: string;
+  created_at: string;
 }
 
 export interface Notification {

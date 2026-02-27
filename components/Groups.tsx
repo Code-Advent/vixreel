@@ -379,7 +379,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             <ArrowLeft className="w-5 h-5 text-[var(--vix-text)]" />
           </button>
           <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
-            {view === 'LIST' ? t('Communities') : view === 'CREATE' ? t('New Group') : selectedGroup?.name}
+            {view === 'LIST' ? t('Channels') : view === 'CREATE' ? t('Create Channel') : selectedGroup?.name}
           </h2>
         </div>
         {view === 'LIST' && (
@@ -391,73 +391,56 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         {view === 'LIST' && (
-          <div className="p-6 space-y-8">
-            <div className="relative group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
-              <input 
-                type="text" 
-                placeholder={t('Search communities...')}
-                className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] py-5 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold shadow-xl"
-              />
+          <div className="flex flex-col">
+            <div className="p-6">
+              <div className="relative group">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder={t('Find channels...')}
+                  className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] py-4 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold shadow-xl"
+                />
+              </div>
             </div>
 
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
+                <Loader2 className="w-8 h-8 animate-spin vix-loader" />
               </div>
             ) : groups.length === 0 ? (
               <div className="text-center py-20 space-y-4">
                 <Users className="w-16 h-16 text-zinc-800 mx-auto opacity-20" />
-                <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No communities found')}</p>
+                <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No channels found')}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+              <div className="divide-y divide-[var(--vix-border)]/30">
                 {groups.map(group => (
                   <div 
                     key={group.id} 
                     onClick={() => selectGroup(group)}
-                    className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] overflow-hidden shadow-2xl hover:border-pink-500/30 transition-all cursor-pointer group relative flex flex-col h-full"
+                    className="flex items-center gap-4 p-6 hover:bg-[var(--vix-secondary)]/30 transition-all cursor-pointer group relative"
                   >
-                    <div className="h-48 relative overflow-hidden">
-                      <img src={group.cover_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={group.name} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      <div className="absolute top-4 right-4 flex gap-2">
-                        <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-                          {group.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white" /> : <Globe className="w-3 h-3 text-white" />}
-                          <span className="text-[8px] text-white font-black uppercase tracking-widest">{t(group.privacy)}</span>
+                    <div className="relative">
+                      <img src={group.cover_url} className="w-14 h-14 rounded-2xl object-cover border border-[var(--vix-border)] shadow-md" alt={group.name} />
+                      {group.is_verified && (
+                        <div className="absolute -bottom-1 -right-1 bg-[var(--vix-bg)] rounded-full p-0.5">
+                          <VerificationBadge size="w-4 h-4" />
                         </div>
-                        {group.only_admin_can_post && (
-                          <div className="bg-purple-500/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-                            <Shield className="w-3 h-3 text-white" />
-                            <span className="text-[8px] text-white font-black uppercase tracking-widest">{t('Admin Only')}</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    <div className="p-8 flex-1 flex flex-col justify-between space-y-6">
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors leading-tight flex items-center gap-2">
-                          {group.name} {group.is_verified && <VerificationBadge size="w-4 h-4" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="font-black text-sm text-[var(--vix-text)] truncate flex items-center gap-1.5">
+                          {group.name}
                         </h3>
-                        <p className="text-xs text-zinc-500 line-clamp-3 leading-relaxed font-medium">{group.description}</p>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">
+                          {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Followers')}
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between pt-6 border-t border-[var(--vix-border)]">
-                        <div className="flex items-center gap-3">
-                          <div className="flex -space-x-2">
-                            {[1,2,3].map(i => (
-                              <div key={i} className="w-6 h-6 rounded-full border-2 border-[var(--vix-card)] bg-[var(--vix-secondary)] overflow-hidden">
-                                <img src={`https://picsum.photos/seed/${group.id}${i}/50/50`} className="w-full h-full object-cover" />
-                              </div>
-                            ))}
-                          </div>
-                          <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest">
-                            {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Members')}
-                          </span>
-                        </div>
-                        <div className="w-10 h-10 rounded-2xl bg-[var(--vix-secondary)] flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition-all shadow-lg">
-                          <ChevronLeft className="w-4 h-4 rotate-180" />
-                        </div>
-                      </div>
+                      <p className="text-[11px] text-zinc-500 truncate font-medium">{group.description}</p>
+                    </div>
+                    <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronLeft className="w-4 h-4 rotate-180 text-zinc-400" />
                     </div>
                   </div>
                 ))}
@@ -560,266 +543,242 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             <button 
               type="submit" 
               disabled={isCreating}
-              className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3"
+              className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 flex items-center justify-center gap-3"
             >
-              {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : t('Establish Community')}
+              {isCreating ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : t('Establish Community')}
             </button>
           </form>
         )}
 
         {view === 'DETAILS' && selectedGroup && (
-          <div className="animate-vix-in">
-            {/* Group Header */}
-            <div className="h-48 relative">
-              <img src={selectedGroup.cover_url} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
-                <div className="space-y-1">
-                  <h3 className="text-2xl font-black text-white flex items-center gap-2">
-                    {selectedGroup.name}
-                    {selectedGroup.is_verified && <VerificationBadge size="w-5 h-5" />}
+          <div className="flex flex-col h-full animate-vix-in">
+            {/* Channel Info Bar */}
+            <div className="p-4 bg-[var(--vix-secondary)]/20 border-b border-[var(--vix-border)] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-xl object-cover border border-[var(--vix-border)]" />
+                <div>
+                  <h3 className="text-sm font-black text-[var(--vix-text)] flex items-center gap-1.5">
+                    {selectedGroup.name} {selectedGroup.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                   </h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3 h-3 text-white/70" />
-                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">
-                        {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('Members')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {selectedGroup.privacy === 'PRIVATE' ? <Lock className="w-3 h-3 text-white/70" /> : <Globe className="w-3 h-3 text-white/70" />}
-                      <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">{t(selectedGroup.privacy)}</span>
-                    </div>
-                  </div>
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">
+                    {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('Followers')}
+                  </p>
                 </div>
-                <div className="flex gap-3">
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => copyGroupLink(selectedGroup.id)}
+                  className="p-2 text-zinc-500 hover:text-pink-500 transition-all"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                </button>
+                {isMember ? (
                   <button 
-                    onClick={() => copyGroupLink(selectedGroup.id)}
-                    className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-white hover:bg-white/20 transition-all"
-                    title={t('Copy Link')}
+                    onClick={leaveGroup}
+                    disabled={isLeaving}
+                    className="px-4 py-2 rounded-full border border-[var(--vix-border)] text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-all"
                   >
-                    <LinkIcon className="w-5 h-5" />
+                    {isLeaving ? <Loader2 className="w-3 h-3 animate-spin vix-loader" /> : t('Following')}
                   </button>
-                  {isMember ? (
-                    <button 
-                      onClick={leaveGroup}
-                      disabled={isLeaving}
-                      className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
-                    >
-                      {isLeaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Joined')}
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={joinGroup}
-                      className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all"
-                    >
-                      {t('Join')}
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button 
+                    onClick={joinGroup}
+                    className="vix-gradient px-6 py-2 rounded-full text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all"
+                  >
+                    {t('Follow')}
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="p-6 space-y-8">
-              {/* Post Composer */}
-              {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
-                <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 shadow-xl space-y-4">
-                  <div className="flex gap-4">
-                    <img src={currentUser.avatar_url} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--vix-border)]" />
-                    <textarea 
-                      value={postContent}
-                      onChange={e => setPostContent(e.target.value)}
-                      placeholder={`${t('Share something with')} ${selectedGroup.name}...`}
-                      className="flex-1 bg-transparent border-none outline-none text-sm text-[var(--vix-text)] resize-none py-2 min-h-[80px]"
-                    />
-                  </div>
-                  
-                  {postPreview && (
-                    <div className="relative rounded-2xl overflow-hidden border border-[var(--vix-border)]">
-                      <button 
-                        onClick={() => { setPostFile(null); setPostPreview(null); }}
-                        className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 transition-all z-10"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                      {postFile?.type.startsWith('video') ? (
-                        <video src={postPreview} className="w-full max-h-60 object-cover" />
-                      ) : (
-                        <img src={postPreview} className="w-full max-h-60 object-cover" />
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-4 border-t border-[var(--vix-border)]">
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => document.getElementById('group-post-media')?.click()}
-                        className="p-3 bg-[var(--vix-secondary)] rounded-xl text-zinc-700 hover:text-pink-500 transition-all"
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                      </button>
-                      <input 
-                        id="group-post-media"
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*,video/*"
-                        onChange={e => {
-                          const f = e.target.files?.[0];
-                          if (f) {
-                            setPostFile(f);
-                            setPostPreview(URL.createObjectURL(f));
-                          }
-                        }}
-                      />
-                    </div>
-                    <button 
-                      onClick={handleCreatePost}
-                      disabled={!postContent.trim() || isPosting}
-                      className="vix-gradient px-8 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:scale-100 hover:scale-105 transition-all flex items-center gap-2"
-                    >
-                      {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> {t('Post')}</>}
-                    </button>
-                  </div>
+            {/* Channel Feed */}
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto no-scrollbar bg-[var(--vix-secondary)]/5">
+              {groupPosts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
+                  <MessageSquare className="w-12 h-12 text-zinc-800" />
+                  <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No updates yet')}</p>
                 </div>
-              ) : isMember && selectedGroup.only_admin_can_post ? (
-                <div className="bg-[var(--vix-secondary)]/30 border border-dashed border-[var(--vix-border)] rounded-[2rem] p-6 text-center">
-                  <Shield className="w-6 h-6 text-zinc-600 mx-auto mb-2" />
-                  <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">
-                    {t('Only administrators can broadcast in this community')}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* Group Posts */}
-              <div className="space-y-6">
-                {groupPosts.length === 0 ? (
-                  <div className="text-center py-20 space-y-4">
-                    <MessageSquare className="w-12 h-12 text-zinc-800 mx-auto opacity-20" />
-                    <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No posts yet')}</p>
-                  </div>
-                ) : (
-                  groupPosts.map(post => (
-                    <div key={post.id} className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <img src={post.user?.avatar_url} className="w-10 h-10 rounded-full object-cover border-2 border-[var(--vix-border)]" />
-                          <div>
-                            <p className="text-sm font-black text-[var(--vix-text)]">@{post.user?.username}</p>
-                            <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">
-                              {new Date(post.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <button className="p-2 text-zinc-500 hover:text-[var(--vix-text)]">
-                          <MoreHorizontal className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <p className="text-sm text-[var(--vix-text)] leading-relaxed">{post.content}</p>
+              ) : (
+                groupPosts.map(post => (
+                  <div key={post.id} className="max-w-[85%] mx-auto space-y-2">
+                    <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-3xl p-4 shadow-sm relative group">
                       {post.media_url && (
-                        <div className="rounded-3xl overflow-hidden border border-[var(--vix-border)] shadow-inner">
+                        <div className="mb-3 rounded-2xl overflow-hidden border border-[var(--vix-border)]">
                           {post.media_type === 'video' ? (
-                            <video src={post.media_url} controls className="w-full object-cover" />
+                            <video src={post.media_url} controls className="w-full max-h-[400px] object-cover" />
                           ) : (
-                            <img src={post.media_url} className="w-full object-cover" />
+                            <img src={post.media_url} className="w-full max-h-[400px] object-cover" />
                           )}
                         </div>
                       )}
-                      <div className="flex flex-col gap-4 pt-2">
-                        <div className="flex items-center gap-6">
+                      <p className="text-sm text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                      
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-widest">
+                          {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        
+                        <div className="flex items-center gap-3">
                           <button 
                             onClick={() => toggleLikePost(post.id)}
-                            className={`flex items-center gap-2 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
+                            className={`flex items-center gap-1 transition-colors ${post.is_liked ? 'text-pink-500' : 'text-zinc-400 hover:text-pink-500'}`}
                           >
-                            <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-current' : ''}`} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{formatNumber(post.likes_count || 0)} {t('Likes')}</span>
+                            <Heart className={`w-3.5 h-3.5 ${post.is_liked ? 'fill-current' : ''}`} />
+                            <span className="text-[9px] font-bold">{formatNumber(post.likes_count || 0)}</span>
                           </button>
+                          
                           <button 
                             onClick={() => {
-                              if (activeCommentPostId === post.id) {
-                                setActiveCommentPostId(null);
-                              } else {
+                              if (activeCommentPostId === post.id) setActiveCommentPostId(null);
+                              else {
                                 setActiveCommentPostId(post.id);
                                 fetchComments(post.id);
                               }
                             }}
-                            className="flex items-center gap-2 text-zinc-500 hover:text-blue-500 transition-colors"
+                            className="flex items-center gap-1 text-zinc-400 hover:text-blue-500 transition-colors"
                           >
-                            <MessageSquare className="w-5 h-5" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{formatNumber(post.comments_count || 0)} {t('Comments')}</span>
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-bold">{formatNumber(post.comments_count || 0)}</span>
                           </button>
-                          
-                          <div className="flex items-center gap-2 ml-auto">
-                            {['❤️', '🔥', '🙌', '😂', '😮', '😢'].map(emoji => (
-                              <button
-                                key={emoji}
-                                onClick={() => togglePostReaction(post.id, emoji)}
-                                className="text-lg hover:scale-125 transition-transform"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
                         </div>
-
-                        {/* Reactions Display */}
-                        {post.reactions && post.reactions.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(
-                              post.reactions.reduce((acc: any, r) => {
-                                acc[r.reaction] = (acc[r.reaction] || 0) + 1;
-                                return acc;
-                              }, {})
-                            ).map(([emoji, count]: [string, any]) => (
-                              <div 
-                                key={emoji}
-                                className="bg-[var(--vix-secondary)] px-2 py-1 rounded-full flex items-center gap-1.5 border border-[var(--vix-border)]"
-                              >
-                                <span className="text-xs">{emoji}</span>
-                                <span className="text-[9px] font-black text-zinc-600">{formatNumber(count)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
 
-                      {/* Comments Section */}
-                      {activeCommentPostId === post.id && (
-                        <div className="pt-4 border-t border-[var(--vix-border)] space-y-4 animate-vix-in">
-                          <div className="space-y-3 max-h-60 overflow-y-auto no-scrollbar">
-                            {comments[post.id]?.map(comment => (
-                              <div key={comment.id} className="flex gap-3">
-                                <img src={comment.user?.avatar_url} className="w-8 h-8 rounded-full object-cover" />
-                                <div className="flex-1 bg-[var(--vix-secondary)] rounded-2xl p-3">
-                                  <p className="text-[10px] font-black text-[var(--vix-text)]">@{comment.user?.username}</p>
-                                  <p className="text-[11px] text-zinc-600">{comment.content}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text" 
-                              value={newComment}
-                              onChange={e => setNewComment(e.target.value)}
-                              placeholder={t('Write a comment...')}
-                              className="flex-1 bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-xl px-4 py-2 text-xs outline-none focus:border-pink-500/30 transition-all"
-                              onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id)}
-                            />
-                            <button 
-                              onClick={() => handleAddComment(post.id)}
-                              disabled={!newComment.trim() || isCommenting}
-                              className="p-2 text-pink-500 hover:bg-pink-500/10 rounded-xl transition-all disabled:opacity-50"
-                            >
-                              <Send className="w-5 h-5" />
-                            </button>
-                          </div>
+                      {/* Reactions Overlay */}
+                      {post.reactions && post.reactions.length > 0 && (
+                        <div className="absolute -bottom-2 right-4 flex -space-x-1">
+                          {Object.entries(
+                            post.reactions.reduce((acc: any, r) => {
+                              acc[r.reaction] = (acc[r.reaction] || 0) + 1;
+                              return acc;
+                            }, {})
+                          ).slice(0, 3).map(([emoji]: [string, any]) => (
+                            <div key={emoji} className="w-5 h-5 rounded-full bg-[var(--vix-card)] border border-[var(--vix-border)] flex items-center justify-center text-[10px] shadow-sm">
+                              {emoji}
+                            </div>
+                          ))}
+                          {post.reactions.length > 3 && (
+                            <div className="w-5 h-5 rounded-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] flex items-center justify-center text-[7px] font-bold text-zinc-500 shadow-sm">
+                              +{post.reactions.length - 3}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  ))
-                )}
-              </div>
+
+                    {/* Quick Reactions */}
+                    <div className="flex justify-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {['❤️', '🔥', '🙌', '😂', '😮'].map(emoji => (
+                        <button
+                          key={emoji}
+                          onClick={() => togglePostReaction(post.id, emoji)}
+                          className="text-sm hover:scale-125 transition-transform grayscale hover:grayscale-0"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Comments Section */}
+                    {activeCommentPostId === post.id && (
+                      <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-3xl p-4 shadow-sm space-y-4 animate-vix-in">
+                        <div className="space-y-3 max-h-40 overflow-y-auto no-scrollbar">
+                          {comments[post.id]?.map(comment => (
+                            <div key={comment.id} className="flex gap-2">
+                              <img src={comment.user?.avatar_url} className="w-6 h-6 rounded-full object-cover" />
+                              <div className="flex-1 bg-[var(--vix-secondary)]/50 rounded-2xl p-2 px-3">
+                                <p className="text-[9px] font-black text-[var(--vix-text)]">@{comment.user?.username}</p>
+                                <p className="text-[10px] text-zinc-600">{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            value={newComment}
+                            onChange={e => setNewComment(e.target.value)}
+                            placeholder={t('Add a comment...')}
+                            className="flex-1 bg-[var(--vix-secondary)]/30 border border-[var(--vix-border)] rounded-full px-4 py-2 text-[10px] outline-none focus:border-pink-500/30"
+                          />
+                          <button 
+                            onClick={() => handleAddComment(post.id)}
+                            disabled={!newComment.trim() || isCommenting}
+                            className="p-2 text-pink-500 disabled:opacity-30"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
+
+            {/* Broadcast Input (Admin Only) */}
+            {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
+              <div className="p-4 bg-[var(--vix-bg)] border-t border-[var(--vix-border)]">
+                <div className="flex items-end gap-3 max-w-2xl mx-auto">
+                  <button 
+                    onClick={() => document.getElementById('channel-post-media')?.click()}
+                    className="p-3 text-zinc-400 hover:text-pink-500 transition-all"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                  <input 
+                    id="channel-post-media"
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*,video/*"
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setPostFile(f);
+                        setPostPreview(URL.createObjectURL(f));
+                      }
+                    }}
+                  />
+                  
+                  <div className="flex-1 flex flex-col gap-2">
+                    {postPreview && (
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-[var(--vix-border)]">
+                        <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full"><X className="w-3 h-3" /></button>
+                        {postFile?.type.startsWith('video') ? <video src={postPreview} className="w-full h-full object-cover" /> : <img src={postPreview} className="w-full h-full object-cover" />}
+                      </div>
+                    )}
+                    <textarea 
+                      value={postContent}
+                      onChange={e => setPostContent(e.target.value)}
+                      placeholder={t('Broadcast an update...')}
+                      className="w-full bg-[var(--vix-secondary)]/30 border border-[var(--vix-border)] rounded-3xl px-6 py-3 text-sm outline-none focus:border-pink-500/30 resize-none max-h-32"
+                      rows={1}
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handleCreatePost}
+                    disabled={!postContent.trim() || isPosting}
+                    className="vix-gradient p-3 rounded-full text-white shadow-lg shadow-pink-500/20 disabled:opacity-50 transition-all"
+                  >
+                    {isPosting ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : <Send className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            ) : isMember && selectedGroup.only_admin_can_post ? (
+              <div className="p-4 bg-[var(--vix-secondary)]/10 text-center">
+                <p className="text-[9px] text-zinc-400 font-black uppercase tracking-widest">
+                  {t('Only administrators can send messages to this channel')}
+                </p>
+              </div>
+            ) : !isMember && (
+              <div className="p-6 bg-[var(--vix-bg)] border-t border-[var(--vix-border)] text-center">
+                <button 
+                  onClick={joinGroup}
+                  className="vix-gradient px-12 py-3 rounded-full text-white text-[10px] font-black uppercase tracking-widest shadow-xl"
+                >
+                  {t('Follow to see updates')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

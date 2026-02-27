@@ -149,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
             <button
               key={item.id}
               onClick={() => setView(item.id)}
-              className={`p-3 transition-all relative ${isActive ? 'text-blue-500 scale-125' : 'text-zinc-400'}`}
+              className={`p-3 transition-all relative ${isActive ? 'text-pink-500 scale-125' : 'text-zinc-400'}`}
             >
               <i className={`${item.icon} text-xl`}></i>
               {item.badge !== undefined && item.badge > 0 && (

@@ -40,13 +40,22 @@
 
 @layer components {
   .vix-gradient {
-    background: linear-gradient(135deg, var(--color-vix-pink), var(--color-vix-purple), var(--color-vix-blue));
+    background: linear-gradient(135deg, #ff0080, #0070f3);
   }
   
   .vix-text-gradient {
-    background: linear-gradient(135deg, var(--color-vix-pink), var(--color-vix-purple), var(--color-vix-blue));
+    background: linear-gradient(135deg, #ff0080, #0070f3);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  .vix-indicator {
+    @apply bg-gradient-to-r from-[#ff0080] to-[#0070f3];
+  }
+
+  .vix-loader {
+    color: #ff0080;
+    filter: drop-shadow(0 0 2px #0070f3);
   }
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
