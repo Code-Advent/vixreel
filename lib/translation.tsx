@@ -15,6 +15,7 @@ interface TranslationContextType {
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
+const COHERE_API_KEY = import.meta.env.VITE_COHERE_API_KEY || 'NxSecHJSm8hfA1aicSOZuhbUbOujq8ftbPIgBUwS';
 const API_KEY = 'ta_bc0aaf5f206a55a3276b63f1d733bfa2c887e061c4c8c4a7fd457bac';
 const API_URL = 'https://api.translateapi.ai/api/v1/translate/';
 
@@ -219,8 +220,65 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
     const totalChunks = Math.ceil(texts.length / chunkSize);
     
     try {
-      // Try Gemini first if available
-      if (process.env.GEMINI_API_KEY) {
+      // Try Cohere first as requested
+      if (COHERE_API_KEY) {
+        console.log("VixReel: Using Cohere Intelligence for Translation...");
+
+        for (let i = 0; i < texts.length; i += chunkSize) {
+          const chunk = texts.slice(i, i + chunkSize);
+          const chunkIndex = Math.floor(i / chunkSize) + 1;
+          
+          const prompt = `Translate the following array of English UI strings into ${targetLang}. 
+          Return ONLY a JSON object where the keys are the original English strings and the values are the translations.
+          Maintain the tone and context of a premium social media app for creators.
+          
+          Strings to translate:
+          ${JSON.stringify(chunk)}`;
+
+          const response = await fetch('https://api.cohere.ai/v1/chat', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${COHERE_API_KEY}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              message: prompt,
+              model: 'command-r-plus',
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Cohere API error: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          // Extract JSON from response.text
+          let jsonText = data.text || '{}';
+          const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) jsonText = jsonMatch[0];
+          
+          const result = JSON.parse(jsonText);
+          
+          // Trim keys in result
+          const trimmedResult: Record<string, string> = {};
+          Object.entries(result).forEach(([k, v]) => {
+            trimmedResult[k.trim()] = String(v);
+          });
+
+          setTranslations(prev => {
+            const newTranslations = { ...prev };
+            newTranslations[targetLang] = { ...(newTranslations[targetLang] || {}), ...trimmedResult };
+            localStorage.setItem('vixreel_translations', JSON.stringify(newTranslations));
+            return newTranslations;
+          });
+
+          setTranslationProgress(Math.round((chunkIndex / totalChunks) * 100));
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      } else if (process.env.GEMINI_API_KEY) {
+        // Fallback to Gemini
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
         const model = "gemini-3-flash-preview";
 
