@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 
   return (
     <>
-      <div className="sticky top-0 h-screen w-20 lg:w-64 border-r border-[var(--vix-border)] bg-[var(--vix-bg)] hidden sm:flex flex-col py-8 px-4 z-50 transition-all duration-300 shrink-0">
+      <div className="fixed left-0 top-0 h-screen w-20 lg:w-64 border-r border-[var(--vix-border)] bg-[var(--vix-bg)] hidden sm:flex flex-col py-8 px-4 z-50 transition-all duration-300 shrink-0">
         <div className="mb-10 px-4">
           <h1 
             className="logo-font text-3xl vix-text-gradient hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
@@ -83,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                className={`w-full flex items-center justify-center lg:justify-start p-3 lg:p-4 rounded-2xl transition-all group relative ${
+                className={`w-full flex items-center p-3 lg:p-4 rounded-2xl transition-all group relative ${
                   isActive ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'
                 }`}
               >
@@ -121,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
         <div className="mt-auto pt-6 border-t border-[var(--vix-border)] space-y-2">
           <button 
             onClick={() => setView('SETTINGS')}
-            className={`w-full flex items-center justify-center lg:justify-start p-3 lg:p-4 rounded-2xl transition-all group ${currentView === 'SETTINGS' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'}`}
+            className={`w-full flex items-center p-3 lg:p-4 rounded-2xl transition-all group ${currentView === 'SETTINGS' ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'}`}
           >
             <div className={`w-6 h-6 flex items-center justify-center transition-all ${currentView === 'SETTINGS' ? 'text-pink-500 scale-110' : 'group-hover:text-pink-400'}`}>
               <SettingsIcon className="w-5 h-5" />
@@ -130,7 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
           </button>
 
           {currentUser && (
-            <div className="flex items-center justify-center lg:justify-start gap-3 p-3 lg:p-4 rounded-2xl cursor-pointer hover:bg-[var(--vix-secondary)]/40 transition-all group" onClick={() => setView('PROFILE')}>
+            <div className="flex items-center gap-3 p-3 lg:p-4 rounded-2xl cursor-pointer hover:bg-[var(--vix-secondary)]/40 transition-all group" onClick={() => setView('PROFILE')}>
                <div className="relative shrink-0">
                  <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover border border-[var(--vix-border)] group-hover:border-pink-500 transition-all" />
                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[var(--vix-bg)]" />

@@ -248,18 +248,17 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className={`bg-[var(--vix-bg)] min-h-screen text-[var(--vix-text)] flex justify-center transition-colors duration-300`}>
-      <div className="flex w-full max-w-[1440px] relative">
-        <Sidebar 
-          currentView={currentView} 
-          setView={setView} 
-          onLogout={() => setIsAccountMenuOpen(true)} 
-          currentUser={currentUser} 
-          isAdminUnlocked={currentUser.is_admin} 
-        />
+    <div dir="ltr" className={`bg-[var(--vix-bg)] min-h-screen text-[var(--vix-text)] flex transition-colors duration-300`}>
+      <Sidebar 
+        currentView={currentView} 
+        setView={setView} 
+        onLogout={() => setIsAccountMenuOpen(true)} 
+        currentUser={currentUser} 
+        isAdminUnlocked={currentUser.is_admin} 
+      />
 
-        <main className="flex-1 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
-          <div className="container mx-auto max-w-[935px] pt-4 px-4">
+      <main className="flex-1 sm:ml-20 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
+        <div className="container mx-auto max-w-[935px] pt-4 px-4">
             {currentView === 'FEED' && (
               <div className="flex flex-col items-center pb-20 animate-vix-in">
                 <div className="w-full flex justify-between items-center mb-6 px-2">
@@ -434,7 +433,6 @@ const AppContent: React.FC = () => {
           />
         )}
       </div>
-    </div>
   );
 };
 
