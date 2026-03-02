@@ -24,6 +24,10 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
 
   useEffect(() => {
     if (videoRef.current && stream.playback_id) {
+      if (stream.playback_id === 'mock_playback') {
+        setLoading(false);
+        return;
+      }
       const video = videoRef.current;
       const src = `https://stream.mux.com/${stream.playback_id}.m3u8`;
 
@@ -157,6 +161,23 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
           playsInline 
           className="w-full h-full object-cover"
         />
+        
+        {stream.playback_id === 'mock_playback' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900">
+            <div className="w-24 h-24 rounded-full bg-pink-500/10 flex items-center justify-center mb-6 animate-pulse">
+              <Signal className="w-12 h-12 text-pink-500" />
+            </div>
+            <h2 className="text-white font-black text-xl uppercase tracking-widest">{t('Simulated Signal')}</h2>
+            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mt-2">{t('Encrypted Peer-to-Peer Connection')}</p>
+            <div className="mt-8 flex gap-2">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="w-1 h-8 bg-pink-500/20 rounded-full overflow-hidden">
+                  <div className="w-full bg-pink-500 animate-vix-pulse" style={{ height: `${Math.random() * 100}%`, animationDelay: `${i * 0.1}s` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">

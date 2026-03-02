@@ -21,6 +21,12 @@ async function startServer() {
   app.use(express.json());
   app.use(cors());
 
+  // Request Logging
+  app.use((req, res, next) => {
+    console.log(`VixReel: [${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+
   // Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -88,6 +94,16 @@ async function startServer() {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('VixReel: Uncaught Server Error:', err);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: err.message,
+      path: req.path
+    });
+  });
 
   const PORT = 3000;
   app.listen(PORT, '0.0.0.0', () => {
