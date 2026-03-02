@@ -18,8 +18,18 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   const [newMessage, setNewMessage] = useState('');
   const [viewerCount, setViewerCount] = useState(stream.viewer_count || 0);
   const [isLiked, setIsLiked] = useState(false);
+  const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const addHeart = () => {
+    const id = Date.now();
+    const x = Math.random() * 100;
+    setHearts(prev => [...prev, { id, x }]);
+    setTimeout(() => {
+      setHearts(prev => prev.filter(h => h.id !== id));
+    }, 2000);
+  };
   const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
@@ -129,29 +139,32 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   return (
     <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in">
       {/* Header */}
-      <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-2 border-pink-500 p-0.5">
+      <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-50 pointer-events-none">
+        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1 pr-4 rounded-full border border-white/10 pointer-events-auto">
+          <div className="w-10 h-10 rounded-full border-2 border-pink-500 p-0.5">
             <img src={stream.user?.avatar_url} className="w-full h-full rounded-full object-cover" />
           </div>
           <div>
-            <p className="font-black text-white text-sm">@{stream.user?.username}</p>
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">LIVE</span>
-              <span className="text-[10px] font-black text-white/60 uppercase tracking-widest ml-2 flex items-center gap-1">
-                <Users className="w-3 h-3" /> {viewerCount}
-              </span>
-              <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-full border border-white/10 ml-2">
-                <Signal className="w-3 h-3 text-emerald-500" />
-                <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Stable</span>
-              </div>
+            <p className="font-black text-white text-[11px] leading-tight">@{stream.user?.username}</p>
+            <div className="flex items-center gap-1">
+              <Users className="w-2.5 h-2.5 text-white/60" />
+              <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{viewerCount}</span>
             </div>
           </div>
+          <div className="ml-3 flex items-center gap-1.5 bg-pink-500 px-2 py-0.5 rounded-full">
+            <span className="text-[8px] font-black text-white uppercase tracking-widest">LIVE</span>
+          </div>
         </div>
-        <button onClick={onClose} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all backdrop-blur-md">
-          <X className="w-6 h-6" />
-        </button>
+
+        <div className="flex flex-col items-end gap-2 pointer-events-auto">
+          <button onClick={onClose} className="p-3 bg-black/40 hover:bg-black/60 rounded-full text-white transition-all backdrop-blur-md border border-white/10">
+            <X className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+            <Signal className="w-3 h-3 text-emerald-500" />
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Stable</span>
+          </div>
+        </div>
       </div>
 
       {/* Video Player */}
@@ -187,21 +200,34 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         )}
 
         {/* Interaction Overlay */}
-        <div className="absolute bottom-32 left-6 right-6 space-y-4 pointer-events-none">
-          <div className="max-h-64 overflow-y-auto no-scrollbar space-y-2 pointer-events-auto">
+        <div className="absolute bottom-32 left-6 right-20 space-y-4 pointer-events-none">
+          <div className="max-h-64 overflow-y-auto no-scrollbar space-y-2 pointer-events-auto mask-fade-top">
             {messages.map((msg, i) => (
               <div key={i} className="flex items-start gap-2 animate-vix-in">
                 {msg.username === 'SYSTEM' ? (
                   <span className="text-pink-500/80 text-[10px] font-black uppercase tracking-widest italic py-1">{msg.text}</span>
                 ) : (
-                  <>
-                    <span className="font-black text-pink-500 text-xs">@{msg.username}</span>
-                    <span className="text-white text-xs bg-black/40 px-3 py-1.5 rounded-2xl backdrop-blur-md">{msg.text}</span>
-                  </>
+                  <div className="bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-2xl border border-white/5">
+                    <span className="font-black text-pink-400 text-[10px] uppercase tracking-widest mr-2">@{msg.username}</span>
+                    <span className="text-white text-xs font-medium">{msg.text}</span>
+                  </div>
                 )}
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Floating Hearts Container */}
+        <div className="absolute bottom-32 right-6 w-16 h-64 pointer-events-none overflow-hidden">
+          {hearts.map(heart => (
+            <div 
+              key={heart.id}
+              className="absolute bottom-0 text-pink-500 animate-vix-float-up"
+              style={{ left: `${heart.x}%` }}
+            >
+              <Heart className="w-6 h-6 fill-current" />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -223,8 +249,12 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         <div className="flex justify-between items-center px-2">
           <div className="flex gap-6">
             <button 
-              onClick={() => setIsLiked(!isLiked)}
-              className={`flex flex-col items-center gap-1 transition-all ${isLiked ? 'text-pink-500' : 'text-white/60 hover:text-white'}`}
+              onClick={() => {
+                setIsLiked(true);
+                addHeart();
+                setTimeout(() => setIsLiked(false), 200);
+              }}
+              className={`flex flex-col items-center gap-1 transition-all ${isLiked ? 'text-pink-500 scale-125' : 'text-white/60 hover:text-white'}`}
             >
               <Heart className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
               <span className="text-[8px] font-black uppercase tracking-widest">Like</span>

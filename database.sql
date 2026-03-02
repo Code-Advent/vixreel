@@ -284,16 +284,6 @@ CREATE TABLE IF NOT EXISTS public.live_viewers (
     UNIQUE(stream_id, user_id)
 );
 
--- RLS for Live Streams
-ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
-CREATE POLICY "Users can manage own live streams" ON public.live_streams FOR ALL USING (auth.uid() = user_id);
-
--- RLS for Live Viewers
-ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
-CREATE POLICY "Users can join/leave streams" ON public.live_viewers FOR ALL USING (auth.uid() = user_id);
-
 -- 19. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -316,6 +306,8 @@ ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_post_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stickers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -442,6 +434,14 @@ CREATE POLICY "System can insert notifications" ON public.notifications FOR INSE
 CREATE POLICY "Stickers are viewable by everyone" ON public.stickers FOR SELECT USING (true);
 CREATE POLICY "Users can insert own stickers" ON public.stickers FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own stickers" ON public.stickers FOR DELETE USING (auth.uid() = user_id);
+
+-- Live Streams
+CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
+CREATE POLICY "Users can manage own live streams" ON public.live_streams FOR ALL USING (auth.uid() = user_id);
+
+-- Live Viewers
+CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
+CREATE POLICY "Users can join/leave streams" ON public.live_viewers FOR ALL USING (auth.uid() = user_id);
 
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
