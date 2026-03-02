@@ -284,6 +284,15 @@ CREATE TABLE IF NOT EXISTS public.live_viewers (
     UNIQUE(stream_id, user_id)
 );
 
+-- 18b. LIVE MESSAGES TABLE
+CREATE TABLE IF NOT EXISTS public.live_messages (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 19. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
@@ -308,6 +317,7 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stickers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_messages ENABLE ROW LEVEL SECURITY;
 
 -- 18. CLEANUP OLD POLICIES
 DO $$ 
@@ -442,6 +452,10 @@ CREATE POLICY "Users can manage own live streams" ON public.live_streams FOR ALL
 -- Live Viewers
 CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
 CREATE POLICY "Users can join/leave streams" ON public.live_viewers FOR ALL USING (auth.uid() = user_id);
+
+-- Live Messages
+CREATE POLICY "Live messages are viewable by everyone" ON public.live_messages FOR SELECT USING (true);
+CREATE POLICY "Users can insert own live messages" ON public.live_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 20. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;

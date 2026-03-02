@@ -5,11 +5,12 @@ import { LiveStream, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
 
 interface LiveExploreProps {
+  currentUser: UserProfile;
   onSelectStream: (stream: LiveStream) => void;
   onStartBroadcast: () => void;
 }
 
-const LiveExplore: React.FC<LiveExploreProps> = ({ onSelectStream, onStartBroadcast }) => {
+const LiveExplore: React.FC<LiveExploreProps> = ({ currentUser, onSelectStream, onStartBroadcast }) => {
   const { t } = useTranslation();
   const [streams, setStreams] = useState<LiveStream[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,50 +71,69 @@ const LiveExplore: React.FC<LiveExploreProps> = ({ onSelectStream, onStartBroadc
           <p className="text-[10px] font-black uppercase tracking-widest">{t('Scanning Frequencies...')}</p>
         </div>
       ) : streams.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {streams.map(stream => (
-            <div 
-              key={stream.id}
-              onClick={() => onSelectStream(stream)}
-              className="group relative aspect-[9/16] bg-zinc-900 rounded-[2.5rem] overflow-hidden cursor-pointer border border-[var(--vix-border)] hover:border-pink-500/50 transition-all shadow-2xl"
-            >
-              <img 
-                src={`https://image.mux.com/${stream.playback_id}/thumbnail.jpg?time=0`} 
-                className="w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-110 transition-all duration-700"
-                alt="Live Stream Thumbnail"
-              />
-              
-              {/* Overlay UI */}
-              <div className="absolute inset-0 p-6 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-black/40">
-                <div className="flex justify-between items-start">
-                  <div className="bg-red-500 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
-                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    <span className="text-[9px] font-black text-white uppercase tracking-widest">LIVE</span>
+        <div className="flex flex-col gap-8 max-w-2xl mx-auto">
+          {streams.map(stream => {
+            const isOwnStream = stream.user_id === currentUser.id;
+            
+            return (
+              <div 
+                key={stream.id}
+                onClick={() => !isOwnStream && onSelectStream(stream)}
+                className={`group relative aspect-[9/16] bg-zinc-900 rounded-[3rem] overflow-hidden ${isOwnStream ? 'cursor-default ring-4 ring-pink-500 ring-offset-4 ring-offset-[var(--vix-bg)]' : 'cursor-pointer hover:scale-[1.02]'} transition-all shadow-2xl border border-white/5`}
+              >
+                <img 
+                  src={`https://image.mux.com/${stream.playback_id}/thumbnail.jpg?time=0`} 
+                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-all duration-700"
+                  alt="Live Stream Thumbnail"
+                />
+                
+                {/* Overlay UI */}
+                <div className="absolute inset-0 p-8 flex flex-col justify-between bg-gradient-to-t from-black/90 via-transparent to-black/40">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-2">
+                      <div className="bg-red-500 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg w-fit">
+                        <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">LIVE</span>
+                      </div>
+                      {isOwnStream && (
+                        <div className="bg-pink-500 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg w-fit">
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">{t('Your Broadcast')}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+                      <Users className="w-4 h-4 text-white" />
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">{stream.viewer_count || 0}</span>
+                    </div>
                   </div>
-                  <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/10">
-                    <Users className="w-3 h-3 text-white" />
-                    <span className="text-[9px] font-black text-white uppercase tracking-widest">{stream.viewer_count || 0}</span>
-                  </div>
-                </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full border-2 border-pink-500 p-0.5">
-                      <img src={stream.user?.avatar_url} className="w-full h-full rounded-full object-cover" />
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full border-2 border-pink-500 p-0.5 shadow-2xl">
+                        <img src={stream.user?.avatar_url} className="w-full h-full rounded-full object-cover" />
+                      </div>
+                      <div>
+                        <p className="text-white font-black text-lg drop-shadow-lg">@{stream.user?.username}</p>
+                        <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">{t('Broadcasting Now')}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white font-black text-sm">@{stream.user?.username}</p>
-                      <p className="text-white/60 text-[9px] font-bold uppercase tracking-widest">{t('Broadcasting Now')}</p>
-                    </div>
-                  </div>
-                  <div className="w-full py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 flex items-center justify-center gap-2 group-hover:bg-pink-500 transition-all">
-                    <Play className="w-4 h-4 text-white fill-white" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">{t('Join Stream')}</span>
+                    
+                    {!isOwnStream ? (
+                      <div className="w-full py-5 bg-pink-500 rounded-[2rem] shadow-2xl shadow-pink-500/20 flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all">
+                        <Play className="w-5 h-5 text-white fill-white" />
+                        <span className="text-[12px] font-black text-white uppercase tracking-[0.2em]">{t('Join Stream')}</span>
+                      </div>
+                    ) : (
+                      <div className="w-full py-5 bg-white/10 backdrop-blur-md rounded-[2rem] border border-white/10 flex items-center justify-center gap-3 opacity-60">
+                        <Radio className="w-5 h-5 text-white" />
+                        <span className="text-[12px] font-black text-white uppercase tracking-[0.2em]">{t('Live Now')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="py-40 text-center flex flex-col items-center gap-6 opacity-20">

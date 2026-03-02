@@ -69,11 +69,69 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
         .subscribe();
 
       fetchViewers();
+      fetchMessages();
+
       return () => {
         supabase.removeChannel(channel);
+        const msgChannel = supabase.channel(`live-messages-${streamInfo.id}`);
+        supabase.removeChannel(msgChannel);
       };
     }
   }, [isLive, streamInfo]);
+
+  useEffect(() => {
+    if (isLive && streamInfo) {
+      const msgChannel = supabase
+        .channel(`live-messages-${streamInfo.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_messages',
+          filter: `stream_id=eq.${streamInfo.db_id}`
+        }, (payload) => {
+          fetchNewMessage(payload.new.id);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(msgChannel);
+      };
+    }
+  }, [isLive, streamInfo]);
+
+  const fetchMessages = async () => {
+    if (!streamInfo?.db_id) return;
+    const { data } = await supabase
+      .from('live_messages')
+      .select('*, user:profiles(*)')
+      .eq('stream_id', streamInfo.db_id)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    
+    if (data) {
+      setMessages(data.map(m => ({
+        username: m.user?.username || 'Unknown',
+        text: m.text,
+        created_at: m.created_at
+      })));
+    }
+  };
+
+  const fetchNewMessage = async (id: string) => {
+    const { data } = await supabase
+      .from('live_messages')
+      .select('*, user:profiles(*)')
+      .eq('id', id)
+      .single();
+    
+    if (data) {
+      setMessages(prev => [...prev, {
+        username: data.user?.username || 'Unknown',
+        text: data.text,
+        created_at: data.created_at
+      }]);
+    }
+  };
 
   const fetchViewers = async () => {
     if (!streamInfo?.db_id) return;
@@ -88,7 +146,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       // Check for new joiners
       if (userList.length > viewers.length) {
         const newJoiner = userList.find(u => !viewers.some(v => v.id === u.id));
-        if (newJoiner) {
+        if (newJoiner && newJoiner.id !== currentUser.id) {
           setJoinNotification(`@${newJoiner.username} joined the broadcast`);
           setTimeout(() => setJoinNotification(null), 3000);
         }
@@ -170,6 +228,10 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
         live_playback_id: streamData.playback_id 
       }).eq('id', currentUser.id);
 
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
+        detail: { id: currentUser.id, is_live: true, live_playback_id: streamData.playback_id } 
+      }));
+
       setIsLive(true);
       
       console.log('VixReel: Broadcast logic initialized.');
@@ -185,6 +247,10 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       await supabase.from('live_streams').delete().eq('mux_live_stream_id', streamInfo.id);
       await supabase.from('profiles').update({ is_live: false, live_playback_id: null }).eq('id', currentUser.id);
       await fetch(`/api/live/${streamInfo.id}`, { method: 'DELETE' });
+      
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
+        detail: { id: currentUser.id, is_live: false, live_playback_id: null } 
+      }));
     }
     
     if (streamRef.current) {
@@ -211,6 +277,25 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
         videoTrack.enabled = !videoTrack.enabled;
         setVideoEnabled(videoTrack.enabled);
       }
+    }
+  };
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !streamInfo) return;
+    
+    const text = newMessage.trim();
+    setNewMessage('');
+
+    try {
+      const { error } = await supabase.from('live_messages').insert({
+        stream_id: streamInfo.db_id,
+        user_id: currentUser.id,
+        text: text
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Send Message Error:', err);
     }
   };
 
@@ -376,7 +461,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
           </div>
         ) : (
           <div className="w-full max-w-md flex flex-col gap-6">
-            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-full border border-white/10 backdrop-blur-xl">
+            <form onSubmit={sendMessage} className="flex items-center gap-3 bg-white/5 p-2 rounded-full border border-white/10 backdrop-blur-xl pointer-events-auto">
               <input 
                 type="text" 
                 placeholder="Broadcast a message..." 
@@ -384,10 +469,10 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
               />
-              <button className="p-3 bg-pink-500 rounded-full text-white">
+              <button type="submit" className="p-3 bg-pink-500 rounded-full text-white">
                 <Send className="w-4 h-4" />
               </button>
-            </div>
+            </form>
 
             <div className="flex justify-between items-center">
               <div className="flex gap-4">

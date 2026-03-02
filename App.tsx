@@ -376,6 +376,13 @@ const AppContent: React.FC = () => {
                 onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
                 onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
                 onExpand={(post) => setSelectedPost(post)}
+                onJoinLive={async (u) => {
+                  const { data } = await supabase.from('live_streams').select('*, user:profiles(*)').eq('user_id', u.id).eq('status', 'active').maybeSingle();
+                  if (data) {
+                    setActiveLiveStream(data);
+                    setCurrentView('LIVE_VIEWER');
+                  }
+                }}
                 autoEdit={profileAutoEdit}
               />
             )}
@@ -402,6 +409,7 @@ const AppContent: React.FC = () => {
             {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
             {currentView === 'LIVE' && (
               <LiveExplore 
+                currentUser={currentUser}
                 onSelectStream={(stream) => {
                   setActiveLiveStream(stream);
                   setCurrentView('LIVE_VIEWER');

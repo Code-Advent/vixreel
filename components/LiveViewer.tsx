@@ -62,13 +62,71 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
     // Increment viewer count
     incrementViewerCount();
 
+    if (stream.id) {
+      fetchMessages();
+      
+      const channel = supabase
+        .channel(`live-messages-${stream.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_messages',
+          filter: `stream_id=eq.${stream.id}`
+        }, (payload) => {
+          fetchNewMessage(payload.new.id);
+        })
+        .subscribe();
+
+      return () => {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+        }
+        decrementViewerCount();
+        supabase.removeChannel(channel);
+      };
+    }
+
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
       }
       decrementViewerCount();
     };
-  }, [stream.playback_id]);
+  }, [stream.playback_id, stream.id]);
+
+  const fetchMessages = async () => {
+    if (!stream.id) return;
+    const { data } = await supabase
+      .from('live_messages')
+      .select('*, user:profiles(*)')
+      .eq('stream_id', stream.id)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    
+    if (data) {
+      setMessages(data.map(m => ({
+        username: m.user?.username || 'Unknown',
+        text: m.text,
+        created_at: m.created_at
+      })));
+    }
+  };
+
+  const fetchNewMessage = async (id: string) => {
+    const { data } = await supabase
+      .from('live_messages')
+      .select('*, user:profiles(*)')
+      .eq('id', id)
+      .single();
+    
+    if (data) {
+      setMessages(prev => [...prev, {
+        username: data.user?.username || 'Unknown',
+        text: data.text,
+        created_at: data.created_at
+      }]);
+    }
+  };
 
   const incrementViewerCount = async () => {
     if (!stream.id || !currentUser.id) return;
@@ -122,18 +180,23 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
     }
   };
 
-  const sendMessage = (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !stream.id) return;
     
-    const msg = {
-      username: currentUser.username,
-      text: newMessage.trim(),
-      created_at: new Date().toISOString()
-    };
-    
-    setMessages(prev => [...prev, msg]);
+    const text = newMessage.trim();
     setNewMessage('');
+
+    try {
+      const { error } = await supabase.from('live_messages').insert({
+        stream_id: stream.id,
+        user_id: currentUser.id,
+        text: text
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Send Message Error:', err);
+    }
   };
 
   return (
