@@ -103,6 +103,9 @@ const AppContent: React.FC = () => {
   const init = async () => {
     setLoading(true);
     try {
+      // Server Health Check
+      fetch('/api/health').then(res => res.json()).then(d => console.log('VixReel: Server Status:', d.status)).catch(() => console.error('VixReel: Server Offline'));
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const profile = await resolveIdentity(session.user);

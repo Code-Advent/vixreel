@@ -18,17 +18,29 @@ const mux = new Mux({
 
 async function startServer() {
   const app = express();
-  app.use(cors());
   app.use(express.json());
+  app.use(cors());
+
+  // Health Check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
 
   // Mux API Endpoints
   app.post('/api/live/create', async (req, res) => {
+    console.log('VixReel: Received request to create live stream');
     try {
+      if (!MUX_TOKEN_ID || !MUX_TOKEN_SECRET) {
+        throw new Error('Mux API keys are missing in environment');
+      }
+
       const liveStream = await mux.video.liveStreams.create({
         playback_policy: ['public'],
         new_asset_settings: { playback_policy: ['public'] },
         test: false,
       });
+
+      console.log('VixReel: Mux stream created successfully:', liveStream.id);
 
       res.json({
         id: liveStream.id,
@@ -37,8 +49,11 @@ async function startServer() {
         status: liveStream.status,
       });
     } catch (error: any) {
-      console.error('Mux Create Stream Error:', error);
-      res.status(500).json({ error: error.message });
+      console.error('VixReel: Mux Create Stream Error:', error);
+      res.status(500).json({ 
+        error: error.message,
+        details: error.stack
+      });
     }
   });
 

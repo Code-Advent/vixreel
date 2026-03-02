@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Hls from 'hls.js';
-import { X, Users, MessageCircle, Send, Heart, Share2, Loader2 } from 'lucide-react';
+import { X, Users, MessageCircle, Send, Heart, Share2, Loader2, Signal } from 'lucide-react';
 import { UserProfile, LiveStream } from '../types';
 import { supabase } from '../lib/supabase';
 import { useTranslation } from '../lib/translation';
@@ -57,12 +57,55 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   }, [stream.playback_id]);
 
   const incrementViewerCount = async () => {
-    // In a real app, we'd use a Supabase function or a real-time presence channel
-    setViewerCount(prev => prev + 1);
+    if (!stream.id || !currentUser.id) return;
+    try {
+      await supabase.from('live_viewers').upsert({
+        stream_id: stream.id,
+        user_id: currentUser.id
+      });
+      
+      // Send join message to local state
+      setMessages(prev => [...prev, {
+        username: 'SYSTEM',
+        text: `@${currentUser.username} joined`,
+        created_at: new Date().toISOString()
+      }]);
+      
+      // Also update the count in live_streams table (could be done via trigger, but let's do it here for simplicity)
+      const { data: countData } = await supabase
+        .from('live_viewers')
+        .select('*', { count: 'exact', head: true })
+        .eq('stream_id', stream.id);
+      
+      if (countData !== null) {
+        await supabase.from('live_streams').update({ viewer_count: countData }).eq('id', stream.id);
+        setViewerCount(countData);
+      }
+    } catch (err) {
+      console.error('Increment Viewer Error:', err);
+    }
   };
 
   const decrementViewerCount = async () => {
-    setViewerCount(prev => Math.max(0, prev - 1));
+    if (!stream.id || !currentUser.id) return;
+    try {
+      await supabase.from('live_viewers').delete().match({
+        stream_id: stream.id,
+        user_id: currentUser.id
+      });
+      
+      const { data: countData } = await supabase
+        .from('live_viewers')
+        .select('*', { count: 'exact', head: true })
+        .eq('stream_id', stream.id);
+      
+      if (countData !== null) {
+        await supabase.from('live_streams').update({ viewer_count: countData }).eq('id', stream.id);
+        setViewerCount(countData);
+      }
+    } catch (err) {
+      console.error('Decrement Viewer Error:', err);
+    }
   };
 
   const sendMessage = (e: React.FormEvent) => {
@@ -95,6 +138,10 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
               <span className="text-[10px] font-black text-white/60 uppercase tracking-widest ml-2 flex items-center gap-1">
                 <Users className="w-3 h-3" /> {viewerCount}
               </span>
+              <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-full border border-white/10 ml-2">
+                <Signal className="w-3 h-3 text-emerald-500" />
+                <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Stable</span>
+              </div>
             </div>
           </div>
         </div>
@@ -123,8 +170,14 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
           <div className="max-h-64 overflow-y-auto no-scrollbar space-y-2 pointer-events-auto">
             {messages.map((msg, i) => (
               <div key={i} className="flex items-start gap-2 animate-vix-in">
-                <span className="font-black text-pink-500 text-xs">@{msg.username}</span>
-                <span className="text-white text-xs bg-black/40 px-3 py-1.5 rounded-2xl backdrop-blur-md">{msg.text}</span>
+                {msg.username === 'SYSTEM' ? (
+                  <span className="text-pink-500/80 text-[10px] font-black uppercase tracking-widest italic py-1">{msg.text}</span>
+                ) : (
+                  <>
+                    <span className="font-black text-pink-500 text-xs">@{msg.username}</span>
+                    <span className="text-white text-xs bg-black/40 px-3 py-1.5 rounded-2xl backdrop-blur-md">{msg.text}</span>
+                  </>
+                )}
               </div>
             ))}
           </div>

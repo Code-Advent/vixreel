@@ -18,8 +18,13 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   const [micEnabled, setMicEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
+  const [viewers, setViewers] = useState<UserProfile[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [showViewerList, setShowViewerList] = useState(false);
+  const [joinNotification, setJoinNotification] = useState<string | null>(null);
+  
+  const [streamHealth, setStreamHealth] = useState<'EXCELLENT' | 'GOOD' | 'POOR'>('EXCELLENT');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -29,6 +34,52 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     startPreview();
     return () => stopStream();
   }, []);
+
+  useEffect(() => {
+    if (isLive && streamInfo) {
+      // Subscribe to viewers
+      const channel = supabase
+        .channel(`live-viewers-${streamInfo.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'live_viewers',
+          filter: `stream_id=eq.${streamInfo.db_id}` 
+        }, () => {
+          fetchViewers();
+        })
+        .subscribe();
+
+      fetchViewers();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [isLive, streamInfo]);
+
+  const fetchViewers = async () => {
+    if (!streamInfo?.db_id) return;
+    const { data } = await supabase
+      .from('live_viewers')
+      .select('*, user:profiles(*)')
+      .eq('stream_id', streamInfo.db_id);
+    
+    if (data) {
+      const userList = data.map((v: any) => v.user).filter(Boolean);
+      
+      // Check for new joiners
+      if (userList.length > viewers.length) {
+        const newJoiner = userList.find(u => !viewers.some(v => v.id === u.id));
+        if (newJoiner) {
+          setJoinNotification(`@${newJoiner.username} joined the broadcast`);
+          setTimeout(() => setJoinNotification(null), 3000);
+        }
+      }
+      
+      setViewers(userList);
+      setViewerCount(userList.length);
+    }
+  };
 
   const startPreview = async () => {
     try {
@@ -55,23 +106,31 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Server Error Response:', text);
+        throw new Error('Server returned non-JSON response. Check server logs.');
+      }
+
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      setStreamInfo(data);
-
       // 2. Register in Supabase
-      const { error: dbErr } = await supabase.from('live_streams').insert({
+      const { data: dbStream, error: dbErr } = await supabase.from('live_streams').insert({
         user_id: currentUser.id,
         stream_key: data.stream_key,
         playback_id: data.playback_id,
         mux_live_stream_id: data.id,
         status: 'active'
-      });
+      }).select().single();
 
       if (dbErr) throw dbErr;
 
-      // 3. Update User Profile Live Status (if possible)
+      setStreamInfo({ ...data, db_id: dbStream.id });
+
+      // 3. Update User Profile Live Status
       await supabase.from('profiles').update({ 
         is_live: true, 
         live_playback_id: data.playback_id 
@@ -79,12 +138,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
 
       setIsLive(true);
       
-      // Note: In a real app, we'd use WebRTC or RTMP to send the stream to Mux.
-      // Since this is a browser demo, we'll simulate the broadcast.
-      // Real RTMP broadcasting usually requires a server-side relay or a specialized library.
-      console.log('VixReel: Broadcast logic initialized. RTMP Endpoint: rtmps://global-live.mux.com:443/app');
-      console.log('VixReel: Stream Key:', data.stream_key);
-
+      console.log('VixReel: Broadcast logic initialized.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -140,9 +194,20 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">LIVE</span>
-                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest ml-2 flex items-center gap-1">
+                <button 
+                  onClick={() => setShowViewerList(true)}
+                  className="text-[10px] font-black text-white/60 hover:text-white uppercase tracking-widest ml-2 flex items-center gap-1 transition-colors"
+                >
                   <Users className="w-3 h-3" /> {viewerCount}
-                </span>
+                </button>
+                <div className="ml-4 flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-full border border-white/10">
+                  <div className={`w-1.5 h-1.5 rounded-full ${streamHealth === 'EXCELLENT' ? 'bg-emerald-500' : streamHealth === 'GOOD' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                  <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">{streamHealth}</span>
+                </div>
+                <div className="ml-4 flex items-center gap-1.5">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                  <span className="text-[8px] font-black text-white/60 uppercase tracking-widest">REC</span>
+                </div>
               </div>
             )}
           </div>
@@ -151,6 +216,33 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
           <X className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Viewer List Modal */}
+      {showViewerList && (
+        <div className="fixed inset-0 z-[3000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl animate-vix-in">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-white font-black text-xs uppercase tracking-widest">Active Viewers ({viewerCount})</h3>
+              <button onClick={() => setShowViewerList(false)} className="text-white/40 hover:text-white"><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-4 max-h-[50vh] overflow-y-auto no-scrollbar space-y-3">
+              {viewers.length > 0 ? viewers.map(v => (
+                <div key={v.id} className="flex items-center gap-4 p-3 rounded-2xl bg-white/5 border border-white/5">
+                  <img src={v.avatar_url} className="w-10 h-10 rounded-full object-cover" />
+                  <div className="flex-1">
+                    <p className="text-white font-bold text-sm">@{v.username}</p>
+                    <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Watching Now</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-12 text-center opacity-20">
+                  <p className="text-white font-black text-[10px] uppercase tracking-widest">No signals detected yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Video View */}
       <div className="flex-1 relative overflow-hidden bg-zinc-900">
@@ -161,6 +253,20 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
           playsInline 
           className={`w-full h-full object-cover ${!videoEnabled ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}
         />
+
+        {/* Techy Overlay */}
+        <div className="absolute inset-0 pointer-events-none border-[20px] border-white/5" />
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10">
+          <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white" />
+          <div className="absolute top-0 left-1/2 w-[1px] h-full bg-white" />
+        </div>
+        
+        {/* Join Notification */}
+        {joinNotification && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-pink-500/90 backdrop-blur-md px-6 py-2 rounded-full border border-white/20 shadow-2xl animate-vix-in z-50">
+            <p className="text-white text-[10px] font-black uppercase tracking-widest">{joinNotification}</p>
+          </div>
+        )}
         {!videoEnabled && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center">

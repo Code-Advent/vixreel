@@ -275,10 +275,24 @@ CREATE TABLE IF NOT EXISTS public.live_streams (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 18a. LIVE VIEWERS TABLE
+CREATE TABLE IF NOT EXISTS public.live_viewers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(stream_id, user_id)
+);
+
 -- RLS for Live Streams
 ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
 CREATE POLICY "Users can manage own live streams" ON public.live_streams FOR ALL USING (auth.uid() = user_id);
+
+-- RLS for Live Viewers
+ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
+CREATE POLICY "Users can join/leave streams" ON public.live_viewers FOR ALL USING (auth.uid() = user_id);
 
 -- 19. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
