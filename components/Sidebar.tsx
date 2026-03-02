@@ -52,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
   
   const navItems = [
     { id: 'FEED' as ViewType, label: t('Home'), icon: 'fa-solid fa-house' },
+    { id: 'LIVE' as ViewType, label: t('Live'), icon: 'fa-solid fa-tower-broadcast' },
     { id: 'SEARCH' as ViewType, label: t('Search'), icon: 'fa-solid fa-magnifying-glass' },
     { id: 'EXPLORE' as ViewType, label: t('Explore'), icon: 'fa-solid fa-compass' },
     { id: 'NOTIFICATIONS' as ViewType, label: t('Notifications'), icon: 'fa-solid fa-bell', badge: unreadCount },

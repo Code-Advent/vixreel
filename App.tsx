@@ -18,6 +18,7 @@ import Groups from './components/Groups';
 import PostDetail from './components/PostDetail';
 import LiveBroadcast from './components/LiveBroadcast';
 import LiveViewer from './components/LiveViewer';
+import LiveExplore from './components/LiveExplore';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { Zap, Radio } from 'lucide-react';
 
@@ -396,6 +397,15 @@ const AppContent: React.FC = () => {
               />
             )}
             {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
+            {currentView === 'LIVE' && (
+              <LiveExplore 
+                onSelectStream={(stream) => {
+                  setActiveLiveStream(stream);
+                  setCurrentView('LIVE_VIEWER');
+                }}
+                onStartBroadcast={() => setCurrentView('LIVE_BROADCAST')}
+              />
+            )}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
             {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
             {currentView === 'NOTIFICATIONS' && (
