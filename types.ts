@@ -179,4 +179,16 @@ export interface Notification {
   post?: Post;
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS';
+export interface LiveStream {
+  id: string;
+  user_id: string;
+  stream_key: string;
+  playback_id: string;
+  mux_live_stream_id: string;
+  status: 'idle' | 'active' | 'disconnected';
+  viewer_count: number;
+  created_at: string;
+  user?: UserProfile;
+}
+
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'LIVE_BROADCAST' | 'LIVE_VIEWER';

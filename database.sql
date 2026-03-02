@@ -260,7 +260,27 @@ CREATE TABLE IF NOT EXISTS public.stickers (
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 
--- 17. ROW LEVEL SECURITY (RLS)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_playback_id TEXT;
+
+-- 18. LIVE STREAMS TABLE
+CREATE TABLE IF NOT EXISTS public.live_streams (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    stream_key TEXT NOT NULL,
+    playback_id TEXT NOT NULL,
+    mux_live_stream_id TEXT NOT NULL,
+    status TEXT DEFAULT 'idle' CHECK (status IN ('idle', 'active', 'disconnected')),
+    viewer_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- RLS for Live Streams
+ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
+CREATE POLICY "Users can manage own live streams" ON public.live_streams FOR ALL USING (auth.uid() = user_id);
+
+-- 19. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;

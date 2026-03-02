@@ -293,7 +293,14 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       )}
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
-          <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
+          <div className={`relative p-0.5 rounded-full ${post.user.is_live ? 'border-2 border-pink-500 animate-pulse' : ''}`}>
+            <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
+            {post.user.is_live && (
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-1.5 py-0.5 rounded-full border border-[var(--vix-bg)]">
+                <span className="text-[6px] font-black text-white uppercase tracking-widest">LIVE</span>
+              </div>
+            )}
+          </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold flex items-center gap-1 text-[var(--vix-text)]">
               {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}

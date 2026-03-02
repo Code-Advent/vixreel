@@ -515,12 +515,17 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
            <div className="relative">
               <div 
                 onClick={() => stories.length > 0 && setShowStoryViewer(true)}
-                className={`w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden cursor-pointer relative group/avatar ${stories.length > 0 ? 'ring-pink-500 ring-offset-2 ring-offset-[var(--vix-bg)]' : ''}`}
+                className={`w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden cursor-pointer relative group/avatar ${stories.length > 0 ? 'ring-pink-500 ring-offset-2 ring-offset-[var(--vix-bg)]' : ''} ${user.is_live ? 'ring-red-500 ring-offset-4 ring-offset-[var(--vix-bg)] animate-pulse' : ''}`}
               >
                 <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-secondary)] group-hover/avatar:scale-110 transition-transform duration-500" />
                 {stories.length > 0 && (
                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
                     <Play className="w-8 h-8 text-white fill-white" />
+                  </div>
+                )}
+                {user.is_live && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-red-500 px-3 py-1 rounded-full border-2 border-[var(--vix-bg)] z-10">
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">LIVE</span>
                   </div>
                 )}
               </div>
