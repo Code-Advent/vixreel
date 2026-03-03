@@ -32,6 +32,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
+  const [beautyEnabled, setBeautyEnabled] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -361,6 +362,12 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     }
   };
 
+  const handleShare = () => {
+    const url = `${window.location.origin}/live/${streamInfo?.id}`;
+    navigator.clipboard.writeText(url);
+    addHeart();
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !streamInfo) return;
@@ -431,7 +438,8 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
           autoPlay 
           muted 
           playsInline 
-          className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''} ${!videoEnabled ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`} 
+          className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''} ${!videoEnabled ? 'opacity-0' : 'opacity-100'} transition-all duration-500`} 
+          style={{ filter: beautyEnabled ? 'brightness(1.1) contrast(1.05) saturate(1.1) blur(0.4px)' : 'none' }}
         />
         
         {!isLive && (
@@ -466,9 +474,9 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
             <span className="text-[10px] font-black text-white drop-shadow-md">Effects</span>
           </button>
 
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <Wand2 className="w-6 h-6 text-emerald-400" />
+          <button onClick={() => setBeautyEnabled(!beautyEnabled)} className="flex flex-col items-center gap-1 group">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${beautyEnabled ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-black/30 backdrop-blur-md border border-white/10 group-hover:bg-black/50'}`}>
+              <Wand2 className="w-6 h-6 text-white" />
             </div>
             <span className="text-[10px] font-black text-white drop-shadow-md">Beauty</span>
           </button>
@@ -480,27 +488,30 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
             <span className="text-[10px] font-black text-white drop-shadow-md">Screen</span>
           </button>
 
-          <button className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-            <Share2 className="w-6 h-6 text-white" />
+          <button onClick={handleShare} className="flex flex-col items-center gap-1 group">
+            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
+              <Share2 className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[10px] font-black text-white drop-shadow-md">Share</span>
           </button>
         </div>
 
         {/* Chat Overlay - TikTok Style */}
         <div className="absolute bottom-24 left-4 right-20 z-30 pointer-events-none">
-          <div className="max-h-[40vh] overflow-y-auto no-scrollbar space-y-2 pointer-events-auto mask-fade-top flex flex-col justify-end">
+          <div className="max-h-[40vh] overflow-y-auto no-scrollbar space-y-1.5 pointer-events-auto mask-fade-top flex flex-col justify-end">
             {messages.map((msg) => (
               <div key={msg.id} className="flex items-start gap-2 animate-vix-in">
                 {msg.username === 'SYSTEM' ? (
                   <div className="bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse" />
-                    <span className="text-pink-400 text-[10px] font-black uppercase tracking-widest italic">{msg.text}</span>
+                    <span className="text-pink-400 text-[10px] font-black uppercase tracking-widest italic drop-shadow-sm">{msg.text}</span>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 max-w-[90%]">
-                    <img src={msg.avatar_url || `https://ui-avatars.com/api/?name=${msg.username}`} className="w-6 h-6 rounded-full border border-white/10 mt-1 shadow-sm" />
-                    <div className="bg-black/30 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/5 flex flex-col">
-                      <span className="font-black text-pink-400 text-[10px] uppercase tracking-tight mb-0.5">@{msg.username}</span>
-                      <span className="text-white text-xs font-medium leading-tight">{msg.text}</span>
+                  <div className="flex items-start gap-2 max-w-[95%]">
+                    <img src={msg.avatar_url || `https://ui-avatars.com/api/?name=${msg.username}`} className="w-7 h-7 rounded-full border border-white/10 mt-0.5 shadow-sm" />
+                    <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/5 flex flex-col shadow-lg">
+                      <span className="font-black text-yellow-400 text-[10px] uppercase tracking-tight mb-0.5">@{msg.username}</span>
+                      <span className="text-white text-[13px] font-medium leading-tight drop-shadow-md">{msg.text}</span>
                     </div>
                   </div>
                 )}
