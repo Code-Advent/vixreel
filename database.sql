@@ -275,6 +275,11 @@ CREATE TABLE IF NOT EXISTS public.live_streams (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_live_streams_user_id ON public.live_streams(user_id);
+CREATE INDEX IF NOT EXISTS idx_live_streams_status ON public.live_streams(status);
+CREATE INDEX IF NOT EXISTS idx_live_viewers_stream_id ON public.live_viewers(stream_id);
+CREATE INDEX IF NOT EXISTS idx_live_messages_stream_id ON public.live_messages(stream_id);
+
 -- 18a. LIVE VIEWERS TABLE
 CREATE TABLE IF NOT EXISTS public.live_viewers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

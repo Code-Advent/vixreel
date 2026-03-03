@@ -60,13 +60,21 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         hls.attachMedia(video);
         hlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(e => console.error('Play Error:', e));
+          video.play().catch(e => {
+            console.warn('Play Error (likely autoplay blocked):', e);
+            video.muted = true;
+            video.play();
+          });
           setLoading(false);
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = src;
         video.addEventListener('loadedmetadata', () => {
-          video.play().catch(e => console.error('Play Error:', e));
+          video.play().catch(e => {
+            console.warn('Play Error (likely autoplay blocked):', e);
+            video.muted = true;
+            video.play();
+          });
           setLoading(false);
         });
       }
@@ -168,6 +176,9 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         user_id: currentUser.id
       });
       
+      // Use RPC for atomic increment
+      await supabase.rpc('increment_live_viewers', { stream_id: stream.id });
+      
       setMessages(prev => [...prev, {
         id: `system-${Date.now()}`,
         username: 'SYSTEM',
@@ -181,7 +192,6 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         .eq('stream_id', stream.id);
       
       if (countData !== null) {
-        await supabase.from('live_streams').update({ viewer_count: countData }).eq('id', stream.id);
         setViewerCount(countData);
       }
     } catch (err) {
@@ -197,13 +207,15 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         user_id: currentUser.id
       });
       
+      // Use RPC for atomic decrement
+      await supabase.rpc('decrement_live_viewers', { stream_id: stream.id });
+      
       const { data: countData } = await supabase
         .from('live_viewers')
         .select('*', { count: 'exact', head: true })
         .eq('stream_id', stream.id);
       
       if (countData !== null) {
-        await supabase.from('live_streams').update({ viewer_count: countData }).eq('id', stream.id);
         setViewerCount(countData);
       }
     } catch (err) {
@@ -231,46 +243,49 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden">
-      {/* Top Bar */}
-      <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-50">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1 pr-4 rounded-full border border-white/10">
-            <div className="w-8 h-8 rounded-full border-2 border-pink-500 p-0.5">
+    <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden font-sans">
+      {/* Top Bar - TikTok Style */}
+      <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-50 pointer-events-none">
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          {/* Broadcaster Pill */}
+          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md p-1 pr-1 rounded-full border border-white/10">
+            <div className="w-9 h-9 rounded-full border-2 border-pink-500 p-0.5">
               <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full rounded-full object-cover" />
             </div>
-            <div>
-              <p className="font-black text-white text-[10px] leading-tight truncate max-w-[80px]">@{stream.user?.username}</p>
+            <div className="flex flex-col">
+              <p className="font-bold text-white text-[11px] leading-tight truncate max-w-[70px]">@{stream.user?.username}</p>
               <div className="flex items-center gap-1">
-                <Eye className="w-2.5 h-2.5 text-white/60" />
-                <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{formatNumber(viewerCount)}</span>
+                <Users className="w-2.5 h-2.5 text-white/80" />
+                <span className="text-[10px] font-bold text-white/80">{formatNumber(viewerCount)}</span>
               </div>
             </div>
             {!isFollowing && stream.user_id !== currentUser.id && (
               <button 
                 onClick={handleFollow}
-                className="ml-2 bg-pink-500 text-white text-[9px] font-black px-3 py-1 rounded-full hover:bg-pink-600 transition-colors"
+                className="ml-2 bg-pink-500 text-white text-[10px] font-black px-4 py-2 rounded-full hover:bg-pink-600 transition-all active:scale-95"
               >
                 {t('Follow')}
               </button>
             )}
           </div>
-          
-          <div className="hidden sm:flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-            <Trophy className="w-3 h-3 text-yellow-500" />
-            <span className="text-[9px] font-black text-white uppercase tracking-widest">#1 Ranking</span>
+
+          {/* Stream Stats Pill */}
+          <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full w-fit">
+            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-[9px] font-black text-white/90 uppercase tracking-widest">LIVE</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex -space-x-2">
+        <div className="flex items-center gap-3 pointer-events-auto">
+          {/* Top Viewers */}
+          <div className="flex -space-x-2 mr-2">
             {[1, 2, 3].map(i => (
-              <div key={i} className="w-7 h-7 rounded-full border-2 border-white/20 overflow-hidden bg-zinc-800">
-                <img src={`https://picsum.photos/seed/viewer${i}/100/100`} className="w-full h-full object-cover" />
+              <div key={i} className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden bg-zinc-800 shadow-lg">
+                <img src={`https://picsum.photos/seed/viewer${i+10}/100/100`} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
-          <button onClick={onClose} className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-all backdrop-blur-md border border-white/10">
+          <button onClick={onClose} className="p-2.5 bg-black/30 hover:bg-black/50 rounded-full text-white transition-all backdrop-blur-md border border-white/10">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -281,41 +296,52 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         <video 
           ref={videoRef} 
           playsInline 
+          autoPlay
+          muted
           className="w-full h-full object-cover"
         />
         
         {stream.playback_id === 'mock_playback' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900">
-            <div className="w-24 h-24 rounded-full bg-pink-500/10 flex items-center justify-center mb-6 animate-pulse">
-              <Signal className="w-12 h-12 text-pink-500" />
+            <div className="absolute inset-0 opacity-30">
+              <img src={stream.user?.cover_url || stream.user?.avatar_url} className="w-full h-full object-cover blur-3xl" />
             </div>
-            <h2 className="text-white font-black text-xl uppercase tracking-widest">{t('LIVE STREAM')}</h2>
-            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mt-2">{t('Connecting to Broadcast...')}</p>
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-36 h-36 rounded-full border-4 border-pink-500 p-1.5 mb-6 animate-vix-pulse shadow-2xl">
+                <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full rounded-full object-cover" />
+              </div>
+              <div className="flex items-center gap-2 bg-red-600 px-5 py-1.5 rounded-full mb-4 shadow-xl">
+                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                <span className="text-[11px] font-black text-white uppercase tracking-[0.2em]">LIVE</span>
+              </div>
+              <h2 className="text-white font-black text-3xl uppercase tracking-tight drop-shadow-lg">@{stream.user?.username}</h2>
+              <p className="text-white/50 text-[11px] font-black uppercase tracking-[0.4em] mt-3 italic">{t('Broadcasting Signal...')}</p>
+            </div>
           </div>
         )}
         
         {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-            <Loader2 className="w-12 h-12 text-pink-500 animate-spin mb-4" />
-            <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.3em]">Synchronizing...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md z-20">
+            <Loader2 className="w-14 h-14 text-pink-500 animate-spin mb-4" />
+            <p className="text-white/80 text-[11px] font-black uppercase tracking-[0.4em]">Connecting...</p>
           </div>
         )}
 
-        {/* Right Side Actions */}
-        <div className="absolute right-4 bottom-32 flex flex-col items-center gap-5 z-40">
-          <div className="relative mb-2">
-            <div className="w-11 h-11 rounded-full border-2 border-white p-0.5 bg-zinc-800">
-              <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full rounded-full object-cover" />
+        {/* Right Side Actions - TikTok Style */}
+        <div className="absolute right-4 bottom-24 flex flex-col items-center gap-6 z-40">
+          <button className="flex flex-col items-center gap-1 group">
+            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
+              <Trophy className="w-6 h-6 text-yellow-500" />
             </div>
-            {!isFollowing && stream.user_id !== currentUser.id && (
-              <button 
-                onClick={handleFollow}
-                className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-pink-500 text-white rounded-full p-0.5 border-2 border-white"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+            <span className="text-[10px] font-black text-white drop-shadow-md">Rank 1</span>
+          </button>
+
+          <button className="flex flex-col items-center gap-1 group">
+            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
+              <Gift className="w-6 h-6 text-pink-400" />
+            </div>
+            <span className="text-[10px] font-black text-white drop-shadow-md">Gift</span>
+          </button>
 
           <button 
             onClick={() => {
@@ -325,54 +351,40 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
             }}
             className="flex flex-col items-center gap-1 group"
           >
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${isLiked ? 'bg-pink-500 scale-125' : 'bg-black/40 backdrop-blur-md border border-white/10 group-hover:bg-black/60'}`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isLiked ? 'bg-pink-500 scale-125' : 'bg-black/30 backdrop-blur-md border border-white/10 group-hover:bg-black/50'}`}>
               <Heart className={`w-6 h-6 text-white ${isLiked ? 'fill-current' : ''}`} />
             </div>
             <span className="text-[10px] font-black text-white drop-shadow-md">12.3K</span>
           </button>
 
           <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/60 transition-all">
-              <Gift className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
+              <Share2 className="w-6 h-6 text-white" />
             </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">1,250</span>
+            <span className="text-[10px] font-black text-white drop-shadow-md">Share</span>
           </button>
 
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/60 transition-all">
-              <Trophy className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">13</span>
-          </button>
-
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/60 transition-all">
-              <ShoppingBag className="w-6 h-6 text-white" />
-            </div>
-          </button>
-
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/60 transition-all animate-spin-slow">
-              <Music className="w-6 h-6 text-white" />
-            </div>
+          <button className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all animate-spin-slow">
+            <Music className="w-6 h-6 text-white" />
           </button>
         </div>
 
-        {/* Chat Overlay (Bottom Left) */}
-        <div className="absolute bottom-32 left-4 right-20 z-30 pointer-events-none">
-          <div className="max-h-72 overflow-y-auto no-scrollbar space-y-2 pointer-events-auto mask-fade-top">
+        {/* Chat Overlay - TikTok Style */}
+        <div className="absolute bottom-24 left-4 right-20 z-30 pointer-events-none">
+          <div className="max-h-[40vh] overflow-y-auto no-scrollbar space-y-2 pointer-events-auto mask-fade-top flex flex-col justify-end">
             {messages.map((msg) => (
               <div key={msg.id} className="flex items-start gap-2 animate-vix-in">
                 {msg.username === 'SYSTEM' ? (
-                  <div className="bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                  <div className="bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse" />
                     <span className="text-pink-400 text-[10px] font-black uppercase tracking-widest italic">{msg.text}</span>
                   </div>
                 ) : (
                   <div className="flex items-start gap-2 max-w-[90%]">
-                    <img src={msg.avatar_url || `https://ui-avatars.com/api/?name=${msg.username}`} className="w-6 h-6 rounded-full border border-white/10 mt-0.5" />
-                    <div className="bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/5">
-                      <span className="font-black text-white/60 text-[10px] uppercase tracking-widest mr-2">@{msg.username}</span>
-                      <span className="text-white text-xs font-medium leading-relaxed">{msg.text}</span>
+                    <img src={msg.avatar_url || `https://ui-avatars.com/api/?name=${msg.username}`} className="w-6 h-6 rounded-full border border-white/10 mt-1 shadow-sm" />
+                    <div className="bg-black/30 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/5 flex flex-col">
+                      <span className="font-black text-pink-400 text-[10px] uppercase tracking-tight mb-0.5">@{msg.username}</span>
+                      <span className="text-white text-xs font-medium leading-tight">{msg.text}</span>
                     </div>
                   </div>
                 )}
@@ -383,63 +395,41 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         </div>
 
         {/* Floating Hearts Container */}
-        <div className="absolute bottom-32 right-6 w-16 h-64 pointer-events-none overflow-hidden z-50">
+        <div className="absolute bottom-24 right-6 w-20 h-80 pointer-events-none overflow-hidden z-50">
           {hearts.map(heart => (
             <div 
               key={heart.id}
               className="absolute bottom-0 text-pink-500 animate-vix-float-up"
               style={{ left: `${heart.x}%` }}
             >
-              <Heart className="w-6 h-6 fill-current" />
+              <Heart className="w-7 h-7 fill-current drop-shadow-lg" />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Footer Controls */}
-      <div className="p-4 bg-gradient-to-t from-black to-transparent z-50">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2">
+      {/* Footer Controls - TikTok Style */}
+      <div className="p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-50">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2.5 group focus-within:bg-white/20 transition-all">
             <Smile className="w-5 h-5 text-white/60 mr-3 cursor-pointer hover:text-white transition-colors" />
             <form onSubmit={sendMessage} className="flex-1">
               <input 
                 type="text" 
-                placeholder={t('Say something...')} 
-                className="w-full bg-transparent border-none outline-none text-white text-xs font-bold placeholder:text-white/40"
+                placeholder={t('Add comment...')} 
+                className="w-full bg-transparent border-none outline-none text-white text-[13px] font-bold placeholder:text-white/40"
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
               />
             </form>
           </div>
           
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10">
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">GOAL</span>
-              <div className="w-12 h-1 bg-white/20 rounded-full mt-0.5 overflow-hidden">
-                <div className="w-2/3 h-full bg-pink-500" />
-              </div>
-            </div>
-          </div>
-
           <button 
             onClick={sendMessage}
-            className="w-10 h-10 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-pink-600 transition-all active:scale-90"
+            className="w-11 h-11 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-pink-600 transition-all active:scale-90"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </button>
-        </div>
-
-        <div className="flex justify-between items-center px-2">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-              <Signal className="w-3 h-3 text-emerald-500" />
-              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Stable Signal</span>
-            </div>
-          </div>
-          
-          <div className="px-4 py-2 bg-white/5 rounded-full border border-white/5 backdrop-blur-md">
-            <p className="text-white/20 text-[8px] font-black uppercase tracking-[0.2em]">VixReel Live Protocol v2.1</p>
-          </div>
         </div>
       </div>
     </div>
