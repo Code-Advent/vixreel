@@ -619,6 +619,15 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         </div>
 
         <div className="flex gap-3 justify-center">
+          {user.is_live && !isOwnProfile && (
+            <button 
+              onClick={() => onJoinLive?.(user)}
+              className="px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-red-500 text-white shadow-2xl shadow-red-500/20 hover:scale-105 transition-all flex items-center gap-2 border border-white/10"
+            >
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              {t('Join Live')}
+            </button>
+          )}
           {isOwnProfile ? (
             <div className="flex items-center gap-3">
               <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">{t('Edit Profile')}</button>

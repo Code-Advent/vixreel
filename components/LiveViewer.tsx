@@ -110,11 +110,24 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         })
         .subscribe();
 
+      const viewersChannel = supabase
+        .channel(`live-viewers-${stream.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'live_viewers',
+          filter: `stream_id=eq.${stream.id}`
+        }, () => {
+          fetchViewerCount();
+        })
+        .subscribe();
+
       return () => {
         if (hlsRef.current) hlsRef.current.destroy();
         decrementViewerCount();
         supabase.removeChannel(channel);
         supabase.removeChannel(likesChannel);
+        supabase.removeChannel(viewersChannel);
       };
     }
 
@@ -232,6 +245,18 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
     addHeart();
   };
 
+  const fetchViewerCount = async () => {
+    if (!stream.id) return;
+    const { data } = await supabase
+      .from('live_viewers')
+      .select('*', { count: 'exact', head: true })
+      .eq('stream_id', stream.id);
+    
+    if (data !== null) {
+      setViewerCount(data);
+    }
+  };
+
   const incrementViewerCount = async () => {
     if (!stream.id || !currentUser.id) return;
     try {
@@ -243,21 +268,14 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
       // Use RPC for atomic increment
       await supabase.rpc('increment_live_viewers', { stream_id: stream.id });
       
-      setMessages(prev => [...prev, {
-        id: `system-${Date.now()}`,
-        username: 'SYSTEM',
-        text: `@${currentUser.username} joined`,
-        created_at: new Date().toISOString()
-      }]);
+      // Insert persistent join message
+      await supabase.from('live_messages').insert({
+        stream_id: stream.id,
+        user_id: currentUser.id,
+        text: 'joined the live stream'
+      });
       
-      const { data: countData } = await supabase
-        .from('live_viewers')
-        .select('*', { count: 'exact', head: true })
-        .eq('stream_id', stream.id);
-      
-      if (countData !== null) {
-        setViewerCount(countData);
-      }
+      fetchViewerCount();
     } catch (err) {
       console.error('Increment Viewer Error:', err);
     }

@@ -8,9 +8,10 @@ import { useTranslation } from '../lib/translation';
 
 interface SearchProps {
   onSelectUser: (user: UserProfile) => void;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
+const Search: React.FC<SearchProps> = ({ onSelectUser, onJoinLive }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserProfile[]>([]);
@@ -103,6 +104,19 @@ const Search: React.FC<SearchProps> = ({ onSelectUser }) => {
                   @{user.username} {user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
                 </div>
                 <div className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em] mt-1 truncate">{user.full_name || t('Creator')}</div>
+                {user.is_live && (
+                  <div className="mt-2">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onJoinLive?.(user);
+                      }}
+                      className="px-4 py-1.5 bg-red-500 rounded-full text-[9px] font-black uppercase tracking-widest text-white hover:bg-red-600 transition-all shadow-lg animate-pulse"
+                    >
+                      {t('Join Live')}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="bg-[var(--vix-secondary)] p-3 rounded-2xl text-zinc-700 group-hover:text-pink-500 transition-all group-hover:rotate-45">
                  <X className="w-5 h-5 rotate-45" />

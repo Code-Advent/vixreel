@@ -10,9 +10,10 @@ interface ExploreProps {
   currentUserId: string;
   onSelectUser: (user: UserProfile) => void;
   onExpand?: (post: Post) => void;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand }) => {
+const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand, onJoinLive }) => {
   const { t } = useTranslation();
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [explorePosts, setExplorePosts] = useState<Post[]>([]);
@@ -90,7 +91,19 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
               </h3>
               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-4 truncate w-full">{user.full_name || t('Creator')}</p>
-              <button className="w-full py-2 bg-[var(--vix-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--vix-text)] hover:text-[var(--vix-bg)] transition-all text-[var(--vix-text)]">{t('Follow')}</button>
+              {user.is_live ? (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onJoinLive?.(user);
+                  }}
+                  className="w-full py-2 bg-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-600 transition-all shadow-lg animate-pulse"
+                >
+                  {t('Join Live')}
+                </button>
+              ) : (
+                <button className="w-full py-2 bg-[var(--vix-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--vix-text)] hover:text-[var(--vix-bg)] transition-all text-[var(--vix-text)]">{t('Follow')}</button>
+              )}
             </div>
           ))}
         </div>

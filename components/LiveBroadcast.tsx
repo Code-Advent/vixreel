@@ -91,28 +91,30 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       const channel = supabase
         .channel(`live-viewers-${streamInfo.id}`)
         .on('postgres_changes', { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'live_viewers',
           filter: `stream_id=eq.${streamInfo.db_id}` 
         }, async (payload) => {
-          const { data: userData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', payload.new.user_id)
-            .single();
-          
-          if (userData && userData.id !== currentUser.id) {
-            setJoinNotification(`@${userData.username} joined`);
-            setTimeout(() => setJoinNotification(null), 3000);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const { data: userData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', payload.new.user_id)
+              .single();
             
-            // Add system message to local chat
-            setMessages(prev => [...prev, {
-              id: `system-${Date.now()}`,
-              username: 'SYSTEM',
-              text: `@${userData.username} joined`,
-              created_at: new Date().toISOString()
-            }]);
+            if (userData && userData.id !== currentUser.id) {
+              setJoinNotification(`@${userData.username} joined`);
+              setTimeout(() => setJoinNotification(null), 3000);
+              
+              // Add system message to local chat
+              setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'SYSTEM',
+                text: `@${userData.username} joined`,
+                created_at: new Date().toISOString()
+              }]);
+            }
           }
           fetchViewers();
         })

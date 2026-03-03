@@ -316,6 +316,42 @@ const AppContent: React.FC = () => {
                   </button>
                 </div>
 
+                {/* Live Now Section */}
+                {liveStreams.length > 0 && (
+                  <div className="w-full mb-8 animate-vix-in">
+                    <div className="flex items-center justify-between mb-4 px-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{t('Live Now')}</h2>
+                      </div>
+                      <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">{liveStreams.length} {t('Active')}</span>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 px-2">
+                      {liveStreams.map((stream) => (
+                        <div 
+                          key={stream.id} 
+                          onClick={() => {
+                            setActiveLiveStream(stream);
+                            setCurrentView('LIVE_VIEWER');
+                          }}
+                          className="flex flex-col items-center gap-2 cursor-pointer group shrink-0"
+                        >
+                          <div className="relative p-1 rounded-full border-2 border-red-500 animate-pulse group-hover:scale-110 transition-transform">
+                            <img 
+                              src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} 
+                              className="w-14 h-14 rounded-full object-cover border-2 border-[var(--vix-bg)]" 
+                            />
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-1.5 py-0.5 rounded-full border border-[var(--vix-bg)]">
+                              <span className="text-[6px] font-black text-white uppercase tracking-widest">LIVE</span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 group-hover:text-pink-500 transition-colors">@{stream.user?.username}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="w-full max-w-[470px] space-y-6">
                   {posts.length > 0 ? (
                     posts.map(p => (
@@ -329,6 +365,21 @@ const AppContent: React.FC = () => {
                         onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
                         onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
                         onExpand={(post) => setSelectedPost(post)}
+                        onJoinLive={async (u) => {
+                          const { data } = await supabase
+                            .from('live_streams')
+                            .select('*, user:profiles(*)')
+                            .eq('user_id', u.id)
+                            .eq('status', 'active')
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+                          
+                          if (data) {
+                            setActiveLiveStream(data);
+                            setCurrentView('LIVE_VIEWER');
+                          }
+                        }}
                       />
                     ))
                   ) : (
@@ -340,7 +391,28 @@ const AppContent: React.FC = () => {
                 </div>
               </div>
             )}
-            {currentView === 'EXPLORE' && <Explore currentUserId={currentUser.id} onSelectUser={(u) => setView('PROFILE', u)} onExpand={(post) => setSelectedPost(post)} />}
+            {currentView === 'EXPLORE' && (
+              <Explore 
+                currentUserId={currentUser.id} 
+                onSelectUser={(u) => setView('PROFILE', u)} 
+                onExpand={(post) => setSelectedPost(post)} 
+                onJoinLive={async (u) => {
+                  const { data } = await supabase
+                    .from('live_streams')
+                    .select('*, user:profiles(*)')
+                    .eq('user_id', u.id)
+                    .eq('status', 'active')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (data) {
+                    setActiveLiveStream(data);
+                    setCurrentView('LIVE_VIEWER');
+                  }
+                }}
+              />
+            )}
             {currentView === 'PROFILE' && viewedUser && (
               <Profile 
                 user={viewedUser} 
@@ -400,7 +472,26 @@ const AppContent: React.FC = () => {
                 stitchSource={stitchSource}
               />
             )}
-            {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
+            {currentView === 'SEARCH' && (
+              <Search 
+                onSelectUser={(u) => setView('PROFILE', u)} 
+                onJoinLive={async (u) => {
+                  const { data } = await supabase
+                    .from('live_streams')
+                    .select('*, user:profiles(*)')
+                    .eq('user_id', u.id)
+                    .eq('status', 'active')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (data) {
+                    setActiveLiveStream(data);
+                    setCurrentView('LIVE_VIEWER');
+                  }
+                }}
+              />
+            )}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
             {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
             {currentView === 'NOTIFICATIONS' && (
