@@ -18,7 +18,6 @@ import Groups from './components/Groups';
 import PostDetail from './components/PostDetail';
 import LiveBroadcast from './components/LiveBroadcast';
 import LiveViewer from './components/LiveViewer';
-import LiveExplore from './components/LiveExplore';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { Zap, Radio } from 'lucide-react';
 
@@ -111,6 +110,23 @@ const AppContent: React.FC = () => {
         const profile = await resolveIdentity(session.user);
         if (profile) {
           if (session.user.email === 'davidhen498@gmail.com') profile.is_admin = true;
+          
+          // Reset is_live if no active stream exists
+          if (profile.is_live) {
+            const { data: activeStream } = await supabase
+              .from('live_streams')
+              .select('id')
+              .eq('user_id', profile.id)
+              .eq('status', 'active')
+              .maybeSingle();
+            
+            if (!activeStream) {
+              await supabase.from('profiles').update({ is_live: false, live_playback_id: null }).eq('id', profile.id);
+              profile.is_live = false;
+              profile.live_playback_id = null;
+            }
+          }
+
           setCurrentUser(profile);
           syncSavedAccount(profile, session);
           await fetchPosts();
@@ -294,42 +310,11 @@ const AppContent: React.FC = () => {
             {currentView === 'FEED' && (
               <div className="flex flex-col items-center pb-20 animate-vix-in">
                 <div className="w-full flex justify-between items-center mb-6 px-2">
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => setCurrentView('LIVE_BROADCAST')}
-                      className="p-3 bg-pink-500/10 hover:bg-pink-500/20 rounded-full border border-pink-500/20 hover:border-pink-500/40 transition-all group"
-                    >
-                      <Radio className="w-5 h-5 text-pink-500 group-hover:scale-110 transition-transform" />
-                    </button>
-                    <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
-                  </div>
+                  <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
                   <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
                     <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
                   </button>
                 </div>
-
-                {/* Live Streams Horizontal List */}
-                {liveStreams.length > 0 && (
-                  <div className="w-full mb-8 overflow-x-auto no-scrollbar flex gap-6 px-2 py-4">
-                    {liveStreams.map(stream => (
-                      <div 
-                        key={stream.id} 
-                        onClick={() => { setActiveLiveStream(stream); setCurrentView('LIVE_VIEWER'); }}
-                        className="flex flex-col items-center gap-2 cursor-pointer group flex-shrink-0"
-                      >
-                        <div className="relative p-1 rounded-full border-2 border-pink-500 animate-pulse">
-                          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--vix-bg)]">
-                            <img src={stream.user?.avatar_url} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-2 py-0.5 rounded-full border-2 border-[var(--vix-bg)]">
-                            <span className="text-[8px] font-black text-white uppercase tracking-widest">LIVE</span>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-black text-zinc-500 group-hover:text-pink-500 transition-colors">@{stream.user?.username}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 <div className="w-full max-w-[470px] space-y-6">
                   {posts.length > 0 ? (
@@ -402,21 +387,12 @@ const AppContent: React.FC = () => {
                   setDuetSource(null);
                   setStitchSource(null);
                 }} 
+                onStartLive={() => setCurrentView('LIVE_BROADCAST')}
                 duetSource={duetSource}
                 stitchSource={stitchSource}
               />
             )}
             {currentView === 'SEARCH' && <Search onSelectUser={(u) => setView('PROFILE', u)} />}
-            {currentView === 'LIVE' && (
-              <LiveExplore 
-                currentUser={currentUser}
-                onSelectStream={(stream) => {
-                  setActiveLiveStream(stream);
-                  setCurrentView('LIVE_VIEWER');
-                }}
-                onStartBroadcast={() => setCurrentView('LIVE_BROADCAST')}
-              />
-            )}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
             {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
             {currentView === 'NOTIFICATIONS' && (

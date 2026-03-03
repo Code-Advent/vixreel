@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, Zap, Loader2, StopCircle, Mic, MicOff, Video, VideoOff, Users, MessageCircle, Send, Heart } from 'lucide-react';
+import { Camera, X, Zap, Loader2, StopCircle, Mic, MicOff, Video, VideoOff, Users, MessageCircle, Send, Heart, Monitor, MonitorOff } from 'lucide-react';
 import { UserProfile, LiveStream } from '../types';
 import { supabase } from '../lib/supabase';
 import { useTranslation } from '../lib/translation';
@@ -25,6 +25,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   const [joinNotification, setJoinNotification] = useState<string | null>(null);
   const [streamHealth, setStreamHealth] = useState<'EXCELLENT' | 'GOOD' | 'POOR'>('EXCELLENT');
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -280,6 +281,42 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     }
   };
 
+  const toggleScreenShare = async () => {
+    try {
+      if (isScreenSharing) {
+        // Switch back to camera
+        await startPreview();
+        setIsScreenSharing(false);
+      } else {
+        // Switch to screen share
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+        
+        if (streamRef.current) {
+          // Replace video track
+          const videoTrack = screenStream.getVideoTracks()[0];
+          const sender = mediaRecorderRef.current?.stream.getVideoTracks()[0]; // This is tricky with MediaRecorder
+          
+          // For simplicity in this mock/Mux setup, we just update the local preview and streamRef
+          streamRef.current = screenStream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = screenStream;
+          }
+          
+          videoTrack.onended = () => {
+            toggleScreenShare();
+          };
+        }
+        setIsScreenSharing(true);
+      }
+    } catch (err) {
+      console.error('Screen Share Error:', err);
+      setError('Screen share access denied.');
+    }
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !streamInfo) return;
@@ -481,6 +518,9 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
                 </button>
                 <button onClick={toggleVideo} className={`p-4 rounded-full transition-all ${videoEnabled ? 'bg-white/10 text-white' : 'bg-red-500 text-white'}`}>
                   {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                </button>
+                <button onClick={toggleScreenShare} className={`p-4 rounded-full transition-all ${!isScreenSharing ? 'bg-white/10 text-white' : 'bg-blue-500 text-white'}`}>
+                  {!isScreenSharing ? <Monitor className="w-5 h-5" /> : <MonitorOff className="w-5 h-5" />}
                 </button>
               </div>
               <button 

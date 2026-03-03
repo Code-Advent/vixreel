@@ -20,6 +20,8 @@ export interface UserProfile {
   is_location_private?: boolean;
   website?: string;
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
+  is_live?: boolean;
+  live_playback_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -191,4 +193,4 @@ export interface LiveStream {
   user?: UserProfile;
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'LIVE' | 'LIVE_BROADCAST' | 'LIVE_VIEWER';
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'LIVE_BROADCAST' | 'LIVE_VIEWER';
