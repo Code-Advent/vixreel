@@ -77,6 +77,10 @@
     animation: vix-pulse 1s ease-in-out infinite;
   }
 
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
   .mask-fade-top {
     mask-image: linear-gradient(to top, black 80%, transparent 100%);
   }

@@ -457,7 +457,26 @@ CREATE POLICY "Users can join/leave streams" ON public.live_viewers FOR ALL USIN
 CREATE POLICY "Live messages are viewable by everyone" ON public.live_messages FOR SELECT USING (true);
 CREATE POLICY "Users can insert own live messages" ON public.live_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 20. STORAGE BUCKETS CONFIGURATION
+-- 20. FUNCTIONS
+CREATE OR REPLACE FUNCTION increment_live_viewers(stream_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.live_streams
+    SET viewer_count = viewer_count + 1
+    WHERE id = stream_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION decrement_live_viewers(stream_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.live_streams
+    SET viewer_count = GREATEST(0, viewer_count - 1)
+    WHERE id = stream_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 21. STORAGE BUCKETS CONFIGURATION
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO UPDATE SET public = true;
