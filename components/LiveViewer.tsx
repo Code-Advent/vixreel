@@ -98,10 +98,23 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         })
         .subscribe();
 
+      const likesChannel = supabase
+        .channel(`live-likes-${stream.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_likes',
+          filter: `stream_id=eq.${stream.id}`
+        }, () => {
+          addHeart();
+        })
+        .subscribe();
+
       return () => {
         if (hlsRef.current) hlsRef.current.destroy();
         decrementViewerCount();
         supabase.removeChannel(channel);
+        supabase.removeChannel(likesChannel);
       };
     }
 
@@ -165,6 +178,24 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         text: data.text,
         created_at: data.created_at
       }]);
+    }
+  };
+
+  const handleLike = async () => {
+    if (!stream.id || !currentUser.id) return;
+    setIsLiked(true);
+    addHeart();
+    setTimeout(() => setIsLiked(false), 200);
+
+    try {
+      await supabase.from('live_likes').insert({
+        stream_id: stream.id,
+        user_id: currentUser.id
+      });
+      
+      await supabase.rpc('increment_live_likes', { stream_id: stream.id });
+    } catch (err) {
+      console.error('Like Error:', err);
     }
   };
 
@@ -344,11 +375,7 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
           </button>
 
           <button 
-            onClick={() => {
-              setIsLiked(true);
-              addHeart();
-              setTimeout(() => setIsLiked(false), 200);
-            }}
+            onClick={handleLike}
             className="flex flex-col items-center gap-1 group"
           >
             <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isLiked ? 'bg-pink-500 scale-125' : 'bg-black/30 backdrop-blur-md border border-white/10 group-hover:bg-black/50'}`}>

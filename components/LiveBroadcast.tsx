@@ -148,8 +148,21 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
         })
         .subscribe();
 
+      const likesChannel = supabase
+        .channel(`live-likes-${streamInfo.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_likes',
+          filter: `stream_id=eq.${streamInfo.db_id}`
+        }, () => {
+          addHeart();
+        })
+        .subscribe();
+
       return () => {
         supabase.removeChannel(msgChannel);
+        supabase.removeChannel(likesChannel);
       };
     }
   }, [isLive, streamInfo]);
