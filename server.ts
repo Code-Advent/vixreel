@@ -33,8 +33,8 @@ async function startServer() {
   });
 
   // Mux API Endpoints
-  app.post('/api/live/create', async (req, res) => {
-    console.log('VixReel: Received request to create live stream');
+  app.post(['/api/live/create', '/api/live/create/'], async (req, res) => {
+    console.log('VixReel: [CREATE_STREAM] Received request');
     try {
       if (!MUX_TOKEN_ID || !MUX_TOKEN_SECRET) {
         throw new Error('Mux API keys are missing in environment');
@@ -63,18 +63,18 @@ async function startServer() {
     }
   });
 
-  app.get('/api/live/:id', async (req, res) => {
+  app.get(['/api/live/:id', '/api/live/:id/'], async (req, res) => {
     try {
-      const liveStream = await mux.video.liveStreams.retrieve(req.params.id);
+      const liveStream = await mux.video.liveStreams.retrieve(req.params.id as string);
       res.json(liveStream);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete('/api/live/:id', async (req, res) => {
+  app.delete(['/api/live/:id', '/api/live/:id/'], async (req, res) => {
     try {
-      await mux.video.liveStreams.delete(req.params.id);
+      await mux.video.liveStreams.delete(req.params.id as string);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

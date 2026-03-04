@@ -143,18 +143,26 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     setLoading(true);
     setError(null);
     try {
-      // 1. Call Supabase Edge Function
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-live-stream`, {
+      // 1. Call Local API instead of Supabase Edge Function
+      const response = await fetch('/api/live/create', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         }
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Live Stream Creation Error Response:', errorText);
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || 'Failed to create live stream');
+        } catch (e) {
+          throw new Error(`Server error (${response.status}): ${errorText.substring(0, 100)}...`);
+        }
+      }
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to create live stream');
 
       // 2. Insert into live_streams table
       const { data: dbStream, error: dbErr } = await supabase.from('live_streams').insert({
