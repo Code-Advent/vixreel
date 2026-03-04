@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "^1.38.0",
     "@mux/mux-node": "^12.8.1",
+    "@mux/mux-player-react": "^3.11.5",
     "@supabase/supabase-js": "^2.93.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

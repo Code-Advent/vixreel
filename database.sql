@@ -263,46 +263,30 @@ ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_playback_id TEXT;
 
--- 18. LIVE STREAMS TABLE
+-- 18. LIVE STREAMS TABLE (REBUILT)
 CREATE TABLE IF NOT EXISTS public.live_streams (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    stream_key TEXT NOT NULL,
     playback_id TEXT NOT NULL,
-    mux_live_stream_id TEXT NOT NULL,
-    status TEXT DEFAULT 'idle' CHECK (status IN ('idle', 'active', 'disconnected')),
+    stream_key TEXT, -- Added for broadcaster use
+    is_live BOOLEAN DEFAULT TRUE,
     viewer_count INTEGER DEFAULT 0,
-    likes_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_live_streams_user_id ON public.live_streams(user_id);
-CREATE INDEX IF NOT EXISTS idx_live_streams_status ON public.live_streams(status);
-CREATE INDEX IF NOT EXISTS idx_live_viewers_stream_id ON public.live_viewers(stream_id);
-CREATE INDEX IF NOT EXISTS idx_live_messages_stream_id ON public.live_messages(stream_id);
+CREATE INDEX IF NOT EXISTS idx_live_streams_is_live ON public.live_streams(is_live);
 
--- 18c. LIVE LIKES TABLE
-CREATE TABLE IF NOT EXISTS public.live_likes (
+-- 18a. LIVE MESSAGES TABLE (REBUILT)
+CREATE TABLE IF NOT EXISTS public.live_messages (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    text TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 18d. LIVE GIFTS TABLE
-CREATE TABLE IF NOT EXISTS public.live_gifts (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    gift_type TEXT NOT NULL,
-    amount INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_live_likes_stream_id ON public.live_likes(stream_id);
-CREATE INDEX IF NOT EXISTS idx_live_gifts_stream_id ON public.live_gifts(stream_id);
-
--- 18a. LIVE VIEWERS TABLE
+-- 18b. LIVE VIEWERS TABLE (REBUILT)
 CREATE TABLE IF NOT EXISTS public.live_viewers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
@@ -311,12 +295,11 @@ CREATE TABLE IF NOT EXISTS public.live_viewers (
     UNIQUE(stream_id, user_id)
 );
 
--- 18b. LIVE MESSAGES TABLE
-CREATE TABLE IF NOT EXISTS public.live_messages (
+-- 18c. LIVE LIKES TABLE (REBUILT)
+CREATE TABLE IF NOT EXISTS public.live_likes (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    text TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -477,27 +460,21 @@ CREATE POLICY "Users can delete own stickers" ON public.stickers FOR DELETE USIN
 -- Live Streams
 CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
 CREATE POLICY "Users can insert own live streams" ON public.live_streams FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own live streams" ON public.live_streams FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own live streams" ON public.live_streams FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own live streams" ON public.live_streams FOR DELETE USING (auth.uid() = user_id);
 
 -- Live Viewers
 CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
 CREATE POLICY "Users can join streams" ON public.live_viewers FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own viewer status" ON public.live_viewers FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can leave streams" ON public.live_viewers FOR DELETE USING (auth.uid() = user_id);
 
 -- Live Messages
 CREATE POLICY "Live messages are viewable by everyone" ON public.live_messages FOR SELECT USING (true);
 CREATE POLICY "Users can insert own live messages" ON public.live_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own live messages" ON public.live_messages FOR DELETE USING (auth.uid() = user_id);
 
 -- Live Likes
 CREATE POLICY "Live likes are viewable by everyone" ON public.live_likes FOR SELECT USING (true);
 CREATE POLICY "Users can insert own live likes" ON public.live_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Live Gifts
-CREATE POLICY "Live gifts are viewable by everyone" ON public.live_gifts FOR SELECT USING (true);
-CREATE POLICY "Users can insert own live gifts" ON public.live_gifts FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 20. FUNCTIONS
 CREATE OR REPLACE FUNCTION increment_live_viewers(stream_id UUID)
@@ -514,15 +491,6 @@ RETURNS VOID AS $$
 BEGIN
     UPDATE public.live_streams
     SET viewer_count = GREATEST(0, viewer_count - 1)
-    WHERE id = stream_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION increment_live_likes(stream_id UUID)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE public.live_streams
-    SET likes_count = likes_count + 1
     WHERE id = stream_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

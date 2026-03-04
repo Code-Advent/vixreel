@@ -18,6 +18,7 @@ import Groups from './components/Groups';
 import PostDetail from './components/PostDetail';
 import LiveBroadcast from './components/LiveBroadcast';
 import LiveViewer from './components/LiveViewer';
+import LiveDiscovery from './components/LiveDiscovery';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { Zap, Radio } from 'lucide-react';
 
@@ -117,7 +118,7 @@ const AppContent: React.FC = () => {
               .from('live_streams')
               .select('id')
               .eq('user_id', profile.id)
-              .eq('status', 'active')
+              .eq('is_live', true)
               .maybeSingle();
             
             if (!activeStream) {
@@ -239,7 +240,7 @@ const AppContent: React.FC = () => {
     const { data: liveData } = await supabase
       .from('live_streams')
       .select('*, user:profiles(*)')
-      .eq('status', 'active');
+      .eq('is_live', true);
     
     if (liveData) setLiveStreams(liveData);
 
@@ -255,6 +256,24 @@ const AppContent: React.FC = () => {
       setPosts(shuffled as any);
     }
   };
+
+  useEffect(() => {
+    // Real-time subscription for live streams
+    const channel = supabase
+      .channel('live-streams-discovery')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'live_streams' 
+      }, () => {
+        fetchPosts(); // Refresh both posts and live streams
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const setView = (view: ViewType, explicitUser?: UserProfile) => {
     setProfileAutoEdit(false);
@@ -310,23 +329,27 @@ const AppContent: React.FC = () => {
             {currentView === 'FEED' && (
               <div className="flex flex-col items-center pb-20 animate-vix-in">
                 <div className="w-full flex justify-between items-center mb-6 px-2">
-                  <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
+                  <div className="flex items-center gap-4">
+                    <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
+                    {liveStreams.length > 0 && (
+                      <button 
+                        onClick={() => setView('LIVE')}
+                        className="flex items-center gap-2 bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20 hover:bg-red-500/20 transition-all group"
+                      >
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">{t('Live')}</span>
+                      </button>
+                    )}
+                  </div>
                   <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
                     <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
                   </button>
                 </div>
 
-                {/* Live Now Section */}
+                {/* Live Now Section - TikTok Style Horizontal Scroll */}
                 {liveStreams.length > 0 && (
                   <div className="w-full mb-8 animate-vix-in">
-                    <div className="flex items-center justify-between mb-4 px-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                        <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{t('Live Now')}</h2>
-                      </div>
-                      <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">{liveStreams.length} {t('Active')}</span>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 px-2">
+                    <div className="flex gap-5 overflow-x-auto no-scrollbar pb-4 px-2">
                       {liveStreams.map((stream) => (
                         <div 
                           key={stream.id} 
@@ -336,16 +359,20 @@ const AppContent: React.FC = () => {
                           }}
                           className="flex flex-col items-center gap-2 cursor-pointer group shrink-0"
                         >
-                          <div className="relative p-1 rounded-full border-2 border-red-500 animate-pulse group-hover:scale-110 transition-transform">
-                            <img 
-                              src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} 
-                              className="w-14 h-14 rounded-full object-cover border-2 border-[var(--vix-bg)]" 
-                            />
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-1.5 py-0.5 rounded-full border border-[var(--vix-bg)]">
-                              <span className="text-[6px] font-black text-white uppercase tracking-widest">LIVE</span>
+                          <div className="relative">
+                            <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-red-500 animate-spin-slow">
+                              <div className="w-full h-full rounded-full p-0.5 bg-[var(--vix-bg)]">
+                                <img 
+                                  src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} 
+                                  className="w-full h-full rounded-full object-cover" 
+                                />
+                              </div>
+                            </div>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-2 py-0.5 rounded-full border-2 border-[var(--vix-bg)] shadow-lg">
+                              <span className="text-[7px] font-black text-white uppercase tracking-widest">LIVE</span>
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-zinc-500 group-hover:text-pink-500 transition-colors">@{stream.user?.username}</span>
+                          <span className="text-[10px] font-bold text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">@{stream.user?.username}</span>
                         </div>
                       ))}
                     </div>
@@ -370,7 +397,7 @@ const AppContent: React.FC = () => {
                             .from('live_streams')
                             .select('*, user:profiles(*)')
                             .eq('user_id', u.id)
-                            .eq('status', 'active')
+                            .eq('is_live', true)
                             .order('created_at', { ascending: false })
                             .limit(1)
                             .maybeSingle();
@@ -401,7 +428,7 @@ const AppContent: React.FC = () => {
                     .from('live_streams')
                     .select('*, user:profiles(*)')
                     .eq('user_id', u.id)
-                    .eq('status', 'active')
+                    .eq('is_live', true)
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
@@ -438,7 +465,7 @@ const AppContent: React.FC = () => {
                     .from('live_streams')
                     .select('*, user:profiles(*)')
                     .eq('user_id', u.id)
-                    .eq('status', 'active')
+                    .eq('is_live', true)
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
@@ -472,6 +499,15 @@ const AppContent: React.FC = () => {
                 stitchSource={stitchSource}
               />
             )}
+            {currentView === 'LIVE' && (
+              <LiveDiscovery 
+                onJoinLive={(stream) => {
+                  setActiveLiveStream(stream);
+                  setCurrentView('LIVE_VIEWER');
+                }} 
+              />
+            )}
+            
             {currentView === 'SEARCH' && (
               <Search 
                 onSelectUser={(u) => setView('PROFILE', u)} 
@@ -480,7 +516,7 @@ const AppContent: React.FC = () => {
                     .from('live_streams')
                     .select('*, user:profiles(*)')
                     .eq('user_id', u.id)
-                    .eq('status', 'active')
+                    .eq('is_live', true)
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .maybeSingle();
