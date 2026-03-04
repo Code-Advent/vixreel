@@ -104,7 +104,17 @@ const AppContent: React.FC = () => {
     setLoading(true);
     try {
       // Server Health Check
-      fetch('/api/health').then(res => res.json()).then(d => console.log('VixReel: Server Status:', d.status)).catch(() => console.error('VixReel: Server Offline'));
+    const checkServer = async () => {
+      console.log('VixReel: App Origin:', window.location.origin);
+      try {
+        const res = await fetch(`${window.location.origin}/api/health`);
+        const d = await res.json();
+        console.log('VixReel: Server Status:', d.status);
+      } catch (e) {
+        console.error('VixReel: Server Offline or Unreachable');
+      }
+    };
+    checkServer();
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {

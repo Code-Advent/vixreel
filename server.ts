@@ -23,7 +23,7 @@ async function startServer() {
 
   // Request Logging
   app.use((req, res, next) => {
-    console.log(`VixReel: [${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log(`VixReel: [${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
   });
 
@@ -33,11 +33,12 @@ async function startServer() {
   });
 
   // Mux API Endpoints
-  app.post(['/api/live/create', '/api/live/create/'], async (req, res) => {
-    console.log('VixReel: [CREATE_STREAM] Received request');
+  app.post('/api/live/create', async (req, res) => {
+    console.log('VixReel: [CREATE_STREAM] Processing request...');
     try {
       if (!MUX_TOKEN_ID || !MUX_TOKEN_SECRET) {
-        throw new Error('Mux API keys are missing in environment');
+        console.error('VixReel: [CREATE_STREAM] ERROR: Mux API keys are missing');
+        return res.status(500).json({ error: 'Mux API keys are missing in environment' });
       }
 
       const liveStream = await mux.video.liveStreams.create({
@@ -46,7 +47,7 @@ async function startServer() {
         test: false,
       });
 
-      console.log('VixReel: Mux stream created successfully:', liveStream.id);
+      console.log('VixReel: [CREATE_STREAM] SUCCESS:', liveStream.id);
 
       res.json({
         id: liveStream.id,
@@ -55,30 +56,40 @@ async function startServer() {
         status: liveStream.status,
       });
     } catch (error: any) {
-      console.error('VixReel: Mux Create Stream Error:', error);
+      console.error('VixReel: [CREATE_STREAM] ERROR:', error);
       res.status(500).json({ 
-        error: error.message,
+        error: error.message || 'Failed to create live stream',
         details: error.stack
       });
     }
   });
 
-  app.get(['/api/live/:id', '/api/live/:id/'], async (req, res) => {
+  app.get('/api/live/:id', async (req, res) => {
+    console.log(`VixReel: [GET_STREAM] ${req.params.id}`);
     try {
       const liveStream = await mux.video.liveStreams.retrieve(req.params.id as string);
       res.json(liveStream);
     } catch (error: any) {
+      console.error(`VixReel: [GET_STREAM] ERROR:`, error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete(['/api/live/:id', '/api/live/:id/'], async (req, res) => {
+  app.delete('/api/live/:id', async (req, res) => {
+    console.log(`VixReel: [DELETE_STREAM] ${req.params.id}`);
     try {
       await mux.video.liveStreams.delete(req.params.id as string);
       res.json({ success: true });
     } catch (error: any) {
+      console.error(`VixReel: [DELETE_STREAM] ERROR:`, error);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // API Catch-all (to distinguish from Vite 404s)
+  app.all('/api/*', (req, res) => {
+    console.warn(`VixReel: [API_404] ${req.method} ${req.url}`);
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
   });
 
   // Vite Middleware for Development

@@ -144,7 +144,8 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     setError(null);
     try {
       // 1. Call Local API instead of Supabase Edge Function
-      const response = await fetch('/api/live/create', {
+      const apiUrl = `${window.location.origin}/api/live/create`;
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
