@@ -4,7 +4,7 @@ import {
   Users, Plus, Search, Globe, Lock, ArrowLeft, 
   MoreHorizontal, MessageSquare, Image as ImageIcon, 
   Video, Send, Heart, X, Loader2, Camera, Shield, ChevronLeft,
-  Link as LinkIcon, CheckCircle2, Bell, Share2, Download, LogOut
+  Link as LinkIcon, CheckCircle2, Bell, Share2, Download, LogOut, Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
@@ -339,6 +339,17 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm(t('Are you sure you want to delete this update?'))) return;
+    try {
+      const { error } = await supabase.from('group_posts').delete().eq('id', postId);
+      if (error) throw error;
+      setGroupPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (err) {
+      console.error('Error deleting post:', err);
+    }
+  };
+
   const togglePostReaction = async (postId: string, reaction: string) => {
     try {
       const { data: existing } = await supabase
@@ -452,40 +463,40 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <Loader2 className="w-8 h-8 animate-spin vix-loader" />
               </div>
             ) : groups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                <div className="w-20 h-20 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-6">
-                  <Globe className="w-10 h-10 text-[var(--vix-muted)]" />
+              <div className="flex flex-col items-center justify-center py-32 text-center px-6">
+                <div className="w-24 h-24 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-8 shadow-inner">
+                  <Globe className="w-12 h-12 text-[var(--vix-muted)]" />
                 </div>
-                <h3 className="text-xl font-bold text-[var(--vix-text)] mb-2">{t('No channels found')}</h3>
-                <p className="text-[var(--vix-muted)] max-w-xs">{t('Be the first to create a community and share your updates with the world.')}</p>
+                <h3 className="text-2xl font-black text-[var(--vix-text)] mb-3 uppercase tracking-tight">{t('No channels found')}</h3>
+                <p className="text-[var(--vix-muted)] max-w-xs font-medium leading-relaxed">{t('Be the first to create a community and share your updates with the world.')}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-8">
                 {groups.map(group => (
                   <div 
                     key={group.id}
                     onClick={() => selectGroup(group)}
-                    className="group bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-3xl p-4 cursor-pointer hover:border-pink-500/50 transition-all hover:shadow-2xl hover:-translate-y-1"
+                    className="group bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 cursor-pointer hover:border-pink-500/50 transition-all hover:shadow-2xl hover:-translate-y-2"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex flex-col items-center text-center gap-4">
                       <div className="relative">
-                        <img src={group.cover_url} className="w-16 h-16 rounded-2xl object-cover border border-[var(--vix-border)]" alt={group.name} />
+                        <img src={group.cover_url} className="w-24 h-24 rounded-[2rem] object-cover border-2 border-[var(--vix-border)] shadow-xl group-hover:scale-105 transition-transform" alt={group.name} />
                         {group.is_verified && (
-                          <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-lg">
-                            <CheckCircle2 className="w-4 h-4 fill-[#ec4899] text-white" />
+                          <div className="absolute -bottom-2 -right-2 bg-[var(--vix-bg)] rounded-full p-1 shadow-xl">
+                            <CheckCircle2 className="w-5 h-5 fill-[#ec4899] text-white" />
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-black text-[var(--vix-text)] truncate uppercase tracking-tight">
+                      <div className="flex-1 min-w-0 w-full">
+                        <h3 className="text-lg font-black text-[var(--vix-text)] truncate uppercase tracking-tight mb-1">
                           {group.name}
                         </h3>
-                        <p className="text-xs text-[var(--vix-muted)] font-bold mt-0.5">
+                        <p className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
                           {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('followers')}
                         </p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <button className="bg-pink-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-pink-600 transition-all">
-                            {t('View')}
+                        <div className="mt-6 flex items-center justify-center gap-2">
+                          <button className="bg-gradient-to-r from-pink-500 to-blue-500 text-white px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all">
+                            {t('View Channel')}
                           </button>
                         </div>
                       </div>
@@ -708,19 +719,19 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                           </div>
                         )}
                         
-                        <div className="max-w-[92%] sm:max-w-[85%] mx-auto space-y-2">
-                          <div className="bg-[var(--vix-card)] rounded-xl shadow-lg relative group overflow-hidden border border-[var(--vix-border)]">
+                        <div className="max-w-[92%] sm:max-w-[85%] mx-auto space-y-3">
+                          <div className="bg-[var(--vix-card)] rounded-[2rem] shadow-lg relative group overflow-hidden border border-[var(--vix-border)]">
                             {post.media_url && (
                               <div className="relative">
                                 {post.media_type === 'video' ? (
-                                  <video src={post.media_url} controls className="w-full max-h-[500px] object-cover" />
+                                  <video src={post.media_url} controls className="w-full max-h-[600px] object-cover" />
                                 ) : (
                                   <div className="relative group/media cursor-pointer">
-                                    <img src={post.media_url} className="w-full max-h-[500px] object-cover" alt="Post media" />
-                                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                                      <div className="bg-black/40 backdrop-blur-md rounded-full px-4 py-2 flex items-center gap-2 text-white text-xs font-bold border border-white/10">
-                                        <Download className="w-4 h-4" />
-                                        <span>2.1 MB</span>
+                                    <img src={post.media_url} className="w-full max-h-[600px] object-cover" alt="Post media" />
+                                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity">
+                                      <div className="bg-black/40 backdrop-blur-md rounded-full px-6 py-3 flex items-center gap-3 text-white text-xs font-bold border border-white/10">
+                                        <Download className="w-5 h-5" />
+                                        <span>{t('Download Media')}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -728,74 +739,69 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                               </div>
                             )}
                             
-                            <div className="p-3 space-y-2">
+                            <div className="p-6 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-[var(--vix-text)] uppercase tracking-widest">
+                                    {selectedGroup.name}
+                                  </span>
+                                  {selectedGroup.is_verified && (
+                                    <CheckCircle2 className="w-3.5 h-3.5 fill-[#ec4899] text-white" />
+                                  )}
+                                </div>
+                                {(selectedGroup.creator_id === currentUser.id) && (
+                                  <button 
+                                    onClick={() => handleDeletePost(post.id)}
+                                    className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+
                               {post.content && (
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                   {/* Detect if content has a title-like first line */}
                                   {post.content.includes('\n') ? (
                                     <>
-                                      <h4 className="text-[15px] font-bold text-[var(--vix-text)] leading-tight">
+                                      <h4 className="text-lg font-black text-[var(--vix-text)] leading-tight uppercase tracking-tight">
                                         {post.content.split('\n')[0]}
                                       </h4>
-                                      <p className="text-[14px] text-[var(--vix-text)] leading-snug whitespace-pre-wrap font-normal opacity-90">
+                                      <p className="text-[15px] text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap font-medium opacity-80">
                                         {post.content.split('\n').slice(1).join('\n')}
                                       </p>
                                     </>
                                   ) : (
-                                    <p className="text-[14.5px] text-[var(--vix-text)] leading-snug whitespace-pre-wrap font-normal">
+                                    <p className="text-[16px] text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap font-medium">
                                       {post.content}
                                     </p>
                                   )}
                                   
                                   {post.content.toLowerCase().includes('http') && (
-                                    <div className="pt-2">
-                                      <p className="text-[14px] text-pink-500 hover:underline cursor-pointer">
-                                        Learn more: {post.content.match(/https?:\/\/[^\s]+/)?.[0]}
+                                    <div className="pt-4">
+                                      <p className="text-[14px] text-blue-500 font-bold hover:underline cursor-pointer flex items-center gap-2">
+                                        <LinkIcon className="w-4 h-4" />
+                                        {t('Learn more')}: {post.content.match(/https?:\/\/[^\s]+/)?.[0]}
                                       </p>
                                     </div>
                                   )}
                                 </div>
                               )}
                               
-                              <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-[var(--vix-muted)] font-medium">
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--vix-border)]/10">
+                                <span className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest">
                                   {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Reactions & Share Bar */}
-                            <div className="flex items-center justify-between px-3 pb-3">
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 bg-[var(--vix-secondary)] rounded-full px-2.5 py-1 border border-[var(--vix-border)] shadow-sm cursor-pointer hover:bg-[var(--vix-border)] transition-colors">
-                                  <div className="flex -space-x-1">
-                                    {['👍', '❤️', '🙏', '😂'].slice(0, 3).map((emoji, i) => (
-                                      <span key={i} className="text-[13px]">{emoji}</span>
-                                    ))}
-                                  </div>
-                                  <span className="text-[12px] text-[var(--vix-muted)] font-bold ml-1.5">
-                                    {formatNumber(post.likes_count || 0)}
-                                  </span>
-                                </div>
-                                
-                                <div className="flex items-center gap-1">
-                                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) => (
-                                    <button 
-                                      key={emoji}
-                                      onClick={() => togglePostReaction(post.id, emoji)}
-                                      className={`text-[14px] p-1 hover:scale-125 transition-transform ${post.reactions?.some(r => r.user_id === currentUser.id && r.reaction === emoji) ? 'bg-pink-500/10 rounded-full' : ''}`}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              
+                            {/* Share Bar */}
+                            <div className="flex items-center justify-end px-6 pb-6">
                               <button 
                                 onClick={() => copyGroupLink(selectedGroup.id)}
-                                className="p-2 bg-[var(--vix-secondary)] rounded-full text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)]"
+                                className="p-3 bg-[var(--vix-secondary)] rounded-full text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)] shadow-md"
                               >
-                                <Share2 className="w-4 h-4" />
+                                <Share2 className="w-5 h-5" />
                               </button>
                             </div>
                           </div>
@@ -817,21 +823,21 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
             {/* Broadcast Input (Admin Only) */}
             {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
-              <div className="p-3 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
-                <div className="flex items-end gap-2 max-w-3xl mx-auto">
-                  <div className="flex-1 bg-[var(--vix-secondary)] rounded-2xl flex flex-col p-1 border border-[var(--vix-border)]">
+              <div className="p-6 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
+                <div className="flex items-end gap-4 max-w-4xl mx-auto">
+                  <div className="flex-1 bg-[var(--vix-secondary)] rounded-[2rem] flex flex-col p-2 border border-[var(--vix-border)] shadow-inner">
                     {postPreview && (
-                      <div className="relative w-20 h-20 m-2 rounded-lg overflow-hidden border border-[var(--vix-border)]">
-                        <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full z-10"><X className="w-3 h-3" /></button>
+                      <div className="relative w-32 h-32 m-3 rounded-2xl overflow-hidden border border-[var(--vix-border)] shadow-lg">
+                        <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full z-10 hover:bg-black transition-colors"><X className="w-4 h-4" /></button>
                         {postFile?.type.startsWith('video') ? <video src={postPreview} className="w-full h-full object-cover" /> : <img src={postPreview} className="w-full h-full object-cover" />}
                       </div>
                     )}
                     <div className="flex items-center">
                       <button 
                         onClick={() => document.getElementById('channel-post-media')?.click()}
-                        className="p-3 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all"
+                        className="p-4 text-[var(--vix-muted)] hover:text-pink-500 transition-all"
                       >
-                        <ImageIcon className="w-6 h-6" />
+                        <Plus className="w-7 h-7" />
                       </button>
                       <input 
                         id="channel-post-media"
@@ -850,7 +856,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                         value={postContent}
                         onChange={e => setPostContent(e.target.value)}
                         placeholder={t('Broadcast an update...')}
-                        className="flex-1 bg-transparent border-none py-3 px-1 text-[15px] text-[var(--vix-text)] outline-none placeholder:text-[var(--vix-muted)] resize-none max-h-32"
+                        className="flex-1 bg-transparent border-none py-4 px-2 text-[16px] text-[var(--vix-text)] outline-none placeholder:text-[var(--vix-muted)] resize-none max-h-48 font-medium"
                         rows={1}
                       />
                     </div>
@@ -859,23 +865,23 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                   <button 
                     onClick={handleCreatePost}
                     disabled={!postContent.trim() || isPosting}
-                    className="bg-pink-500 p-3.5 rounded-full text-white shadow-lg disabled:opacity-50 transition-all flex-shrink-0"
+                    className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full text-white shadow-2xl disabled:opacity-30 transition-all flex-shrink-0 hover:scale-110 active:scale-95"
                   >
-                    {isPosting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-6 h-6" />}
+                    {isPosting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-7 h-7" />}
                   </button>
                 </div>
               </div>
             ) : isMember && selectedGroup.only_admin_can_post ? (
-              <div className="p-4 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
-                <p className="text-[12px] text-[var(--vix-muted)] font-medium">
+              <div className="p-8 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
+                <p className="text-[11px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
                   {t('Only administrators can send messages to this channel')}
                 </p>
               </div>
             ) : !isMember && (
-              <div className="p-4 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
+              <div className="p-8 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
                 <button 
                   onClick={joinGroup}
-                  className="bg-pink-500 px-10 py-3 rounded-full text-white text-sm font-bold shadow-xl hover:scale-105 transition-all"
+                  className="bg-gradient-to-r from-pink-500 to-blue-500 px-16 py-4 rounded-full text-white text-xs font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
                 >
                   {t('Follow to see updates')}
                 </button>

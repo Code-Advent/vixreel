@@ -241,21 +241,24 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/20">
+        <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/10">
           {chats.length > 0 ? chats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
-              className={`flex items-center gap-4 p-6 cursor-pointer transition-all relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
+              className={`flex items-center gap-5 p-8 cursor-pointer transition-all relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
             >
-              {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1 vix-gradient"></div>}
-              <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full border border-[var(--vix-border)] object-cover shadow-md" />
+              {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1.5 vix-gradient"></div>}
+              <div className="relative">
+                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-14 h-14 rounded-full border border-[var(--vix-border)] object-cover shadow-lg" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-[var(--vix-bg)] rounded-full"></div>
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-bold text-sm truncate text-[var(--vix-text)]">@{u.username}</span>
-                  {u.last_message_at && <span className="text-[9px] text-zinc-500 font-bold">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-black text-sm truncate text-[var(--vix-text)] uppercase tracking-tight">@{u.username}</span>
+                  {u.last_message_at && <span className="text-[10px] text-zinc-500 font-black">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
-                <p className="text-[11px] text-zinc-500 truncate">{u.last_message || t('New conversation')}</p>
+                <p className="text-[12px] text-zinc-500 truncate font-medium opacity-70">{u.last_message || t('New conversation')}</p>
               </div>
             </div>
           )) : (
@@ -286,7 +289,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
 
             {/* Messages List */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-6 no-scrollbar" dir="ltr">
+            <div className="flex-1 p-8 overflow-y-auto space-y-8 no-scrollbar" dir="ltr">
               {loading && messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin vix-loader" /></div>
               ) : (
@@ -296,16 +299,16 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
                       <div 
                         dir="auto"
-                        className={`group relative max-w-[80%] p-4 px-6 rounded-[2rem] text-[13px] font-medium shadow-xl transition-all whitespace-pre-wrap break-words ${
+                        className={`group relative max-w-[85%] p-5 px-8 rounded-[2.5rem] text-[14px] font-medium shadow-2xl transition-all whitespace-pre-wrap break-words ${
                         isOwn ? 'vix-gradient text-white rounded-tr-none' : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]'
                       }`}>
                         {m.media_url && (
-                          <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
-                            {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-60" /> : <img src={m.media_url} className="max-h-60" />}
+                          <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+                            {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-80" /> : <img src={m.media_url} className="max-h-80" />}
                           </div>
                         )}
                         {m.sticker_url && (
-                          <div className="mb-2 w-32 h-32">
+                          <div className="mb-3 w-40 h-40">
                             <img src={m.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
                           </div>
                         )}
@@ -314,9 +317,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                         {/* Reaction Trigger */}
                         <button 
                           onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
-                          className={`absolute ${isOwn ? '-left-8' : '-right-8'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500`}
+                          className={`absolute ${isOwn ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500 p-2`}
                         >
-                          <Smile className="w-4 h-4" />
+                          <Smile className="w-5 h-5" />
                         </button>
 
                         {/* Reactions Display */}
@@ -373,11 +376,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 </div>
               )}
               
-              <div className="flex gap-3 items-end">
+              <div className="flex gap-4 items-end">
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-md"><ImageIcon className="w-5 h-5" /></button>
-                  <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className={`p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-md ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}><StickerIcon className="w-5 h-5" /></button>
-                  <button type="button" onClick={() => setShowFullEmojiPicker(!showFullEmojiPicker)} className={`p-4 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-md ${showFullEmojiPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}><Smile className="w-5 h-5" /></button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-lg">
+                    <Plus className="w-6 h-6" />
+                  </button>
+                  <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className={`p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-lg ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}>
+                    <StickerIcon className="w-6 h-6" />
+                  </button>
                 </div>
                 <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
                 
@@ -395,12 +401,12 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     placeholder={t('Type your message...')}
                     dir="auto"
                     rows={1}
-                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2rem] px-6 py-4 text-sm focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner resize-none max-h-32 no-scrollbar" 
+                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-[15px] focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner resize-none max-h-40 no-scrollbar font-medium" 
                   />
                 </div>
                 
-                <button type="submit" disabled={(!text.trim() && !selectedFile) || isUploading} className="vix-gradient p-4 rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center">
-                  {isUploading ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : <Send className="w-5 h-5 text-white" />}
+                <button type="submit" disabled={(!text.trim() && !selectedFile) || isUploading} className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full shadow-2xl active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center">
+                  {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-white" /> : <Send className="w-6 h-6 text-white" />}
                 </button>
               </div>
             </form>
