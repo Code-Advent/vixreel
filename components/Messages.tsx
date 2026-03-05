@@ -62,20 +62,28 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
       const uniqueUsersMap = new Map<string, ChatPreview>();
       
-      if (initialChatUser && !uniqueUsersMap.has(initialChatUser.id)) {
-        uniqueUsersMap.set(initialChatUser.id, { ...initialChatUser });
-      }
-
       msgs.forEach(m => {
         const otherUser = m.sender_id === currentUser.id ? m.receiver : m.sender;
         if (otherUser && !uniqueUsersMap.has(otherUser.id)) {
+          // Count unread messages from this user
+          const unreadCount = msgs.filter(msg => 
+            msg.sender_id === otherUser.id && 
+            msg.receiver_id === currentUser.id && 
+            !msg.is_read
+          ).length;
+
           uniqueUsersMap.set(otherUser.id, {
             ...otherUser,
-            last_message: m.content || (m.media_url ? '📷 Media' : ''),
-            last_message_at: m.created_at
+            last_message: m.content || (m.media_url ? '📷 Media' : (m.sticker_url ? '🎨 Sticker' : '')),
+            last_message_at: m.created_at,
+            unread_count: unreadCount
           });
         }
       });
+
+      if (initialChatUser && !uniqueUsersMap.has(initialChatUser.id)) {
+        uniqueUsersMap.set(initialChatUser.id, { ...initialChatUser });
+      }
       
       setChats(Array.from(uniqueUsersMap.values()));
     } catch (err) {
@@ -96,6 +104,18 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       
       if (error) throw error;
       setMessages(data || []);
+
+      // Mark messages as read
+      const unreadIds = data?.filter(m => m.receiver_id === currentUser.id && !m.is_read).map(m => m.id);
+      if (unreadIds && unreadIds.length > 0) {
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .in('id', unreadIds);
+        
+        // Refresh chat list to update unread counts
+        fetchChats();
+      }
     } catch (err) {
       console.error("Message fetch error:", err);
     } finally {
@@ -234,11 +254,27 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
       
       {/* Sidebar */}
       <div className={`w-full md:w-80 border-r border-[var(--vix-border)] flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-8 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-secondary)]/10">
-          <h2 className="text-xl font-black uppercase tracking-tighter text-[var(--vix-text)]">{t('Messages')}</h2>
-          <button onClick={() => setShowNewChatModal(true)} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-pink-500 hover:scale-110 transition-all shadow-lg active:scale-95">
-            <Plus className="w-5 h-5" />
-          </button>
+        <div className="p-8 border-b border-[var(--vix-border)] flex flex-col gap-6 bg-[var(--vix-secondary)]/10">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-[var(--vix-text)]">{t('Messages')}</h2>
+            <button onClick={() => setShowNewChatModal(true)} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-pink-500 hover:scale-110 transition-all shadow-lg active:scale-95">
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+          
+          {/* Search Bar Structure */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Search className="w-4 h-4 text-zinc-500 group-focus-within:text-pink-500 transition-colors" />
+            </div>
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('Search conversations...')}
+              className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-3.5 pl-11 pr-4 text-xs outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] font-bold shadow-inner placeholder:text-zinc-600"
+            />
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/10">
@@ -258,7 +294,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   <span className="font-black text-sm truncate text-[var(--vix-text)] uppercase tracking-tight">@{u.username}</span>
                   {u.last_message_at && <span className="text-[10px] text-zinc-500 font-black">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
-                <p className="text-[12px] text-zinc-500 truncate font-medium opacity-70">{u.last_message || t('New conversation')}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-[12px] text-zinc-500 truncate font-medium opacity-70 flex-1">{u.last_message || t('New conversation')}</p>
+                  {u.unread_count && u.unread_count > 0 && (
+                    <span className="ml-2 bg-pink-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                      {u.unread_count}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )) : (
@@ -351,17 +394,6 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
 
             {/* Input Area */}
             <form onSubmit={sendMessage} className="p-6 bg-[var(--vix-secondary)]/10 border-t border-[var(--vix-border)] flex flex-col gap-4 relative">
-              {showFullEmojiPicker && (
-                <div className="absolute bottom-full left-6 mb-4 z-50">
-                  <EmojiPicker 
-                    onEmojiClick={(emojiData) => {
-                      setText(prev => prev + emojiData.emoji);
-                      setShowFullEmojiPicker(false);
-                    }}
-                    theme={EmojiTheme.DARK}
-                  />
-                </div>
-              )}
               {showStickerPicker && (
                 <StickerPicker 
                   currentUser={currentUser}
@@ -376,18 +408,17 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 </div>
               )}
               
-              <div className="flex gap-4 items-end">
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full text-zinc-500 hover:text-pink-500 transition-all shadow-lg">
+              <div className="flex gap-4 items-end max-w-5xl mx-auto w-full">
+                <div className="flex-1 relative flex items-center bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] shadow-inner group focus-within:border-pink-500/30 transition-all">
+                  {/* Attachment Button (Left) */}
+                  <button 
+                    type="button" 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="p-4 text-zinc-500 hover:text-pink-500 transition-all"
+                  >
                     <Plus className="w-6 h-6" />
                   </button>
-                  <button type="button" onClick={() => setShowStickerPicker(!showStickerPicker)} className={`p-5 bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-full transition-all shadow-lg ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}>
-                    <StickerIcon className="w-6 h-6" />
-                  </button>
-                </div>
-                <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
-                
-                <div className="flex-1 relative">
+
                   <textarea 
                     ref={messageInputRef}
                     value={text} 
@@ -398,14 +429,31 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                         sendMessage();
                       }
                     }}
-                    placeholder={t('Type your message...')}
+                    placeholder={t('Message')}
                     dir="auto"
                     rows={1}
-                    className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] px-8 py-5 text-[15px] focus:border-pink-500/30 outline-none transition-all text-[var(--vix-text)] shadow-inner resize-none max-h-40 no-scrollbar font-medium" 
+                    className="flex-1 bg-transparent border-none px-2 py-5 text-[15px] outline-none text-[var(--vix-text)] resize-none max-h-40 no-scrollbar font-medium" 
                   />
+
+                  {/* Sticker Button (Right) */}
+                  <div className="flex items-center pr-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowStickerPicker(!showStickerPicker)} 
+                      className={`p-3 transition-all ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
+                    >
+                      <StickerIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
+
+                <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
                 
-                <button type="submit" disabled={(!text.trim() && !selectedFile) || isUploading} className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full shadow-2xl active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center">
+                <button 
+                  type="submit" 
+                  disabled={(!text.trim() && !selectedFile) || isUploading} 
+                  className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full shadow-2xl active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center flex-shrink-0"
+                >
                   {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-white" /> : <Send className="w-6 h-6 text-white" />}
                 </button>
               </div>

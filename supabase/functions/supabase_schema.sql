@@ -33,6 +33,16 @@ BEGIN
   END IF;
 END $$;
 
+-- 1.1 MESSAGES EXTENSION
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='messages') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='is_read') THEN
+      ALTER TABLE public.messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+    END IF;
+  END IF;
+END $$;
+
 -- 2. BUCKET INITIALIZATION
 -- We ensure public access is enabled for the buckets
 INSERT INTO storage.buckets (id, name, public)

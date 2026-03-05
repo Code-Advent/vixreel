@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     content TEXT,
     media_url TEXT,
     media_type TEXT CHECK (media_type IN ('image', 'video')),
+    is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -142,6 +143,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
 ALTER TABLE public.messages ALTER COLUMN content DROP NOT NULL;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_url TEXT;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_type TEXT CHECK (media_type IN ('image', 'video'));
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
 
 -- 12a. MESSAGE REACTIONS TABLE
 CREATE TABLE IF NOT EXISTS public.message_reactions (

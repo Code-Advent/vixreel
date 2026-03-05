@@ -142,6 +142,7 @@ export interface Message {
   media_url?: string;
   media_type?: 'image' | 'video';
   sticker_url?: string;
+  is_read?: boolean;
   created_at: string;
   reactions?: MessageReaction[];
 }
