@@ -4,7 +4,7 @@ import {
   Users, Plus, Search, Globe, Lock, ArrowLeft, 
   MoreHorizontal, MessageSquare, Image as ImageIcon, 
   Video, Send, Heart, X, Loader2, Camera, Shield, ChevronLeft,
-  Link as LinkIcon, CheckCircle2, Bell, Share2, Download
+  Link as LinkIcon, CheckCircle2, Bell, Share2, Download, LogOut
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
@@ -413,25 +413,27 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--vix-bg)] animate-vix-in">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-[var(--vix-border)] sticky top-0 bg-[var(--vix-bg)]/80 backdrop-blur-xl z-50">
-        <div className="flex items-center gap-4">
-          <button onClick={view === 'LIST' ? onBack : () => setView('LIST')} className="p-3 hover:bg-[var(--vix-secondary)] rounded-2xl transition-all">
-            <ArrowLeft className="w-5 h-5 text-[var(--vix-text)]" />
-          </button>
-          <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
-            {view === 'LIST' ? t('Channels') : view === 'CREATE' ? t('Create Channel') : selectedGroup?.name}
-          </h2>
+    <div className={`flex flex-col h-full bg-[var(--vix-bg)] animate-vix-in ${view === 'DETAILS' ? 'fixed inset-0 z-[100] sm:ml-0 lg:ml-0' : ''}`}>
+      {/* Main Header - Hide in DETAILS view as it has its own header */}
+      {view !== 'DETAILS' && (
+        <div className="flex items-center justify-between p-4 border-b border-[var(--vix-border)] sticky top-0 bg-[var(--vix-bg)]/80 backdrop-blur-xl z-50">
+          <div className="flex items-center gap-4">
+            <button onClick={view === 'LIST' ? onBack : () => setView('LIST')} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+              <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
+            </button>
+            <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
+              {view === 'LIST' ? t('Channels') : t('Create Channel')}
+            </h2>
+          </div>
+          {view === 'LIST' && (
+            <button onClick={() => setView('CREATE')} className="vix-gradient p-2.5 rounded-full text-white shadow-lg hover:scale-105 transition-all">
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        {view === 'LIST' && (
-          <button onClick={() => setView('CREATE')} className="vix-gradient p-3 rounded-2xl text-white shadow-lg hover:scale-105 transition-all">
-            <Plus className="w-5 h-5" />
-          </button>
-        )}
-      </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+      <div className="flex-1 overflow-y-auto no-scrollbar">
         {view === 'LIST' && (
           <div className="flex flex-col">
             <div className="p-6">
@@ -450,39 +452,43 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <Loader2 className="w-8 h-8 animate-spin vix-loader" />
               </div>
             ) : groups.length === 0 ? (
-              <div className="text-center py-20 space-y-4">
-                <Users className="w-16 h-16 text-zinc-800 mx-auto opacity-20" />
-                <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{t('No channels found')}</p>
+              <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                <div className="w-20 h-20 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-6">
+                  <Globe className="w-10 h-10 text-[var(--vix-muted)]" />
+                </div>
+                <h3 className="text-xl font-bold text-[var(--vix-text)] mb-2">{t('No channels found')}</h3>
+                <p className="text-[var(--vix-muted)] max-w-xs">{t('Be the first to create a community and share your updates with the world.')}</p>
               </div>
             ) : (
-              <div className="divide-y divide-[var(--vix-border)]/30">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
                 {groups.map(group => (
                   <div 
-                    key={group.id} 
+                    key={group.id}
                     onClick={() => selectGroup(group)}
-                    className="flex items-center gap-4 p-6 hover:bg-[var(--vix-secondary)]/30 transition-all cursor-pointer group relative"
+                    className="group bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-3xl p-4 cursor-pointer hover:border-pink-500/50 transition-all hover:shadow-2xl hover:-translate-y-1"
                   >
-                    <div className="relative">
-                      <img src={group.cover_url} className="w-14 h-14 rounded-2xl object-cover border border-[var(--vix-border)] shadow-md" alt={group.name} />
-                      {group.is_verified && (
-                        <div className="absolute -bottom-1 -right-1 bg-[var(--vix-bg)] rounded-full p-0.5">
-                          <VerificationBadge size="w-4 h-4" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="font-black text-sm text-[var(--vix-text)] truncate flex items-center gap-1.5">
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <img src={group.cover_url} className="w-16 h-16 rounded-2xl object-cover border border-[var(--vix-border)]" alt={group.name} />
+                        {group.is_verified && (
+                          <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-lg">
+                            <CheckCircle2 className="w-4 h-4 fill-[#ec4899] text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-black text-[var(--vix-text)] truncate uppercase tracking-tight">
                           {group.name}
                         </h3>
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">
-                          {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Followers')}
-                        </span>
+                        <p className="text-xs text-[var(--vix-muted)] font-bold mt-0.5">
+                          {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('followers')}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button className="bg-pink-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-pink-600 transition-all">
+                            {t('View')}
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-zinc-500 truncate font-medium">{group.description}</p>
-                    </div>
-                    <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronLeft className="w-4 h-4 rotate-180 text-zinc-400" />
                     </div>
                   </div>
                 ))}
@@ -593,49 +599,97 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         )}
 
         {view === 'DETAILS' && selectedGroup && (
-          <div className="flex flex-col h-full animate-vix-in bg-[#0b141a]">
+          <div className="flex flex-col h-full animate-vix-in bg-[var(--vix-bg)]">
             {/* WhatsApp Style Header */}
-            <div className="flex items-center justify-between p-3 bg-[#111b21] border-b border-white/5 sticky top-0 z-50">
+            <div className="flex items-center justify-between p-3 bg-[var(--vix-card)] border-b border-[var(--vix-border)] sticky top-0 z-50">
               <div className="flex items-center gap-3">
-                <button onClick={() => setView('LIST')} className="p-1 hover:bg-white/10 rounded-full transition-all">
-                  <ArrowLeft className="w-6 h-6 text-[#e9edef]" />
+                <button onClick={() => setView('LIST')} className="p-1 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+                  <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
                 </button>
                 <div className="flex items-center gap-3 cursor-pointer">
-                  <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-full object-cover border border-white/10" alt={selectedGroup.name} />
+                  <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)]" alt={selectedGroup.name} />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1">
-                      <h3 className="text-base font-bold text-[#e9edef] leading-tight">
+                      <h3 className="text-base font-bold text-[var(--vix-text)] leading-tight">
                         {selectedGroup.name}
                       </h3>
                       {selectedGroup.is_verified && (
                         <CheckCircle2 className="w-4 h-4 fill-[#ec4899] text-white" />
                       )}
                     </div>
-                    <p className="text-[11px] text-[#8696a0] font-medium">
+                    <p className="text-[11px] text-[var(--vix-muted)] font-medium">
                       {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('followers')}
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <button className="p-2 text-[#8696a0] hover:text-[#e9edef] transition-all">
+              <div className="flex items-center gap-2">
+                {!isMember ? (
+                  <button 
+                    onClick={joinGroup}
+                    className="bg-pink-500 text-white px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg hover:bg-pink-600 transition-all"
+                  >
+                    {t('Follow')}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={leaveGroup}
+                    className="bg-[var(--vix-secondary)] text-[var(--vix-text)] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-border)] transition-all"
+                  >
+                    {t('Following')}
+                  </button>
+                )}
+                <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
                   <Bell className="w-5 h-5" />
                 </button>
-                <button className="p-2 text-[#8696a0] hover:text-[#e9edef] transition-all">
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
+                <div className="relative group">
+                  <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
+                    {selectedGroup.creator_id === currentUser.id && (
+                      <button 
+                        onClick={async () => {
+                          const newVal = !selectedGroup.only_admin_can_post;
+                          const { error } = await supabase.from('groups').update({ only_admin_can_post: newVal }).eq('id', selectedGroup.id);
+                          if (!error) setSelectedGroup({ ...selectedGroup, only_admin_can_post: newVal });
+                        }}
+                        className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
+                      >
+                        <Shield className="w-4 h-4" />
+                        {selectedGroup.only_admin_can_post ? t('Allow everyone to post') : t('Only admins can post')}
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => copyGroupLink(selectedGroup.id)}
+                      className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
+                    >
+                      <LinkIcon className="w-4 h-4" />
+                      {t('Copy Link')}
+                    </button>
+                    {isMember && (
+                      <button 
+                        onClick={leaveGroup}
+                        className="w-full px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-500/5 transition-all flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        {t('Unfollow')}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Channel Feed */}
-            <div id="channel-feed" className="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar bg-[#0b141a] relative scroll-smooth">
+            <div id="channel-feed" className="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] relative scroll-smooth">
               {/* Background Pattern Overlay (Optional) */}
-              <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:invert"></div>
 
               {groupPosts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                  <MessageSquare className="w-12 h-12 text-[#e9edef]" />
-                  <p className="text-[#8696a0] font-bold uppercase tracking-widest text-[10px]">{t('No updates yet')}</p>
+                  <MessageSquare className="w-12 h-12 text-[var(--vix-text)]" />
+                  <p className="text-[var(--vix-muted)] font-bold uppercase tracking-widest text-[10px]">{t('No updates yet')}</p>
                 </div>
               ) : (
                 <div className="space-y-8 relative z-10">
@@ -648,14 +702,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                       <React.Fragment key={post.id}>
                         {showDateSeparator && (
                           <div className="flex justify-center my-6">
-                            <div className="bg-[#182229] text-[#8696a0] text-[11px] px-3 py-1 rounded-lg shadow-sm font-medium">
+                            <div className="bg-[var(--vix-secondary)] text-[var(--vix-muted)] text-[11px] px-3 py-1 rounded-lg shadow-sm font-medium border border-[var(--vix-border)]">
                               {postDate}
                             </div>
                           </div>
                         )}
                         
                         <div className="max-w-[92%] sm:max-w-[85%] mx-auto space-y-2">
-                          <div className="bg-[#202c33] rounded-xl shadow-lg relative group overflow-hidden border border-white/5">
+                          <div className="bg-[var(--vix-card)] rounded-xl shadow-lg relative group overflow-hidden border border-[var(--vix-border)]">
                             {post.media_url && (
                               <div className="relative">
                                 {post.media_type === 'video' ? (
@@ -680,22 +734,22 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                                   {/* Detect if content has a title-like first line */}
                                   {post.content.includes('\n') ? (
                                     <>
-                                      <h4 className="text-[15px] font-bold text-[#e9edef] leading-tight">
+                                      <h4 className="text-[15px] font-bold text-[var(--vix-text)] leading-tight">
                                         {post.content.split('\n')[0]}
                                       </h4>
-                                      <p className="text-[14px] text-[#e9edef] leading-snug whitespace-pre-wrap font-normal opacity-90">
+                                      <p className="text-[14px] text-[var(--vix-text)] leading-snug whitespace-pre-wrap font-normal opacity-90">
                                         {post.content.split('\n').slice(1).join('\n')}
                                       </p>
                                     </>
                                   ) : (
-                                    <p className="text-[14.5px] text-[#e9edef] leading-snug whitespace-pre-wrap font-normal">
+                                    <p className="text-[14.5px] text-[var(--vix-text)] leading-snug whitespace-pre-wrap font-normal">
                                       {post.content}
                                     </p>
                                   )}
                                   
                                   {post.content.toLowerCase().includes('http') && (
                                     <div className="pt-2">
-                                      <p className="text-[14px] text-[#53bdeb] hover:underline cursor-pointer">
+                                      <p className="text-[14px] text-pink-500 hover:underline cursor-pointer">
                                         Learn more: {post.content.match(/https?:\/\/[^\s]+/)?.[0]}
                                       </p>
                                     </div>
@@ -704,7 +758,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                               )}
                               
                               <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-[#8696a0] font-medium">
+                                <span className="text-[10px] text-[var(--vix-muted)] font-medium">
                                   {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </span>
                               </div>
@@ -712,18 +766,35 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
 
                             {/* Reactions & Share Bar */}
                             <div className="flex items-center justify-between px-3 pb-3">
-                              <div className="flex items-center gap-1 bg-[#182229] rounded-full px-2.5 py-1 border border-white/5 shadow-sm cursor-pointer hover:bg-[#2a3942] transition-colors">
-                                <div className="flex -space-x-1">
-                                  {['👍', '❤️', '🙏', '😂'].slice(0, 3).map((emoji, i) => (
-                                    <span key={i} className="text-[13px]">{emoji}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 bg-[var(--vix-secondary)] rounded-full px-2.5 py-1 border border-[var(--vix-border)] shadow-sm cursor-pointer hover:bg-[var(--vix-border)] transition-colors">
+                                  <div className="flex -space-x-1">
+                                    {['👍', '❤️', '🙏', '😂'].slice(0, 3).map((emoji, i) => (
+                                      <span key={i} className="text-[13px]">{emoji}</span>
+                                    ))}
+                                  </div>
+                                  <span className="text-[12px] text-[var(--vix-muted)] font-bold ml-1.5">
+                                    {formatNumber(post.likes_count || 0)}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1">
+                                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) => (
+                                    <button 
+                                      key={emoji}
+                                      onClick={() => togglePostReaction(post.id, emoji)}
+                                      className={`text-[14px] p-1 hover:scale-125 transition-transform ${post.reactions?.some(r => r.user_id === currentUser.id && r.reaction === emoji) ? 'bg-pink-500/10 rounded-full' : ''}`}
+                                    >
+                                      {emoji}
+                                    </button>
                                   ))}
                                 </div>
-                                <span className="text-[12px] text-[#8696a0] font-bold ml-1.5">
-                                  {formatNumber((post.likes_count || 0) + 42000)}
-                                </span>
                               </div>
                               
-                              <button className="p-2 bg-[#182229] rounded-full text-[#8696a0] hover:text-[#e9edef] transition-all border border-white/5">
+                              <button 
+                                onClick={() => copyGroupLink(selectedGroup.id)}
+                                className="p-2 bg-[var(--vix-secondary)] rounded-full text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)]"
+                              >
                                 <Share2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -739,18 +810,18 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             {/* Floating Scroll to Bottom Button */}
             <button 
               onClick={() => document.getElementById('channel-feed')?.scrollTo({ top: document.getElementById('channel-feed')?.scrollHeight, behavior: 'smooth' })}
-              className="absolute bottom-24 right-6 p-2 bg-[#202c33] text-[#8696a0] rounded-full shadow-lg border border-white/5 hover:text-[#e9edef] transition-all z-20"
+              className="absolute bottom-24 right-6 p-2 bg-[var(--vix-card)] text-[var(--vix-muted)] rounded-full shadow-lg border border-[var(--vix-border)] hover:text-[var(--vix-text)] transition-all z-20"
             >
               <ChevronLeft className="w-5 h-5 -rotate-90" />
             </button>
 
             {/* Broadcast Input (Admin Only) */}
             {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
-              <div className="p-3 bg-[#111b21] border-t border-white/5">
+              <div className="p-3 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
                 <div className="flex items-end gap-2 max-w-3xl mx-auto">
-                  <div className="flex-1 bg-[#2a3942] rounded-2xl flex flex-col p-1">
+                  <div className="flex-1 bg-[var(--vix-secondary)] rounded-2xl flex flex-col p-1 border border-[var(--vix-border)]">
                     {postPreview && (
-                      <div className="relative w-20 h-20 m-2 rounded-lg overflow-hidden border border-white/10">
+                      <div className="relative w-20 h-20 m-2 rounded-lg overflow-hidden border border-[var(--vix-border)]">
                         <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full z-10"><X className="w-3 h-3" /></button>
                         {postFile?.type.startsWith('video') ? <video src={postPreview} className="w-full h-full object-cover" /> : <img src={postPreview} className="w-full h-full object-cover" />}
                       </div>
@@ -758,7 +829,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     <div className="flex items-center">
                       <button 
                         onClick={() => document.getElementById('channel-post-media')?.click()}
-                        className="p-3 text-[#8696a0] hover:text-[#e9edef] transition-all"
+                        className="p-3 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all"
                       >
                         <ImageIcon className="w-6 h-6" />
                       </button>
@@ -779,7 +850,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                         value={postContent}
                         onChange={e => setPostContent(e.target.value)}
                         placeholder={t('Broadcast an update...')}
-                        className="flex-1 bg-transparent border-none py-3 px-1 text-[15px] text-[#e9edef] outline-none placeholder:text-[#8696a0] resize-none max-h-32"
+                        className="flex-1 bg-transparent border-none py-3 px-1 text-[15px] text-[var(--vix-text)] outline-none placeholder:text-[var(--vix-muted)] resize-none max-h-32"
                         rows={1}
                       />
                     </div>
@@ -788,23 +859,23 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                   <button 
                     onClick={handleCreatePost}
                     disabled={!postContent.trim() || isPosting}
-                    className="bg-[#00a884] p-3.5 rounded-full text-white shadow-lg disabled:opacity-50 transition-all flex-shrink-0"
+                    className="bg-pink-500 p-3.5 rounded-full text-white shadow-lg disabled:opacity-50 transition-all flex-shrink-0"
                   >
                     {isPosting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-6 h-6" />}
                   </button>
                 </div>
               </div>
             ) : isMember && selectedGroup.only_admin_can_post ? (
-              <div className="p-4 bg-[#111b21] text-center border-t border-white/5">
-                <p className="text-[12px] text-[#8696a0] font-medium">
+              <div className="p-4 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
+                <p className="text-[12px] text-[var(--vix-muted)] font-medium">
                   {t('Only administrators can send messages to this channel')}
                 </p>
               </div>
             ) : !isMember && (
-              <div className="p-4 bg-[#111b21] border-t border-white/5 text-center">
+              <div className="p-4 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
                 <button 
                   onClick={joinGroup}
-                  className="bg-[#00a884] px-10 py-3 rounded-full text-white text-sm font-bold shadow-xl hover:scale-105 transition-all"
+                  className="bg-pink-500 px-10 py-3 rounded-full text-white text-sm font-bold shadow-xl hover:scale-105 transition-all"
                 >
                   {t('Follow to see updates')}
                 </button>
