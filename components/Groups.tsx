@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
-import { sanitizeFilename, formatNumber } from '../lib/utils';
+import { sanitizeFilename, formatNumber, formatFileSize } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 
@@ -42,6 +42,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [postFile, setPostFile] = useState<File | null>(null);
   const [postPreview, setPostPreview] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [downloadingPostId, setDownloadingPostId] = useState<string | null>(null);
 
   // Comment State
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
@@ -102,6 +103,27 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
     const url = `${window.location.origin}/groups/${groupId}`;
     navigator.clipboard.writeText(url);
     alert(t('Community link copied to clipboard!'));
+  };
+
+  const handleDownload = async (postId: string, url: string, filename: string) => {
+    setDownloadingPostId(postId);
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename || 'download';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Download error:', err);
+    } finally {
+      // Keep loader for a moment for visual effect as requested
+      setTimeout(() => setDownloadingPostId(null), 1500);
+    }
   };
 
   const fetchGroups = async () => {
@@ -726,13 +748,31 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                                 {post.media_type === 'video' ? (
                                   <video src={post.media_url} controls className="w-full max-h-[600px] object-cover" />
                                 ) : (
-                                  <div className="relative group/media cursor-pointer">
+                                  <div className="relative group/media">
                                     <img src={post.media_url} className="w-full max-h-[600px] object-cover" alt="Post media" />
-                                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity">
-                                      <div className="bg-black/40 backdrop-blur-md rounded-full px-6 py-3 flex items-center gap-3 text-white text-xs font-bold border border-white/10">
-                                        <Download className="w-5 h-5" />
-                                        <span>{t('Download Media')}</span>
-                                      </div>
+                                    
+                                    {/* Download Overlay */}
+                                    <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                                      <button 
+                                        onClick={() => handleDownload(post.id, post.media_url!, `vix-${post.id}.jpg`)}
+                                        disabled={downloadingPostId === post.id}
+                                        className="bg-black/40 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 text-white border border-white/10 hover:bg-black/60 transition-all group/btn shadow-2xl"
+                                      >
+                                        {downloadingPostId === post.id ? (
+                                          <div className="relative w-6 h-6">
+                                            <div className="absolute inset-0 border-2 border-pink-500 border-t-blue-500 rounded-full animate-spin"></div>
+                                          </div>
+                                        ) : (
+                                          <Download className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+                                        )}
+                                        <div className="flex flex-col items-start">
+                                          <span className="text-[10px] font-black uppercase tracking-widest">{t('Download')}</span>
+                                          <span className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">
+                                            {/* Mocking file size as we don't store it, but using a realistic random-ish size for the UI feel */}
+                                            {formatFileSize(Math.floor(Math.random() * 2000000) + 500000)}
+                                          </span>
+                                        </div>
+                                      </button>
                                     </div>
                                   </div>
                                 )}

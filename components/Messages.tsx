@@ -28,6 +28,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -47,6 +48,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const REACTION_OPTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
+
+  const filteredChats = useMemo(() => {
+    if (!chatSearchQuery.trim()) return chats;
+    return chats.filter(chat => 
+      chat.username.toLowerCase().includes(chatSearchQuery.toLowerCase()) ||
+      chat.full_name?.toLowerCase().includes(chatSearchQuery.toLowerCase())
+    );
+  }, [chats, chatSearchQuery]);
 
   // 1. Fetch Chat List
   const fetchChats = async () => {
@@ -207,6 +216,33 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
     } catch (err) { console.error("Reaction error:", err); }
   };
 
+  const deleteMessage = async (messageId: string) => {
+    if (!confirm(t('Are you sure you want to delete this message?'))) return;
+    try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+      if (error) throw error;
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err) {
+      console.error("Delete message error:", err);
+    }
+  };
+
+  const deleteConversation = async (otherUserId: string) => {
+    if (!confirm(t('Are you sure you want to remove this conversation? This will delete all messages for both participants.'))) return;
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUser.id})`);
+      
+      if (error) throw error;
+      setChats(prev => prev.filter(c => c.id !== otherUserId));
+      if (activeChat?.id === otherUserId) setActiveChat(null);
+    } catch (err) {
+      console.error("Delete conversation error:", err);
+    }
+  };
+
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!text.trim() && !selectedFile) || !activeChat || isUploading) return;
@@ -269,8 +305,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
             <input 
               type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={chatSearchQuery}
+              onChange={(e) => setChatSearchQuery(e.target.value)}
               placeholder={t('Search conversations...')}
               className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-3.5 pl-11 pr-4 text-xs outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] font-bold shadow-inner placeholder:text-zinc-600"
             />
@@ -278,7 +314,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
         </div>
         
         <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/10">
-          {chats.length > 0 ? chats.map(u => (
+          {filteredChats.length > 0 ? filteredChats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
@@ -292,7 +328,15 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-black text-sm truncate text-[var(--vix-text)] uppercase tracking-tight">@{u.username}</span>
-                  {u.last_message_at && <span className="text-[10px] text-zinc-500 font-black">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                  <div className="flex items-center gap-2">
+                    {u.last_message_at && <span className="text-[10px] text-zinc-500 font-black">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteConversation(u.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <p className="text-[12px] text-zinc-500 truncate font-medium opacity-70 flex-1">{u.last_message || t('New conversation')}</p>
@@ -358,12 +402,22 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                         {m.content}
                         
                         {/* Reaction Trigger */}
-                        <button 
-                          onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
-                          className={`absolute ${isOwn ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all text-zinc-500 hover:text-pink-500 p-2`}
-                        >
-                          <Smile className="w-5 h-5" />
-                        </button>
+                        <div className={`absolute ${isOwn ? '-left-20' : '-right-20'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
+                          <button 
+                            onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
+                            className="text-zinc-500 hover:text-pink-500 p-2"
+                          >
+                            <Smile className="w-5 h-5" />
+                          </button>
+                          {isOwn && (
+                            <button 
+                              onClick={() => deleteMessage(m.id)}
+                              className="text-zinc-500 hover:text-red-500 p-2"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
 
                         {/* Reactions Display */}
                         {m.reactions && m.reactions.length > 0 && (
