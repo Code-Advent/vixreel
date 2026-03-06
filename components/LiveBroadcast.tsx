@@ -13,11 +13,15 @@ interface LiveBroadcastProps {
   onClose: () => void;
 }
 
+import AgoraRTC, { IAgoraRTCClient, IMicrophoneAudioTrack, ICameraVideoTrack } from 'agora-rtc-sdk-ng';
+
+const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID || '39f712e5cf114fc084d9265e8987bbe6';
+
 const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
-  const [streamData, setStreamData] = useState<{ id: string; stream_key: string; playback_id: string } | null>(null);
+  const [streamData, setStreamData] = useState<{ id: string; channelName: string; token: string; uid: string | number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [messages, setMessages] = useState<any[]>([]);
@@ -25,93 +29,47 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
+  const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
+  const localTracksRef = useRef<{ videoTrack: ICameraVideoTrack | null; audioTrack: IMicrophoneAudioTrack | null }>({
+    videoTrack: null,
+    audioTrack: null
+  });
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     startPreview();
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+      stopTracks();
+      if (agoraClientRef.current) {
+        agoraClientRef.current.leave();
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (isLive && streamData) {
-      const channel = supabase
-        .channel(`live-updates-${streamData.id}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'live_streams',
-          filter: `id=eq.${streamData.id}` 
-        }, (payload: any) => {
-          if (payload.new) {
-            setViewerCount(payload.new.viewer_count || 0);
-          }
-        })
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'live_messages',
-          filter: `stream_id=eq.${streamData.id}`
-        }, (payload) => {
-          fetchNewMessage(payload.new.id);
-        })
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'live_likes',
-          filter: `stream_id=eq.${streamData.id}`
-        }, () => {
-          addHeart();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+  const stopTracks = () => {
+    if (localTracksRef.current.videoTrack) {
+      localTracksRef.current.videoTrack.stop();
+      localTracksRef.current.videoTrack.close();
+      localTracksRef.current.videoTrack = null;
     }
-  }, [isLive, streamData]);
-
-  const addHeart = () => {
-    const id = Date.now();
-    const x = Math.random() * 100;
-    setHearts(prev => [...prev, { id, x }]);
-    setTimeout(() => {
-      setHearts(prev => prev.filter(h => h.id !== id));
-    }, 2000);
-  };
-
-  const fetchNewMessage = async (id: string) => {
-    const { data } = await supabase
-      .from('live_messages')
-      .select('*, user:profiles(*)')
-      .eq('id', id)
-      .single();
-    
-    if (data) {
-      setMessages(prev => [...prev, {
-        id: data.id,
-        username: data.user?.username || 'Unknown',
-        avatar_url: data.user?.avatar_url,
-        text: data.text,
-        created_at: data.created_at
-      }]);
+    if (localTracksRef.current.audioTrack) {
+      localTracksRef.current.audioTrack.stop();
+      localTracksRef.current.audioTrack.close();
+      localTracksRef.current.audioTrack = null;
     }
   };
 
   const startPreview = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: isFrontCamera ? 'user' : 'environment' },
-        audio: true
-      });
-      streamRef.current = stream;
+      stopTracks();
+      const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+        {},
+        { facingMode: isFrontCamera ? 'user' : 'environment' }
+      );
+      localTracksRef.current = { videoTrack, audioTrack };
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        videoTrack.play(videoRef.current);
       }
     } catch (err) {
       console.error('Preview Error:', err);
@@ -120,22 +78,18 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   };
 
   const toggleCamera = async () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
     const nextMode = !isFrontCamera;
     setIsFrontCamera(nextMode);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: nextMode ? 'user' : 'environment' },
-        audio: true
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+    if (isLive && localTracksRef.current.videoTrack) {
+      try {
+        await localTracksRef.current.videoTrack.setDevice(nextMode ? 'user' : 'environment' as any);
+      } catch (err) {
+        console.error('Toggle Camera Error:', err);
+        // Fallback: recreate tracks
+        startPreview();
       }
-    } catch (err) {
-      console.error('Toggle Camera Error:', err);
+    } else {
+      startPreview();
     }
   };
 
@@ -143,42 +97,48 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     setLoading(true);
     setError(null);
     try {
-      // 1. Call Local API instead of Supabase Edge Function
+      // 1. Get Agora Token from Server
+      const channelName = `live_${currentUser.id.substring(0, 8)}_${Date.now()}`;
       const apiUrl = `${window.location.origin}/api/live/create`;
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelName, uid: 0 })
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Live Stream Creation Error Response:', errorText);
-        try {
-          const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.error || 'Failed to create live stream');
-        } catch (e) {
-          throw new Error(`Server error (${response.status}): ${errorText.substring(0, 100)}...`);
-        }
-      }
-
+      if (!response.ok) throw new Error('Failed to get streaming token');
       const data = await response.json();
 
-      // 2. Insert into live_streams table
+      // 2. Initialize Agora Client
+      const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+      agoraClientRef.current = client;
+      client.setClientRole('host');
+
+      await client.join(AGORA_APP_ID, data.channelName, data.token, data.uid);
+      
+      if (localTracksRef.current.audioTrack && localTracksRef.current.videoTrack) {
+        await client.publish([localTracksRef.current.audioTrack, localTracksRef.current.videoTrack]);
+      }
+
+      // 3. Insert into live_streams table
       const { data: dbStream, error: dbErr } = await supabase.from('live_streams').insert({
         user_id: currentUser.id,
-        playback_id: data.playback_id,
-        stream_key: data.stream_key,
+        playback_id: data.channelName, // Use channelName as playback_id for Agora
+        stream_key: data.token, // Store token temporarily if needed
         is_live: true
       }).select().single();
 
       if (dbErr) throw dbErr;
 
-      setStreamData({ id: dbStream.id, stream_key: data.stream_key, playback_id: data.playback_id });
+      setStreamData({ id: dbStream.id, channelName: data.channelName, token: data.token, uid: data.uid });
       setIsLive(true);
+      
+      // Update profile
+      await supabase.from('profiles').update({ is_live: true, live_playback_id: data.channelName }).eq('id', currentUser.id);
+
     } catch (err: any) {
       setError(err.message);
+      console.error('Start Live Error:', err);
     } finally {
       setLoading(false);
     }
@@ -188,6 +148,13 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     if (!streamData) return;
     try {
       await supabase.from('live_streams').update({ is_live: false }).eq('id', streamData.id);
+      await supabase.from('profiles').update({ is_live: false, live_playback_id: null }).eq('id', currentUser.id);
+      
+      if (agoraClientRef.current) {
+        await agoraClientRef.current.leave();
+      }
+      stopTracks();
+      
       setIsLive(false);
       onClose();
     } catch (err) {
@@ -217,11 +184,8 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden font-sans">
       {/* Video Preview / Stream */}
       <div className="flex-1 relative bg-zinc-900">
-        <video 
+        <div 
           ref={videoRef} 
-          autoPlay 
-          muted 
-          playsInline 
           className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''}`}
         />
 

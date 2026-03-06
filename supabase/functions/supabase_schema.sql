@@ -18,6 +18,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   is_following_public BOOLEAN DEFAULT true, 
   allow_comments BOOLEAN DEFAULT true,
   boosted_followers INTEGER DEFAULT 0,
+  location TEXT,
+  date_of_birth TEXT,
+  is_location_private BOOLEAN DEFAULT false,
+  website TEXT,
+  show_followers_to TEXT DEFAULT 'EVERYONE',
+  is_live BOOLEAN DEFAULT false,
+  live_playback_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -31,6 +38,27 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='cover_url') THEN
     ALTER TABLE public.profiles ADD COLUMN cover_url TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='location') THEN
+    ALTER TABLE public.profiles ADD COLUMN location TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='date_of_birth') THEN
+    ALTER TABLE public.profiles ADD COLUMN date_of_birth TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_location_private') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_location_private BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='website') THEN
+    ALTER TABLE public.profiles ADD COLUMN website TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='show_followers_to') THEN
+    ALTER TABLE public.profiles ADD COLUMN show_followers_to TEXT DEFAULT 'EVERYONE';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_live') THEN
+    ALTER TABLE public.profiles ADD COLUMN is_live BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='live_playback_id') THEN
+    ALTER TABLE public.profiles ADD COLUMN live_playback_id TEXT;
+  END IF;
 END $$;
 
 -- 1.1 MESSAGES EXTENSION
@@ -39,6 +67,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='messages') THEN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='is_read') THEN
       ALTER TABLE public.messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='messages' AND column_name='sticker_url') THEN
+      ALTER TABLE public.messages ADD COLUMN sticker_url TEXT;
     END IF;
   END IF;
 END $$;

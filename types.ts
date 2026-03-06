@@ -187,7 +187,6 @@ export interface LiveStream {
   user_id: string;
   stream_key: string;
   playback_id: string;
-  mux_live_stream_id: string;
   status: 'idle' | 'active' | 'disconnected';
   viewer_count: number;
   created_at: string;

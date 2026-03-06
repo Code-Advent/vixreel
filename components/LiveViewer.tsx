@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import MuxPlayer from '@mux/mux-player-react';
+import AgoraRTC, { IAgoraRTCClient } from 'agora-rtc-sdk-ng';
 import { 
   X, Users, Send, Heart, Share2, Loader2, 
   Gift, Trophy, ShoppingBag, Music, Smile, Eye,
@@ -16,6 +16,8 @@ interface LiveViewerProps {
   onClose: () => void;
 }
 
+const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID || '39f712e5cf114fc084d9265e8987bbe6';
+
 const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -26,11 +28,14 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   
+  const videoRef = useRef<HTMLDivElement>(null);
+  const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkFollowStatus();
     joinStream();
+    initAgora();
     
     const channel = supabase
       .channel(`live-updates-${stream.id}`)
@@ -68,8 +73,52 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
     return () => {
       leaveStream();
       supabase.removeChannel(channel);
+      if (agoraClientRef.current) {
+        agoraClientRef.current.leave();
+      }
     };
   }, [stream.id]);
+
+  const initAgora = async () => {
+    try {
+      const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+      agoraClientRef.current = client;
+      client.setClientRole('audience');
+
+      // Get token for audience
+      const response = await fetch(`${window.location.origin}/api/live/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          channelName: stream.playback_id, 
+          uid: 0,
+          role: 'subscriber'
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to get viewer token');
+      const { token } = await response.json();
+
+      client.on('user-published', async (user, mediaType) => {
+        await client.subscribe(user, mediaType);
+        if (mediaType === 'video') {
+          const remoteVideoTrack = user.videoTrack;
+          if (videoRef.current && remoteVideoTrack) {
+            remoteVideoTrack.play(videoRef.current);
+          }
+          setLoading(false);
+        }
+        if (mediaType === 'audio') {
+          user.audioTrack?.play();
+        }
+      });
+
+      await client.join(AGORA_APP_ID, stream.playback_id, token, 0);
+    } catch (err) {
+      console.error('Agora Init Error:', err);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -192,20 +241,10 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden font-sans select-none">
-      {/* Mux Player */}
       <div className="flex-1 relative bg-zinc-900">
-        <MuxPlayer
-          playbackId={stream.playback_id}
-          streamType="live"
-          autoPlay
-          muted={false}
-          style={{ height: '100%', width: '100%', objectFit: 'cover' }}
-          onCanPlay={() => setLoading(false)}
-          metadata={{
-            video_id: stream.id,
-            video_title: `Live stream by ${stream.user?.username}`,
-            viewer_user_id: currentUser.id,
-          }}
+        <div 
+          ref={videoRef}
+          className="w-full h-full"
         />
         
         {loading && (

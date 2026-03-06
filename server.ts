@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import Mux from '@mux/mux-node';
+import { RtcTokenBuilder, RtcRole } from 'agora-token';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,13 +8,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || '656f9e37-8d1d-4505-af15-5d0c6c7398e2';
-const MUX_TOKEN_SECRET = process.env.MUX_TOKEN_SECRET || 'k3M3j9uQigy0+9J3JJQeEx+dLiiujqIQYMAIqsxDSzozljOJOHDVMN/REhSbHfGL6c/oDc2sGgC';
-
-const mux = new Mux({
-  tokenId: MUX_TOKEN_ID,
-  tokenSecret: MUX_TOKEN_SECRET,
-});
+const AGORA_APP_ID = process.env.VITE_AGORA_APP_ID || '39f712e5cf114fc084d9265e8987bbe6';
+const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || '494a1eaabbd9424aa6fb1ef28601a60b';
 
 async function startServer() {
   const app = express();
@@ -32,58 +27,73 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Mux API Endpoints
-  app.post('/api/live/create', async (req, res) => {
-    console.log('VixReel: [CREATE_STREAM] Processing request...');
+  // Agora Token Generation
+  app.post('/api/live/create', (req, res) => {
+    console.log('VixReel: [CREATE_AGORA_TOKEN] Processing request...');
     try {
-      if (!MUX_TOKEN_ID || !MUX_TOKEN_SECRET) {
-        console.error('VixReel: [CREATE_STREAM] ERROR: Mux API keys are missing');
-        return res.status(500).json({ error: 'Mux API keys are missing in environment' });
-      }
+      const channelName = req.body.channelName || `channel_${Math.floor(Math.random() * 1000000)}`;
+      const uid = req.body.uid || 0;
+      const role = RtcRole.PUBLISHER;
+      const expirationTimeInSeconds = 3600;
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
-      const liveStream = await mux.video.liveStreams.create({
-        playback_policy: ['public'],
-        new_asset_settings: { playback_policy: ['public'] },
-        test: false,
-      });
+      const token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        channelName,
+        uid,
+        role,
+        privilegeExpiredTs
+      );
 
-      console.log('VixReel: [CREATE_STREAM] SUCCESS:', liveStream.id);
+      console.log('VixReel: [CREATE_AGORA_TOKEN] SUCCESS for channel:', channelName);
 
       res.json({
-        id: liveStream.id,
-        stream_key: liveStream.stream_key,
-        playback_id: liveStream.playback_ids?.[0]?.id,
-        status: liveStream.status,
+        token,
+        channelName,
+        appId: AGORA_APP_ID,
+        uid
       });
     } catch (error: any) {
-      console.error('VixReel: [CREATE_STREAM] ERROR:', error);
-      res.status(500).json({ 
-        error: error.message || 'Failed to create live stream',
-        details: error.stack
-      });
+      console.error('VixReel: [CREATE_AGORA_TOKEN] ERROR:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate Agora token' });
+    }
+  });
+
+  app.post('/api/live/token', (req, res) => {
+    const { channelName, uid, role: roleStr } = req.body;
+    if (!channelName) return res.status(400).json({ error: 'channelName is required' });
+
+    try {
+      const role = roleStr === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
+      const expirationTimeInSeconds = 3600;
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+      const token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        channelName,
+        uid || 0,
+        role,
+        privilegeExpiredTs
+      );
+
+      res.json({ token });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
   app.get('/api/live/:id', async (req, res) => {
-    console.log(`VixReel: [GET_STREAM] ${req.params.id}`);
-    try {
-      const liveStream = await mux.video.liveStreams.retrieve(req.params.id as string);
-      res.json(liveStream);
-    } catch (error: any) {
-      console.error(`VixReel: [GET_STREAM] ERROR:`, error);
-      res.status(500).json({ error: error.message });
-    }
+    // Legacy endpoint for compatibility
+    res.json({ status: 'active', provider: 'agora' });
   });
 
   app.delete('/api/live/:id', async (req, res) => {
-    console.log(`VixReel: [DELETE_STREAM] ${req.params.id}`);
-    try {
-      await mux.video.liveStreams.delete(req.params.id as string);
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error(`VixReel: [DELETE_STREAM] ERROR:`, error);
-      res.status(500).json({ error: error.message });
-    }
+    // Legacy endpoint for compatibility
+    res.json({ success: true });
   });
 
   // API Catch-all (to distinguish from Vite 404s)

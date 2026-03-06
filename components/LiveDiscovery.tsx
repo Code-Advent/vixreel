@@ -90,9 +90,10 @@ const LiveDiscovery: React.FC<LiveDiscoveryProps> = ({ onJoinLive }) => {
               {/* Thumbnail / Preview */}
               <div className="absolute inset-0">
                 <img 
-                  src={`https://image.mux.com/${stream.playback_id}/thumbnail.jpg?time=0`} 
+                  src={stream.user?.cover_url || `https://picsum.photos/seed/${stream.id}/400/600`} 
                   className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                   alt={stream.user?.username}
+                  referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
               </div>

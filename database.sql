@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     is_location_private BOOLEAN DEFAULT FALSE,
     website TEXT,
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
+    is_live BOOLEAN DEFAULT FALSE,
+    live_playback_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -136,6 +138,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     media_url TEXT,
     media_type TEXT CHECK (media_type IN ('image', 'video')),
     is_read BOOLEAN DEFAULT FALSE,
+    sticker_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
