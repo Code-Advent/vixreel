@@ -99,14 +99,16 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     try {
       // 1. Get Agora Token from Server
       const channelName = `live_${currentUser.id.substring(0, 8)}_${Date.now()}`;
-      const apiUrl = `${window.location.origin}/api/live/create`;
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/live/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channelName, uid: 0 })
       });
 
-      if (!response.ok) throw new Error('Failed to get streaming token');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Failed to get streaming token');
+      }
       const data = await response.json();
 
       // 2. Initialize Agora Client
@@ -123,8 +125,8 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       // 3. Insert into live_streams table
       const { data: dbStream, error: dbErr } = await supabase.from('live_streams').insert({
         user_id: currentUser.id,
-        playback_id: data.channelName, // Use channelName as playback_id for Agora
-        stream_key: data.token, // Store token temporarily if needed
+        channel_name: data.channelName,
+        token: data.token,
         is_live: true
       }).select().single();
 
@@ -134,7 +136,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       setIsLive(true);
       
       // Update profile
-      await supabase.from('profiles').update({ is_live: true, live_playback_id: data.channelName }).eq('id', currentUser.id);
+      await supabase.from('profiles').update({ is_live: true, live_channel_name: data.channelName }).eq('id', currentUser.id);
 
     } catch (err: any) {
       setError(err.message);
@@ -148,7 +150,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
     if (!streamData) return;
     try {
       await supabase.from('live_streams').update({ is_live: false }).eq('id', streamData.id);
-      await supabase.from('profiles').update({ is_live: false, live_playback_id: null }).eq('id', currentUser.id);
+      await supabase.from('profiles').update({ is_live: false, live_channel_name: null }).eq('id', currentUser.id);
       
       if (agoraClientRef.current) {
         await agoraClientRef.current.leave();

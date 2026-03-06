@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     website TEXT,
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
     is_live BOOLEAN DEFAULT FALSE,
-    live_playback_id TEXT,
+    live_channel_name TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -266,14 +266,14 @@ ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_playback_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_channel_name TEXT;
 
 -- 18. LIVE STREAMS TABLE (REBUILT)
 CREATE TABLE IF NOT EXISTS public.live_streams (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    playback_id TEXT NOT NULL,
-    stream_key TEXT, -- Added for broadcaster use
+    channel_name TEXT NOT NULL,
+    token TEXT, -- Agora token for the host
     is_live BOOLEAN DEFAULT TRUE,
     viewer_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

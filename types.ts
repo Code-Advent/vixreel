@@ -21,7 +21,7 @@ export interface UserProfile {
   website?: string;
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
   is_live?: boolean;
-  live_playback_id?: string;
+  live_channel_name?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -185,8 +185,8 @@ export interface Notification {
 export interface LiveStream {
   id: string;
   user_id: string;
-  stream_key: string;
-  playback_id: string;
+  token: string;
+  channel_name: string;
   status: 'idle' | 'active' | 'disconnected';
   viewer_count: number;
   created_at: string;

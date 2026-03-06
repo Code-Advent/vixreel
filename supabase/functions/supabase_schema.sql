@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   website TEXT,
   show_followers_to TEXT DEFAULT 'EVERYONE',
   is_live BOOLEAN DEFAULT false,
-  live_playback_id TEXT,
+  live_channel_name TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -56,8 +56,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_live') THEN
     ALTER TABLE public.profiles ADD COLUMN is_live BOOLEAN DEFAULT FALSE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='live_playback_id') THEN
-    ALTER TABLE public.profiles ADD COLUMN live_playback_id TEXT;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='live_channel_name') THEN
+    ALTER TABLE public.profiles ADD COLUMN live_channel_name TEXT;
   END IF;
 END $$;
 

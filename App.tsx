@@ -132,9 +132,9 @@ const AppContent: React.FC = () => {
               .maybeSingle();
             
             if (!activeStream) {
-              await supabase.from('profiles').update({ is_live: false, live_playback_id: null }).eq('id', profile.id);
+              await supabase.from('profiles').update({ is_live: false, live_channel_name: null }).eq('id', profile.id);
               profile.is_live = false;
-              profile.live_playback_id = null;
+              profile.live_channel_name = undefined;
             }
           }
 

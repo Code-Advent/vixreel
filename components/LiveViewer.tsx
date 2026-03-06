@@ -86,17 +86,20 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
       client.setClientRole('audience');
 
       // Get token for audience
-      const response = await fetch(`${window.location.origin}/api/live/token`, {
+      const response = await fetch('/api/live/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          channelName: stream.playback_id, 
+          channelName: stream.channel_name, 
           uid: 0,
           role: 'subscriber'
         })
       });
 
-      if (!response.ok) throw new Error('Failed to get viewer token');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Failed to get viewer token');
+      }
       const { token } = await response.json();
 
       client.on('user-published', async (user, mediaType) => {
@@ -113,7 +116,7 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         }
       });
 
-      await client.join(AGORA_APP_ID, stream.playback_id, token, 0);
+      await client.join(AGORA_APP_ID, stream.channel_name, token, 0);
     } catch (err) {
       console.error('Agora Init Error:', err);
       setLoading(false);

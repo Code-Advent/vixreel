@@ -4,6 +4,9 @@ import { RtcTokenBuilder, RtcRole } from 'agora-token';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +19,9 @@ async function startServer() {
   app.use(express.json());
   app.use(cors());
 
+  console.log('VixReel: [CONFIG] AGORA_APP_ID:', AGORA_APP_ID ? `${AGORA_APP_ID.substring(0, 4)}...` : 'MISSING');
+  console.log('VixReel: [CONFIG] AGORA_APP_CERTIFICATE:', AGORA_APP_CERTIFICATE ? `${AGORA_APP_CERTIFICATE.substring(0, 4)}...` : 'MISSING');
+
   // Request Logging
   app.use((req, res, next) => {
     console.log(`VixReel: [${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -24,19 +30,47 @@ async function startServer() {
 
   // Health Check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      agoraConfigured: !!(AGORA_APP_ID && AGORA_APP_CERTIFICATE)
+    });
   });
+
+  // Test Agora Token on startup
+  try {
+    const testToken = RtcTokenBuilder.buildTokenWithUid(
+      AGORA_APP_ID, 
+      AGORA_APP_CERTIFICATE, 
+      'test', 
+      0, 
+      RtcRole.PUBLISHER, 
+      Math.floor(Date.now() / 1000) + 3600, 
+      Math.floor(Date.now() / 1000) + 3600
+    );
+    console.log('VixReel: [STARTUP] Agora Token Test SUCCESS');
+  } catch (e: any) {
+    console.error('VixReel: [STARTUP] Agora Token Test FAILED:', e.message);
+  }
 
   // Agora Token Generation
   app.post('/api/live/create', (req, res) => {
-    console.log('VixReel: [CREATE_AGORA_TOKEN] Processing request...');
+    console.log('VixReel: [CREATE_AGORA_TOKEN] Processing request for channel:', req.body.channelName);
     try {
-      const channelName = req.body.channelName || `channel_${Math.floor(Math.random() * 1000000)}`;
+      const channelName = req.body.channelName;
+      if (!channelName) {
+        return res.status(400).json({ error: 'channelName is required' });
+      }
+
       const uid = req.body.uid || 0;
       const role = RtcRole.PUBLISHER;
       const expirationTimeInSeconds = 3600;
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+      if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
+        throw new Error('Agora credentials not configured on server');
+      }
 
       const token = RtcTokenBuilder.buildTokenWithUid(
         AGORA_APP_ID,
@@ -44,6 +78,7 @@ async function startServer() {
         channelName,
         uid,
         role,
+        privilegeExpiredTs,
         privilegeExpiredTs
       );
 
@@ -56,7 +91,7 @@ async function startServer() {
         uid
       });
     } catch (error: any) {
-      console.error('VixReel: [CREATE_AGORA_TOKEN] ERROR:', error);
+      console.error('VixReel: [CREATE_AGORA_TOKEN] ERROR:', error.message);
       res.status(500).json({ error: error.message || 'Failed to generate Agora token' });
     }
   });
@@ -77,6 +112,7 @@ async function startServer() {
         channelName,
         uid || 0,
         role,
+        privilegeExpiredTs,
         privilegeExpiredTs
       );
 
