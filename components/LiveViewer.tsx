@@ -27,6 +27,7 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   const [isLiked, setIsLiked] = useState(false);
   const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLDivElement>(null);
   const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
@@ -100,7 +101,7 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || errorData.message || 'Failed to get viewer token');
       }
-      const { token } = await response.json();
+      const { token, appId } = await response.json();
 
       client.on('user-published', async (user, mediaType) => {
         await client.subscribe(user, mediaType);
@@ -116,9 +117,10 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
         }
       });
 
-      await client.join(AGORA_APP_ID, stream.channel_name, token, 0);
-    } catch (err) {
+      await client.join(appId || AGORA_APP_ID, stream.channel_name, token, 0);
+    } catch (err: any) {
       console.error('Agora Init Error:', err);
+      setError(err.message || 'Failed to connect to stream');
       setLoading(false);
     }
   };
@@ -243,135 +245,136 @@ const LiveViewer: React.FC<LiveViewerProps> = ({ stream, currentUser, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden font-sans select-none">
-      <div className="flex-1 relative bg-zinc-900">
-        <div 
-          ref={videoRef}
-          className="w-full h-full"
-        />
-        
-        {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md z-20">
-            <Loader2 className="w-14 h-14 text-pink-500 animate-spin mb-4" />
-            <p className="text-white/80 text-[11px] font-black uppercase tracking-[0.4em]">Connecting...</p>
-          </div>
-        )}
-
-        {/* Top Bar - Broadcaster Info */}
-        <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-50 pointer-events-none">
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md p-1 pr-3 rounded-full border border-white/10 pointer-events-auto">
-            <div className="w-8 h-8 rounded-full border-2 border-red-500 p-0.5 relative">
-              <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full rounded-full object-cover" />
-              {!isFollowing && stream.user_id !== currentUser.id && (
-                <button 
-                  onClick={handleFollow}
-                  className="absolute -bottom-1 -right-1 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-white border border-black"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                </button>
-              )}
+    <div className="fixed inset-0 z-[2000] bg-[#0e0e10] flex flex-col md:flex-row animate-vix-in overflow-hidden font-sans text-[#efeff1]">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Top Bar */}
+        <div className="h-12 bg-[#18181b] border-b border-[#26262c] flex items-center justify-between px-4 z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-800 border border-[#323239]">
+              <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full object-cover" />
             </div>
-            <div className="flex flex-col">
-              <p className="font-bold text-white text-[10px] leading-tight">@{stream.user?.username}</p>
-              <div className="flex items-center gap-1">
-                <Users className="w-2.5 h-2.5 text-white/80" />
-                <span className="text-[9px] font-bold text-white/80">{formatNumber(viewerCount)}</span>
+            <span className="font-bold text-sm">@{stream.user?.username}</span>
+            <div className="flex items-center gap-2 ml-2">
+              <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Live</span>
+              <span className="text-red-500 text-xs font-medium flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {formatNumber(viewerCount)}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-[#26262c] rounded-md transition-colors text-zinc-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Video Area */}
+        <div className="flex-1 relative bg-black group">
+          <div 
+            ref={videoRef}
+            className="w-full h-full"
+          />
+          
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md z-20">
+              <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+              <p className="text-white/80 text-[10px] font-black uppercase tracking-[0.4em]">Connecting to stream...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm z-30 p-6 text-center">
+              <div className="bg-red-600/20 p-4 rounded-full mb-4">
+                <X className="w-12 h-12 text-red-500" />
               </div>
+              <h3 className="text-xl font-bold mb-2">Stream Offline</h3>
+              <p className="text-zinc-400 text-sm max-w-xs">{error}</p>
+              <button onClick={onClose} className="mt-6 px-6 py-2 bg-[#26262c] hover:bg-[#323239] rounded font-bold text-sm transition-all">
+                Go Back
+              </button>
             </div>
-            <div className="ml-2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full animate-pulse">
-              LIVE
-            </div>
-          </div>
-
-          <button onClick={onClose} className="p-2 bg-black/30 hover:bg-black/50 rounded-full text-white backdrop-blur-md border border-white/10 pointer-events-auto">
-            <X className="w-6 h-6" />
-          </button>
+          )}
         </div>
 
-        {/* Right Actions - Floating Icons */}
-        <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6 z-40">
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <Gift className="w-6 h-6 text-pink-400" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Gift</span>
-          </button>
-
-          <button 
-            onClick={handleLike}
-            className="flex flex-col items-center gap-1 group"
-          >
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${isLiked ? 'bg-pink-500 scale-125' : 'bg-black/30 backdrop-blur-md border border-white/10 group-hover:bg-black/50'}`}>
-              <Heart className={`w-6 h-6 text-white ${isLiked ? 'fill-current' : ''}`} />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Like</span>
-          </button>
-
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <Share2 className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Share</span>
-          </button>
-        </div>
-
-        {/* Chat Overlay - TikTok Style */}
-        <div className="absolute bottom-24 left-4 right-20 z-30 pointer-events-none">
-          <div className="max-h-[35vh] overflow-y-auto no-scrollbar space-y-1.5 pointer-events-auto flex flex-col justify-end">
-            {messages.map((msg) => (
-              <div key={msg.id} className="flex items-start gap-2 animate-vix-in">
-                <div className="bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/5 flex flex-wrap items-center gap-1.5 shadow-lg">
-                  {msg.isSystem ? (
-                    <span className="text-white/60 text-[12px] font-bold">
-                      <span className="text-yellow-400">@{msg.username}</span> {msg.text}
-                    </span>
-                  ) : (
-                    <>
-                      <span className="font-black text-yellow-400 text-[11px] uppercase tracking-tight">@{msg.username}</span>
-                      <span className="text-white text-[13px] font-medium leading-tight">{msg.text}</span>
-                    </>
-                  )}
+        {/* Bottom Info Bar */}
+        <div className="bg-[#18181b] p-4 border-t border-[#26262c]">
+          <div className="flex items-start justify-between">
+            <div className="flex gap-4">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500 p-0.5">
+                <img src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} className="w-full h-full object-cover rounded-full" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">{stream.title || `${stream.user?.username}'s Stream`}</h1>
+                <p className="text-purple-400 text-sm font-medium hover:underline cursor-pointer">@{stream.user?.username}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="bg-[#26262c] text-zinc-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Just Chatting</span>
                 </div>
               </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-        </div>
-
-        {/* Floating Hearts */}
-        <div className="absolute bottom-24 right-6 w-20 h-80 pointer-events-none overflow-hidden z-50">
-          {hearts.map(heart => (
-            <div 
-              key={heart.id}
-              className="absolute bottom-0 text-pink-500 animate-vix-float-up"
-              style={{ left: `${heart.x}%` }}
-            >
-              <Heart className="w-7 h-7 fill-current drop-shadow-lg" />
             </div>
-          ))}
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleFollow}
+                disabled={isFollowing || stream.user_id === currentUser.id}
+                className={`px-4 py-2 rounded font-bold text-sm transition-all flex items-center gap-2 ${isFollowing ? 'bg-[#26262c] text-zinc-400' : 'bg-[#9147ff] hover:bg-[#772ce8] text-white'}`}
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </button>
+              <button 
+                onClick={handleLike}
+                className={`p-2 rounded transition-all ${isLiked ? 'bg-pink-500 text-white' : 'bg-[#26262c] hover:bg-[#323239] text-zinc-400'}`}
+              >
+                <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+              </button>
+              <button className="p-2 bg-[#26262c] hover:bg-[#323239] rounded text-white transition-colors">
+                <Share2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Footer Controls - TikTok Style */}
-      <div className="p-4 bg-black/90 backdrop-blur-xl z-50 border-t border-white/5">
-        <div className="flex items-center gap-3">
-          <form onSubmit={sendMessage} className="flex-1 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2.5 group focus-within:bg-white/20 transition-all">
-            <Smile className="w-5 h-5 text-white/60 mr-3 cursor-pointer hover:text-white transition-colors" />
+      {/* Right Sidebar (Chat) */}
+      <div className="w-full md:w-80 bg-[#18181b] border-l border-[#26262c] flex flex-col">
+        <div className="h-12 flex items-center justify-center border-b border-[#26262c]">
+          <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Stream Chat</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`text-sm leading-relaxed animate-vix-in ${msg.isSystem ? 'text-zinc-500 italic' : ''}`}>
+              {!msg.isSystem && <span className="font-bold text-purple-400 mr-2">@{msg.username}:</span>}
+              <span className={msg.isSystem ? 'text-zinc-500' : 'text-[#efeff1]'}>
+                {msg.isSystem && <span className="text-yellow-400 mr-1">@{msg.username}</span>}
+                {msg.text}
+              </span>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-4 border-t border-[#26262c]">
+          <form onSubmit={sendMessage} className="relative">
             <input 
               type="text" 
-              placeholder={t('Add comment...')} 
-              className="w-full bg-transparent border-none outline-none text-white text-[13px] font-bold placeholder:text-white/40"
+              placeholder="Send a message" 
+              className="w-full bg-[#26262c] border-2 border-transparent focus:border-purple-500 rounded-md px-3 py-2 text-sm outline-none transition-all placeholder:text-zinc-500"
               value={newMessage}
               onChange={e => setNewMessage(e.target.value)}
             />
+            <button 
+              type="submit"
+              disabled={!newMessage.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-purple-500 hover:text-purple-400 disabled:opacity-30"
+            >
+              <Send className="w-4 h-4" />
+            </button>
           </form>
-          
-          <button 
-            onClick={sendMessage}
-            className="w-11 h-11 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-pink-600 transition-all active:scale-90"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          <div className="flex items-center justify-between mt-2 px-1">
+            <div className="flex items-center gap-2">
+              <Smile className="w-4 h-4 text-zinc-500 hover:text-white cursor-pointer" />
+            </div>
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Twitch Style</span>
+          </div>
         </div>
       </div>
     </div>

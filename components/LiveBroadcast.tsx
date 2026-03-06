@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Loader2, RefreshCw, Sparkles, Wand2,
-  Users, Send, Heart, Camera, StopCircle, Share2
+  Users, Send, Heart, Camera, StopCircle, Share2,
+  MessageCircle, Smile
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -27,7 +28,8 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isFrontCamera, setIsFrontCamera] = useState(true);
-  const [hearts, setHearts] = useState<{ id: number; x: number }[]>([]);
+  const [streamTitle, setStreamTitle] = useState(`${currentUser.username}'s Epic Stream`);
+  const [category, setCategory] = useState('Just Chatting');
   
   const videoRef = useRef<HTMLDivElement>(null);
   const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
@@ -46,6 +48,51 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (streamData?.id) {
+      const channel = supabase
+        .channel(`live-broadcast-${streamData.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'live_streams',
+          filter: `id=eq.${streamData.id}` 
+        }, (payload: any) => {
+          if (payload.new) {
+            setViewerCount(payload.new.viewer_count || 0);
+          }
+        })
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_messages',
+          filter: `stream_id=eq.${streamData.id}`
+        }, async (payload) => {
+          const { data } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', payload.new.user_id)
+            .single();
+          
+          setMessages(prev => [...prev, {
+            id: payload.new.id,
+            username: data?.username || 'User',
+            text: payload.new.text,
+            created_at: payload.new.created_at
+          }]);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [streamData?.id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const stopTracks = () => {
     if (localTracksRef.current.videoTrack) {
@@ -116,7 +163,7 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
       agoraClientRef.current = client;
       client.setClientRole('host');
 
-      await client.join(AGORA_APP_ID, data.channelName, data.token, data.uid);
+      await client.join(data.appId || AGORA_APP_ID, data.channelName, data.token, data.uid);
       
       if (localTracksRef.current.audioTrack && localTracksRef.current.videoTrack) {
         await client.publish([localTracksRef.current.audioTrack, localTracksRef.current.videoTrack]);
@@ -183,142 +230,172 @@ const LiveBroadcast: React.FC<LiveBroadcastProps> = ({ currentUser, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-vix-in overflow-hidden font-sans">
-      {/* Video Preview / Stream */}
-      <div className="flex-1 relative bg-zinc-900">
-        <div 
-          ref={videoRef} 
-          className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''}`}
-        />
-
-        {/* Top Overlay */}
-        <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-50">
-          <div className="flex flex-col gap-2">
-            {isLive ? (
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md p-1 pr-3 rounded-full border border-white/10">
-                <div className="w-8 h-8 rounded-full border-2 border-red-500 p-0.5">
-                  <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-full h-full rounded-full object-cover" />
-                </div>
-                <div className="flex flex-col">
-                  <p className="font-bold text-white text-[10px] leading-tight">@{currentUser.username}</p>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-2.5 h-2.5 text-white/80" />
-                    <span className="text-[9px] font-bold text-white/80">{formatNumber(viewerCount)}</span>
-                  </div>
-                </div>
-                <div className="ml-2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full animate-pulse">
-                  LIVE
-                </div>
-              </div>
-            ) : (
-              <div className="bg-black/30 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
-                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Preview Mode</span>
+    <div className="fixed inset-0 z-[2000] bg-[#0e0e10] flex flex-col md:flex-row animate-vix-in overflow-hidden font-sans text-[#efeff1]">
+      {/* Main Content Area (Video + Info) */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Top Bar */}
+        <div className="h-12 bg-[#18181b] border-b border-[#26262c] flex items-center justify-between px-4 z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-zinc-800 border border-[#323239]">
+              <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-full h-full object-cover" />
+            </div>
+            <span className="font-bold text-sm">@{currentUser.username}</span>
+            {isLive && (
+              <div className="flex items-center gap-2 ml-2">
+                <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Live</span>
+                <span className="text-red-500 text-xs font-medium flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {formatNumber(viewerCount)}
+                </span>
               </div>
             )}
           </div>
-
-          <button onClick={isLive ? endLive : onClose} className="p-2 bg-black/30 hover:bg-black/50 rounded-full text-white backdrop-blur-md border border-white/10">
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleCamera} className="p-2 hover:bg-[#26262c] rounded-md transition-colors text-zinc-400 hover:text-white">
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button onClick={isLive ? endLive : onClose} className="p-2 hover:bg-[#26262c] rounded-md transition-colors text-zinc-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Right Actions */}
-        <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6 z-40">
-          <button onClick={toggleCamera} className="flex flex-col items-center gap-1 group">
-            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <RefreshCw className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Flip</span>
-          </button>
-
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <Sparkles className="w-6 h-6 text-pink-400" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Effects</span>
-          </button>
-
-          <button className="flex flex-col items-center gap-1 group">
-            <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:bg-black/50 transition-all">
-              <Wand2 className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[10px] font-black text-white drop-shadow-md">Beauty</span>
-          </button>
-        </div>
-
-        {/* Chat Overlay */}
-        {isLive && (
-          <div className="absolute bottom-24 left-4 right-20 z-30 pointer-events-none">
-            <div className="max-h-[30vh] overflow-y-auto no-scrollbar space-y-1.5 pointer-events-auto flex flex-col justify-end">
-              {messages.map((msg) => (
-                <div key={msg.id} className="flex items-start gap-2 animate-vix-in">
-                  <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/5 flex flex-col shadow-lg">
-                    <span className="font-black text-yellow-400 text-[10px] uppercase tracking-tight mb-0.5">@{msg.username}</span>
-                    <span className="text-white text-[13px] font-medium leading-tight">{msg.text}</span>
+        {/* Video Area */}
+        <div className="flex-1 relative bg-black group">
+          <div 
+            ref={videoRef} 
+            className={`w-full h-full ${isFrontCamera ? 'scale-x-[-1]' : ''}`}
+          />
+          
+          {!isLive && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-20 p-6">
+              <div className="w-full max-w-md bg-[#18181b] p-6 rounded-lg border border-[#26262c] shadow-2xl">
+                <h2 className="text-xl font-bold mb-4">Stream Manager</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">Stream Title</label>
+                    <input 
+                      type="text" 
+                      value={streamTitle}
+                      onChange={e => setStreamTitle(e.target.value)}
+                      className="w-full bg-[#0e0e10] border border-[#323239] rounded px-3 py-2 text-sm focus:border-purple-500 outline-none transition-all"
+                      placeholder="Enter stream title..."
+                    />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">Category</label>
+                    <select 
+                      value={category}
+                      onChange={e => setCategory(e.target.value)}
+                      className="w-full bg-[#0e0e10] border border-[#323239] rounded px-3 py-2 text-sm focus:border-purple-500 outline-none transition-all"
+                    >
+                      <option>Just Chatting</option>
+                      <option>Gaming</option>
+                      <option>Music</option>
+                      <option>Talk Shows</option>
+                      <option>Creative</option>
+                    </select>
+                  </div>
+                  <button 
+                    onClick={startLive}
+                    disabled={loading}
+                    className="w-full py-2.5 bg-[#9147ff] hover:bg-[#772ce8] text-white rounded font-bold text-sm transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start Streaming'}
+                  </button>
                 </div>
-              ))}
-              <div ref={chatEndRef} />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute bottom-4 left-4 right-4 bg-red-600/90 text-white p-3 rounded border border-red-500 flex items-center gap-3 z-[100] animate-vix-in">
+              <div className="bg-white/20 p-1.5 rounded">
+                <X className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Stream Error</p>
+                <p className="text-xs font-bold">{error}</p>
+              </div>
+              <button onClick={() => setError(null)} className="text-white/60 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Info Bar */}
+        <div className="bg-[#18181b] p-4 border-t border-[#26262c]">
+          <div className="flex items-start justify-between">
+            <div className="flex gap-4">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500 p-0.5">
+                <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-full h-full object-cover rounded-full" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">{streamTitle}</h1>
+                <p className="text-purple-400 text-sm font-medium hover:underline cursor-pointer">@{currentUser.username}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="bg-[#26262c] text-zinc-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">{category}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="p-2 bg-[#26262c] hover:bg-[#323239] rounded text-white transition-colors">
+                <Share2 className="w-5 h-5" />
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Floating Hearts */}
-        <div className="absolute bottom-24 right-6 w-20 h-80 pointer-events-none overflow-hidden z-50">
-          {hearts.map(heart => (
-            <div 
-              key={heart.id}
-              className="absolute bottom-0 text-pink-500 animate-vix-float-up"
-              style={{ left: `${heart.x}%` }}
-            >
-              <Heart className="w-7 h-7 fill-current drop-shadow-lg" />
+      {/* Right Sidebar (Chat) */}
+      <div className="w-full md:w-80 bg-[#18181b] border-l border-[#26262c] flex flex-col">
+        <div className="h-12 flex items-center justify-center border-b border-[#26262c]">
+          <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Stream Chat</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2">
+              <MessageCircle className="w-8 h-8 opacity-20" />
+              <p className="text-[10px] font-bold uppercase tracking-tighter">Welcome to the chat!</p>
+            </div>
+          )}
+          {messages.map((msg) => (
+            <div key={msg.id} className="text-sm leading-relaxed animate-vix-in">
+              <span className="font-bold text-purple-400 mr-2">@{msg.username}:</span>
+              <span className="text-[#efeff1]">{msg.text}</span>
             </div>
           ))}
+          <div ref={chatEndRef} />
         </div>
 
-        {/* Start Button Overlay */}
-        {!isLive && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-20">
+        <div className="p-4 border-t border-[#26262c]">
+          <form onSubmit={sendMessage} className="relative">
+            <input 
+              type="text" 
+              placeholder="Send a message" 
+              className="w-full bg-[#26262c] border-2 border-transparent focus:border-purple-500 rounded-md px-3 py-2 text-sm outline-none transition-all placeholder:text-zinc-500"
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+              disabled={!isLive}
+            />
             <button 
-              onClick={startLive}
-              disabled={loading}
-              className="px-12 py-4 bg-pink-500 text-white rounded-full font-black text-lg uppercase tracking-[0.2em] shadow-2xl hover:bg-pink-600 transition-all active:scale-95 disabled:opacity-50"
+              type="submit"
+              disabled={!isLive || !newMessage.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-purple-500 hover:text-purple-400 disabled:opacity-30"
             >
-              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : t('Go Live')}
+              <Send className="w-4 h-4" />
             </button>
+          </form>
+          <div className="flex items-center justify-between mt-2 px-1">
+            <div className="flex items-center gap-2">
+              <Smile className="w-4 h-4 text-zinc-500 hover:text-white cursor-pointer" />
+            </div>
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Twitch Style</span>
           </div>
-        )}
-      </div>
-
-      {/* Footer Controls */}
-      <div className="p-4 bg-black z-50">
-        {isLive ? (
-          <div className="flex items-center gap-3">
-            <form onSubmit={sendMessage} className="flex-1 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2.5">
-              <input 
-                type="text" 
-                placeholder={t('Add comment...')} 
-                className="w-full bg-transparent border-none outline-none text-white text-[13px] font-bold placeholder:text-white/40"
-                value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-              />
-            </form>
-            <button onClick={endLive} className="px-6 py-2.5 bg-red-500 text-white rounded-full font-black text-[11px] uppercase tracking-widest shadow-lg">
-              {t('End Live')}
-            </button>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">{t('Ready to broadcast?')}</p>
-          </div>
-        )}
-      </div>
-
-      {error && (
-        <div className="absolute top-24 left-6 right-6 bg-red-500/90 backdrop-blur-md p-4 rounded-2xl text-white text-[11px] font-black uppercase tracking-widest text-center z-[3000]">
-          {error}
         </div>
-      )}
+      </div>
     </div>
   );
 };

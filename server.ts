@@ -55,52 +55,58 @@ async function startServer() {
 
   // Agora Token Generation
   app.post('/api/live/create', (req, res) => {
-    console.log('VixReel: [CREATE_AGORA_TOKEN] Processing request for channel:', req.body.channelName);
+    const { channelName, uid } = req.body;
+    console.log(`VixReel: [CREATE_TOKEN] Channel: ${channelName}, UID: ${uid}`);
+    
     try {
-      const channelName = req.body.channelName;
       if (!channelName) {
         return res.status(400).json({ error: 'channelName is required' });
       }
 
-      const uid = req.body.uid || 0;
+      if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
+        console.error('VixReel: [CONFIG_ERROR] Agora credentials missing');
+        return res.status(500).json({ error: 'Agora credentials not configured on server' });
+      }
+
       const role = RtcRole.PUBLISHER;
       const expirationTimeInSeconds = 3600;
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
-      if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
-        throw new Error('Agora credentials not configured on server');
-      }
-
       const token = RtcTokenBuilder.buildTokenWithUid(
         AGORA_APP_ID,
         AGORA_APP_CERTIFICATE,
         channelName,
-        uid,
+        uid || 0,
         role,
         privilegeExpiredTs,
         privilegeExpiredTs
       );
 
-      console.log('VixReel: [CREATE_AGORA_TOKEN] SUCCESS for channel:', channelName);
-
+      console.log('VixReel: [CREATE_TOKEN] SUCCESS');
       res.json({
         token,
         channelName,
         appId: AGORA_APP_ID,
-        uid
+        uid: uid || 0
       });
     } catch (error: any) {
-      console.error('VixReel: [CREATE_AGORA_TOKEN] ERROR:', error.message);
-      res.status(500).json({ error: error.message || 'Failed to generate Agora token' });
+      console.error('VixReel: [CREATE_TOKEN] FAILED:', error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
   app.post('/api/live/token', (req, res) => {
     const { channelName, uid, role: roleStr } = req.body;
-    if (!channelName) return res.status(400).json({ error: 'channelName is required' });
+    console.log(`VixReel: [GET_TOKEN] Channel: ${channelName}, Role: ${roleStr}`);
 
     try {
+      if (!channelName) return res.status(400).json({ error: 'channelName is required' });
+      
+      if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
+        return res.status(500).json({ error: 'Agora credentials not configured on server' });
+      }
+
       const role = roleStr === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
       const expirationTimeInSeconds = 3600;
       const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -116,8 +122,9 @@ async function startServer() {
         privilegeExpiredTs
       );
 
-      res.json({ token });
+      res.json({ token, appId: AGORA_APP_ID });
     } catch (error: any) {
+      console.error('VixReel: [GET_TOKEN] FAILED:', error.message);
       res.status(500).json({ error: error.message });
     }
   });
