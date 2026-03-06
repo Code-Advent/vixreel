@@ -33,6 +33,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_location_private BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME'));
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_channel_name TEXT;
 
 -- 3. LOCATIONS TABLE
 CREATE TABLE IF NOT EXISTS public.locations (
@@ -265,9 +267,6 @@ CREATE TABLE IF NOT EXISTS public.stickers (
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
 
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_channel_name TEXT;
-
 -- 18. LIVE STREAMS TABLE (REBUILT)
 CREATE TABLE IF NOT EXISTS public.live_streams (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -278,6 +277,12 @@ CREATE TABLE IF NOT EXISTS public.live_streams (
     viewer_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure all live_streams columns exist (Migration for existing tables)
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS channel_name TEXT;
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS token TEXT;
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS viewer_count INTEGER DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_live_streams_user_id ON public.live_streams(user_id);
 CREATE INDEX IF NOT EXISTS idx_live_streams_is_live ON public.live_streams(is_live);
