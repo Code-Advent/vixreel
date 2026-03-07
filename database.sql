@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
     is_live BOOLEAN DEFAULT FALSE,
     live_channel_name TEXT,
+    is_business_mode BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -35,6 +36,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME'));
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_channel_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_business_mode BOOLEAN DEFAULT FALSE;
 
 -- 3. LOCATIONS TABLE
 CREATE TABLE IF NOT EXISTS public.locations (
@@ -53,6 +55,9 @@ CREATE TABLE IF NOT EXISTS public.posts (
     media_type TEXT CHECK (media_type IN ('image', 'video')) NOT NULL,
     caption TEXT,
     boosted_likes INTEGER DEFAULT 0,
+    is_ad BOOLEAN DEFAULT FALSE,
+    cta_text TEXT,
+    cta_link TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -65,6 +70,9 @@ ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS location_name TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS feeling TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS privacy TEXT DEFAULT 'PUBLIC' CHECK (privacy IN ('PUBLIC', 'FOLLOWERS', 'PRIVATE'));
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS allow_comments BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS is_ad BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS cta_text TEXT;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS cta_link TEXT;
 
 -- 5. REPOSTS TABLE
 CREATE TABLE IF NOT EXISTS public.reposts (

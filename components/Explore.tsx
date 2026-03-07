@@ -132,6 +132,13 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand
               ) : (
                 <img src={post.media_url} className="w-full h-full object-cover" alt="Trending" />
               )}
+              
+              {post.is_ad && (
+                <div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 z-10">
+                  <span className="text-[6px] font-black text-white uppercase tracking-widest">Ads</span>
+                </div>
+              )}
+
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm gap-4">
                 <div className="flex items-center gap-1.5 text-white font-black text-xs">
                   <Heart className="w-4 h-4 fill-white" /> {(post.likes_count || 0) + (post.boosted_likes || 0)}

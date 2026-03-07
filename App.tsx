@@ -493,7 +493,7 @@ const AppContent: React.FC = () => {
             
             {currentView === 'CREATE' && (
               <CreatePost 
-                userId={currentUser.id} 
+                user={currentUser} 
                 onClose={() => {
                   setCurrentView('FEED');
                   setDuetSource(null);

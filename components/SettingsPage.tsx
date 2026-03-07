@@ -52,6 +52,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
+  const [isBusinessMode, setIsBusinessMode] = useState(user.is_business_mode || false);
   const [location, setLocation] = useState(user.location || '');
   const [website, setWebsite] = useState(user.website || '');
   const [isLocationPrivate, setIsLocationPrivate] = useState(user.is_location_private || false);
@@ -70,6 +71,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         if (key === 'is_private') setIsPrivate(value);
         if (key === 'allow_comments') setAllowComments(value);
         if (key === 'is_following_public') setIsFollowingPublic(value);
+        if (key === 'is_business_mode') setIsBusinessMode(value);
         if (key === 'is_location_private') setIsLocationPrivate(value);
         if (key === 'show_followers_to') setShowFollowersTo(value);
       }
@@ -146,6 +148,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           label: t('Linked Accounts'), 
           action: onOpenSwitchAccount, 
           desc: t('Manage other VixReel identities.') 
+        },
+        { 
+          icon: Shield, 
+          label: t('Business Mode'), 
+          isToggle: true, 
+          active: isBusinessMode, 
+          onToggle: () => toggleSetting('is_business_mode', !isBusinessMode),
+          desc: t('Switch to business mode to access ads and CTA buttons.')
         },
         { 
           icon: Bell, 

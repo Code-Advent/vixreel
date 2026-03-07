@@ -4,17 +4,17 @@ import {
   X, Wand2, Loader2, Image as ImageIcon, Video, 
   UploadCloud, ChevronRight, Columns2, Scissors,
   MapPin, Lock, MessageSquare, Smile, Sparkles,
-  Globe, EyeOff, Check, Radio, Play
+  Globe, EyeOff, Check, Radio, Play, Megaphone, Link as LinkIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText, generateAIImage } from '../services/geminiService';
 import { sanitizeFilename } from '../lib/utils';
-import { Post } from '../types';
+import { Post, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
 
 interface CreatePostProps {
-  userId: string;
+  user: UserProfile;
   onClose: () => void;
   onPostSuccess: () => void;
   onStartLive?: () => void;
@@ -22,7 +22,7 @@ interface CreatePostProps {
   stitchSource?: Post | null;
 }
 
-const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess, onStartLive, duetSource, stitchSource }) => {
+const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, onStartLive, duetSource, stitchSource }) => {
   const { t } = useTranslation();
   const [mode, setMode] = useState<'POST' | 'LIVE'>('POST');
   const [file, setFile] = useState<File | null>(null);
@@ -32,6 +32,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
   const [privacy, setPrivacy] = useState<'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'>('PUBLIC');
   const [allowComments, setAllowComments] = useState(true);
   const [feeling, setFeeling] = useState('');
+  const [isAd, setIsAd] = useState(false);
+  const [ctaText, setCtaText] = useState('');
+  const [ctaLink, setCtaLink] = useState('');
   const [isPosting, setIsPosting] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -88,7 +91,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
     setIsPosting(true);
     const safeFilename = sanitizeFilename(file.name);
     const fileName = `${Date.now()}-${safeFilename}`;
-    const filePath = `${userId}/${fileName}`;
+    const filePath = `${user.id}/${fileName}`;
     try {
       const { error: uploadErr } = await supabase.storage
         .from('posts')
@@ -102,14 +105,17 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
       const { data: { publicUrl } } = supabase.storage.from('posts').getPublicUrl(filePath);
       
       const { data: newPost, error: insertErr } = await supabase.from('posts').insert({
-        user_id: userId, 
+        user_id: user.id, 
         media_url: publicUrl, 
         media_type: mediaType, 
         caption: caption.trim(),
-        location_name: location, // Assuming we add location_name or just use location_id
+        location_name: location,
         privacy,
         allow_comments: allowComments,
         feeling,
+        is_ad: isAd,
+        cta_text: ctaText,
+        cta_link: ctaLink,
         duet_from_id: duetSource?.id,
         stitch_from_id: stitchSource?.id
       }).select().single();
@@ -118,20 +124,20 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
 
       if (duetSource && newPost) {
         await supabase.from('duets').insert({
-          user_id: userId,
+          user_id: user.id,
           original_post_id: duetSource.id,
           duet_post_id: newPost.id
         });
-        await createNotification(duetSource.user_id, userId, 'DUET', newPost.id);
+        await createNotification(duetSource.user_id, user.id, 'DUET', newPost.id);
       }
 
       if (stitchSource && newPost) {
         await supabase.from('stitches').insert({
-          user_id: userId,
+          user_id: user.id,
           original_post_id: stitchSource.id,
           stitch_post_id: newPost.id
         });
-        await createNotification(stitchSource.user_id, userId, 'STITCH', newPost.id);
+        await createNotification(stitchSource.user_id, user.id, 'STITCH', newPost.id);
       }
 
       // Handle mentions in caption
@@ -142,7 +148,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
             const username = mention.slice(1);
             const { data: mentionedUser } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
             if (mentionedUser) {
-              await createNotification(mentionedUser.id, userId, 'MENTION', newPost.id, caption);
+              await createNotification(mentionedUser.id, user.id, 'MENTION', newPost.id, caption);
             }
           }
         }
@@ -326,6 +332,52 @@ const CreatePost: React.FC<CreatePostProps> = ({ userId, onClose, onPostSuccess,
                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${allowComments ? 'right-1' : 'left-1'}`} />
                   </button>
                 </div>
+
+                {user.is_business_mode && (
+                  <div className="pt-4 border-t border-[var(--vix-border)] space-y-4">
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-600 px-2">{t('Business Tools')}</h3>
+                    
+                    <div className="flex items-center justify-between px-2">
+                      <div className="flex items-center gap-3">
+                        <Megaphone className="w-4 h-4 text-zinc-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{t('Mark as Ad')}</span>
+                      </div>
+                      <button 
+                        onClick={() => setIsAd(!isAd)}
+                        className={`w-10 h-5 rounded-full relative transition-all ${isAd ? 'bg-blue-500' : 'bg-zinc-800'}`}
+                      >
+                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isAd ? 'right-1' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                    {isAd && (
+                      <div className="space-y-3 animate-vix-in">
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <input 
+                            value={ctaText}
+                            onChange={e => setCtaText(e.target.value)}
+                            placeholder={t('Button Text (e.g. Shop Now)')}
+                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/30 transition-all"
+                          />
+                        </div>
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                            <LinkIcon className="w-4 h-4" />
+                          </div>
+                          <input 
+                            value={ctaLink}
+                            onChange={e => setCtaLink(e.target.value)}
+                            placeholder={t('Redirect Link (https://...)')}
+                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/30 transition-all"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -22,6 +22,7 @@ export interface UserProfile {
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
   is_live?: boolean;
   live_channel_name?: string;
+  is_business_mode?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -49,6 +50,9 @@ export interface Post {
   feeling?: string;
   privacy?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
   allow_comments?: boolean;
+  is_ad?: boolean;
+  cta_text?: string;
+  cta_link?: string;
 }
 
 export interface Comment {

@@ -250,6 +250,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
             <img src={post.media_url} className="w-full h-full object-contain" alt="Post" />
           )}
 
+          {post.is_ad && (
+            <div className="absolute top-4 right-4 bg-blue-500/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 z-10">
+              <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">Ads</span>
+            </div>
+          )}
+
           {/* Like Animation Overlay */}
           {showLikeAnim && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
@@ -344,9 +350,22 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
                   <Repeat2 className="w-7 h-7" />
                 </button>
               </div>
-              <button className={`${saved ? 'text-white' : 'text-zinc-400 hover:text-white'} transition-all`}>
-                <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
-              </button>
+              <div className="flex items-center gap-4">
+                {post.is_ad && post.cta_text && post.cta_link && (
+                  <a 
+                    href={post.cta_link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10"
+                  >
+                    {post.cta_text}
+                  </a>
+                )}
+                <button className={`${saved ? 'text-white' : 'text-zinc-400 hover:text-white'} transition-all`}>
+                  <Bookmark className={`w-7 h-7 ${saved ? 'fill-current' : ''}`} />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
