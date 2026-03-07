@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText, generateAIImage } from '../services/geminiService';
-import { sanitizeFilename } from '../lib/utils';
+import { sanitizeFilename, formatExternalLink } from '../lib/utils';
 import { Post, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
@@ -114,8 +114,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
         allow_comments: allowComments,
         feeling,
         is_ad: isAd,
-        cta_text: ctaText,
-        cta_link: ctaLink,
+        cta_text: ctaText.trim(),
+        cta_link: formatExternalLink(ctaLink),
         duet_from_id: duetSource?.id,
         stitch_from_id: stitchSource?.id
       }).select().single();

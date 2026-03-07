@@ -3,11 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, MessageCircle, Download, Bookmark, Trash2, X, 
   Volume2, VolumeX, Loader2, MessageSquareOff, Lock, 
-  Repeat2, Columns2, Scissors, MapPin, Smile, Sticker as StickerIcon
+  Repeat2, Columns2, Scissors, MapPin, Smile, Sticker as StickerIcon,
+  ExternalLink
 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
-import { formatNumber } from '../lib/utils';
+import { formatNumber, formatExternalLink } from '../lib/utils';
 import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
@@ -430,13 +431,14 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
           <div className="flex items-center gap-3">
             {post.is_ad && post.cta_text && post.cta_link && (
               <a 
-                href={post.cta_link} 
+                href={formatExternalLink(post.cta_link)} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10"
+                className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10 flex items-center gap-1.5"
               >
                 {post.cta_text}
+                <ExternalLink className="w-2.5 h-2.5" />
               </a>
             )}
             <button onClick={handleSave} className={`${saved ? 'text-[var(--vix-text)]' : 'text-zinc-500 hover:text-[var(--vix-text)]'} transition-all`}>

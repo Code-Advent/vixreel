@@ -4,11 +4,11 @@ import {
   X, Heart, MessageCircle, Download, Bookmark, 
   Repeat2, Columns2, Scissors, Volume2, VolumeX, 
   Loader2, MapPin, Smile, MoreHorizontal, ChevronLeft, ChevronRight,
-  Sticker as StickerIcon
+  Sticker as StickerIcon, ExternalLink
 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
-import { formatNumber } from '../lib/utils';
+import { formatNumber, formatExternalLink } from '../lib/utils';
 import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
@@ -353,13 +353,14 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
               <div className="flex items-center gap-4">
                 {post.is_ad && post.cta_text && post.cta_link && (
                   <a 
-                    href={post.cta_link} 
+                    href={formatExternalLink(post.cta_link)} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10"
+                    className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10 flex items-center gap-1.5"
                   >
                     {post.cta_text}
+                    <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 )}
                 <button className={`${saved ? 'text-white' : 'text-zinc-400 hover:text-white'} transition-all`}>
