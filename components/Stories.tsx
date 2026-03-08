@@ -17,6 +17,8 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [showOutro, setShowOutro] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     fetchStories();
@@ -165,16 +167,36 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
             {stories[activeStoryIndex].media_type === 'video' ? (
               <video 
+                ref={videoRef}
                 src={stories[activeStoryIndex].media_url} 
                 autoPlay 
+                loop={false}
                 className="w-full h-full object-contain" 
                 onEnded={() => {
-                  if (activeStoryIndex < stories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
-                  else setActiveStoryIndex(null);
+                  setShowOutro(true);
+                  setTimeout(() => {
+                    setShowOutro(false);
+                    if (activeStoryIndex < stories.length - 1) setActiveStoryIndex(activeStoryIndex + 1);
+                    else setActiveStoryIndex(null);
+                  }, 2500);
                 }} 
               />
             ) : (
               <img src={stories[activeStoryIndex].media_url} className="w-full h-full object-contain" alt="Story" />
+            )}
+
+            {showOutro && (
+              <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-40 animate-vix-outro-bg">
+                <div className="relative text-center animate-vix-outro-text">
+                  <h2 className="text-6xl sm:text-7xl font-logo vix-text-gradient drop-shadow-[0_0_30px_rgba(255,0,128,0.5)]">VixReel</h2>
+                  <div className="mt-6 flex flex-col items-center gap-2">
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full" />
+                    <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] opacity-80">
+                      @{stories[activeStoryIndex].user.username}
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 

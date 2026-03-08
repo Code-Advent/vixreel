@@ -58,6 +58,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
+  const [showStoryOutro, setShowStoryOutro] = useState(false);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -466,17 +467,36 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <video 
               src={currentStory.media_url} 
               autoPlay 
+              loop={false}
               className="w-full h-full object-cover"
               onEnded={() => {
-                if (currentStoryIndex < stories.length - 1) {
-                  setCurrentStoryIndex(prev => prev + 1);
-                } else {
-                  setShowStoryViewer(false);
-                }
+                setShowStoryOutro(true);
+                setTimeout(() => {
+                  setShowStoryOutro(false);
+                  if (currentStoryIndex < stories.length - 1) {
+                    setCurrentStoryIndex(prev => prev + 1);
+                  } else {
+                    setShowStoryViewer(false);
+                  }
+                }, 2500);
               }}
             />
           ) : (
             <img src={currentStory.media_url} className="w-full h-full object-cover" />
+          )}
+
+          {showStoryOutro && (
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-40 animate-vix-outro-bg">
+              <div className="relative text-center animate-vix-outro-text">
+                <h2 className="text-6xl sm:text-7xl font-logo vix-text-gradient drop-shadow-[0_0_30px_rgba(255,0,128,0.5)]">VixReel</h2>
+                <div className="mt-6 flex flex-col items-center gap-2">
+                  <div className="w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full" />
+                  <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] opacity-80">
+                    @{user.username}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
           <div className="absolute inset-0 flex">
