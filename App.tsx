@@ -341,55 +341,13 @@ const AppContent: React.FC = () => {
                 <div className="w-full flex justify-between items-center mb-6 px-2">
                   <div className="flex items-center gap-4">
                     <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
-                    {liveStreams.length > 0 && (
-                      <button 
-                        onClick={() => setView('LIVE')}
-                        className="flex items-center gap-2 bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20 hover:bg-red-500/20 transition-all group"
-                      >
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">{t('Live')}</span>
-                      </button>
-                    )}
                   </div>
                   <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
                     <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
                   </button>
                 </div>
 
-                {/* Live Now Section - TikTok Style Horizontal Scroll */}
-                {liveStreams.length > 0 && (
-                  <div className="w-full mb-8 animate-vix-in">
-                    <div className="flex gap-5 overflow-x-auto no-scrollbar pb-4 px-2">
-                      {liveStreams.map((stream) => (
-                        <div 
-                          key={stream.id} 
-                          onClick={() => {
-                            setActiveLiveStream(stream);
-                            setCurrentView('LIVE_VIEWER');
-                          }}
-                          className="flex flex-col items-center gap-2 cursor-pointer group shrink-0"
-                        >
-                          <div className="relative">
-                            <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-red-500 animate-spin-slow">
-                              <div className="w-full h-full rounded-full p-0.5 bg-[var(--vix-bg)]">
-                                <img 
-                                  src={stream.user?.avatar_url || `https://ui-avatars.com/api/?name=${stream.user?.username}`} 
-                                  className="w-full h-full rounded-full object-cover" 
-                                />
-                              </div>
-                            </div>
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 px-2 py-0.5 rounded-full border-2 border-[var(--vix-bg)] shadow-lg">
-                              <span className="text-[7px] font-black text-white uppercase tracking-widest">LIVE</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">@{stream.user?.username}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="w-full max-w-[470px] space-y-6">
+                <div className="w-full max-[470px] space-y-6">
                   {posts.length > 0 ? (
                     posts.map(p => (
                       <Post 

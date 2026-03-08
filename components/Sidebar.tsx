@@ -52,7 +52,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
   
   const navItems = [
     { id: 'FEED' as ViewType, label: t('Home'), icon: 'fa-solid fa-house' },
-    { id: 'LIVE' as ViewType, label: t('Live'), icon: 'fa-solid fa-video', color: 'text-red-500' },
     { id: 'SEARCH' as ViewType, label: t('Search'), icon: 'fa-solid fa-magnifying-glass' },
     { id: 'EXPLORE' as ViewType, label: t('Explore'), icon: 'fa-solid fa-compass' },
     { id: 'NOTIFICATIONS' as ViewType, label: t('Notifications'), icon: 'fa-solid fa-bell', badge: unreadCount },
@@ -88,8 +87,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
                   isActive ? 'bg-[var(--vix-secondary)] text-[var(--vix-text)]' : 'text-zinc-500 hover:bg-[var(--vix-secondary)]/40 hover:text-[var(--vix-text)]'
                 }`}
               >
-                <div className={`w-6 h-6 flex items-center justify-center transition-all duration-300 ${isActive ? `scale-110 ${item.color || 'text-pink-500'}` : `group-hover:scale-110 ${item.color ? 'opacity-80' : 'group-hover:text-pink-400'}`}`}>
-                  <i className={`${item.icon} text-xl ${!isActive && item.color ? item.color : ''}`}></i>
+                <div className={`w-6 h-6 flex items-center justify-center transition-all duration-300 ${isActive ? `scale-110 ${(item as any).color || 'text-pink-500'}` : `group-hover:scale-110 ${(item as any).color ? 'opacity-80' : 'group-hover:text-pink-400'}`}`}>
+                  <i className={`${item.icon} text-xl ${!isActive && (item as any).color ? (item as any).color : ''}`}></i>
                   {item.badge !== undefined && item.badge > 0 && (
                     <span className="absolute -top-1 -right-1 lg:-top-2 lg:-right-2 bg-pink-500 text-white text-[8px] font-black px-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center border-2 border-[var(--vix-bg)] shadow-lg">
                       {item.badge > 99 ? '99+' : item.badge}
