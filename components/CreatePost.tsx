@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
 import { 
-  X, Wand2, Loader2, Image as ImageIcon, Video, 
+  X, Wand2, Loader2, Video, 
   UploadCloud, ChevronRight, Columns2, Scissors,
   MapPin, Lock, MessageSquare, Smile, Sparkles,
-  Globe, EyeOff, Check, Radio, Play, Megaphone, Link as LinkIcon
+  Megaphone, Link as LinkIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText, generateAIImage } from '../services/geminiService';
@@ -17,20 +17,15 @@ interface CreatePostProps {
   user: UserProfile;
   onClose: () => void;
   onPostSuccess: () => void;
-  onStartLive?: () => void;
   duetSource?: Post | null;
   stitchSource?: Post | null;
 }
 
-const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, onStartLive, duetSource, stitchSource }) => {
+const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, duetSource, stitchSource }) => {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<'POST' | 'LIVE' | 'IMPORT'>('POST');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
-  const [importUrl, setImportUrl] = useState('');
-  const [fakeUsername, setFakeUsername] = useState('');
-  const [fakeAvatarUrl, setFakeAvatarUrl] = useState('');
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<'PUBLIC' | 'FOLLOWERS' | 'PRIVATE'>('PUBLIC');
   const [allowComments, setAllowComments] = useState(true);
@@ -172,69 +167,22 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
     } finally { setIsPosting(false); }
   };
 
-  const handleImport = async () => {
-    if (!importUrl || isPosting) return;
-    setIsPosting(true);
-    try {
-      const platform = importUrl.includes('tiktok.com') ? 'tiktok' : 'instagram';
-      const { error } = await supabase.from('engaging_videos').insert({
-        user_id: user.id,
-        video_url: importUrl,
-        platform,
-        caption: caption.trim(),
-        fake_username: fakeUsername.trim() || 'Engaging Creator',
-        fake_avatar_url: fakeAvatarUrl.trim()
-      });
-      if (error) throw error;
-      onPostSuccess();
-      onClose();
-    } catch (err: any) {
-      alert(err.message);
-    } finally { setIsPosting(false); }
-  };
-
   return (
     <div className="fixed inset-0 z-[9999] bg-[var(--vix-bg)] flex flex-col items-center animate-vix-in overflow-y-auto no-scrollbar">
       {/* Header */}
       <div className="w-full flex items-center justify-between p-6 bg-[var(--vix-bg)] border-b border-[var(--vix-border)] sticky top-0 z-50">
         <button onClick={onClose} className="p-2 text-zinc-500 hover:text-[var(--vix-text)]"><X className="w-6 h-6" /></button>
         
-        <div className="flex bg-[var(--vix-secondary)] rounded-full p-1 border border-[var(--vix-border)]">
-          <button 
-            onClick={() => setMode('POST')}
-            className={`px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'POST' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
-          >
-            {t('Upload')}
-          </button>
-          <button 
-            onClick={() => setMode('IMPORT')}
-            className={`px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'IMPORT' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
-          >
-            {t('Import')}
-          </button>
-          <button 
-            onClick={() => setMode('LIVE')}
-            className={`px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'LIVE' ? 'vix-gradient text-white shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
-          >
-            {t('Live')}
-          </button>
+        <div className="flex items-center gap-4">
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-[var(--vix-text)]">{t('Create Post')}</h2>
         </div>
 
-        {mode === 'POST' ? (
-          <button onClick={handlePost} disabled={!file || isPosting || isProcessingWatermark} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
-            {isPosting || isProcessingWatermark ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Share')}
-          </button>
-        ) : mode === 'IMPORT' ? (
-          <button onClick={handleImport} disabled={!importUrl || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
-            {isPosting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Import')}
-          </button>
-        ) : (
-          <div className="w-20" /> // Spacer
-        )}
+        <button onClick={handlePost} disabled={!file || isPosting || isProcessingWatermark} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
+          {isPosting || isProcessingWatermark ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Share')}
+        </button>
       </div>
 
-      {mode === 'POST' ? (
-        <div className="w-full max-w-5xl flex-1 flex flex-col md:flex-row overflow-visible p-6 sm:p-12 gap-12">
+      <div className="w-full max-w-5xl flex-1 flex flex-col md:flex-row overflow-visible p-6 sm:p-12 gap-12">
           {/* Upload Area */}
           <div className="flex-1 bg-[var(--vix-card)] flex flex-col items-center justify-center rounded-[3rem] border border-[var(--vix-border)] min-h-[400px] relative p-8 shadow-2xl">
             {duetSource && (
@@ -451,89 +399,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
             </div>
           </div>
         </div>
-      ) : mode === 'IMPORT' ? (
-        <div className="w-full max-w-5xl flex-1 flex flex-col md:flex-row p-6 sm:p-12 gap-12 animate-vix-in">
-          <div className="flex-1 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl">
-            <div className="space-y-4">
-              <h2 className="text-2xl font-black text-[var(--vix-text)] uppercase tracking-tight">{t('Import Reel / TikTok')}</h2>
-              <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-black">{t('Paste a public link to embed it natively')}</p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                  <LinkIcon className="w-4 h-4" />
-                </div>
-                <input 
-                  value={importUrl}
-                  onChange={e => setImportUrl(e.target.value)}
-                  placeholder={t('TikTok or Instagram Reel URL')}
-                  className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/30 transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                    <Megaphone className="w-4 h-4" />
-                  </div>
-                  <input 
-                    value={fakeUsername}
-                    onChange={e => setFakeUsername(e.target.value)}
-                    placeholder={t('Fake Username')}
-                    className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/30 transition-all"
-                  />
-                </div>
-                <div className="relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                    <ImageIcon className="w-4 h-4" />
-                  </div>
-                  <input 
-                    value={fakeAvatarUrl}
-                    onChange={e => setFakeAvatarUrl(e.target.value)}
-                    placeholder={t('Fake Avatar URL (Optional)')}
-                    className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/30 transition-all"
-                  />
-                </div>
-              </div>
-
-              <textarea 
-                value={caption} 
-                onChange={e => setCaption(e.target.value)} 
-                className="w-full h-32 bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl p-6 text-sm text-[var(--vix-text)] outline-none resize-none focus:border-pink-500/30 transition-all shadow-inner placeholder:text-zinc-700" 
-                placeholder={t('Caption for this imported video...')}
-              />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 w-full flex flex-col items-center justify-center p-12 animate-vix-in">
-          <div className="max-w-2xl w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[4rem] p-16 text-center space-y-12 shadow-2xl">
-            <div className="w-32 h-32 rounded-[3rem] bg-pink-500/10 flex items-center justify-center mx-auto border border-pink-500/20">
-              <Radio className="w-12 h-12 text-pink-500 animate-pulse" />
-            </div>
-            <div className="space-y-4">
-              <h2 className="text-4xl font-black text-[var(--vix-text)] uppercase tracking-tight">{t('Go Live')}</h2>
-              <p className="text-sm text-zinc-500 uppercase tracking-[0.2em] font-bold max-w-md mx-auto leading-relaxed">
-                {t('Broadcast your signal to the world. Connect with your community in real-time.')}
-              </p>
-            </div>
-            <button 
-              onClick={onStartLive}
-              className="vix-gradient w-full py-8 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.4em] text-white shadow-2xl shadow-pink-500/40 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              {t('Start Broadcast')}
-            </button>
-            <div className="pt-8 border-t border-[var(--vix-border)]">
-              <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">
-                {t('By going live, you agree to our community guidelines.')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    );
 };
 
 export default CreatePost;
