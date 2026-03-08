@@ -82,7 +82,7 @@ export const downloadVideoWithWatermark = async (
 
       const drawOutro = () => {
         let startTime = Date.now();
-        const outroDuration = 2500; // Slightly longer for better impact
+        const outroDuration = 3000; // 3 seconds for the outro
 
         const animateOutro = () => {
           const elapsed = Date.now() - startTime;
@@ -97,62 +97,68 @@ export const downloadVideoWithWatermark = async (
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Animated Gradient for "Shimmer" effect
-          const shimmerOffset = Math.sin(progress * Math.PI * 2) * 0.2;
+          // Dynamic Scaling based on canvas size
+          const baseScale = canvas.height / 1080;
+          const logoSize = 180 * baseScale;
+          const handleSize = 32 * baseScale;
+
+          // Animated Gradient for "Shimmer" effect - matching CSS vix-shimmer
+          const shimmerOffset = (progress * 2) % 1;
           const gradient = ctx.createLinearGradient(
-            canvas.width * (0.2 + shimmerOffset), 0, 
-            canvas.width * (0.8 + shimmerOffset), canvas.height
+            -canvas.width * 0.5 + (canvas.width * 2 * shimmerOffset), 0, 
+            canvas.width * 0.5 + (canvas.width * 2 * shimmerOffset), 0
           );
-          gradient.addColorStop(0, '#ff0080'); // Vix Pink
-          gradient.addColorStop(0.5, '#7928ca'); // Vix Purple
-          gradient.addColorStop(1, '#0070f3'); // Vix Blue
-
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-
-          // Animate logo scale and rotation
-          // Elastic pop-in effect
-          let scale = 1;
-          if (progress < 0.2) {
-            scale = (progress / 0.2) * 1.2;
-          } else if (progress < 0.4) {
-            scale = 1.2 - ((progress - 0.2) / 0.2) * 0.2;
-          } else {
-            scale = 1 + Math.sin((progress - 0.4) * Math.PI * 4) * 0.02;
-          }
-
-          const rotation = Math.sin(progress * Math.PI * 2) * 0.02;
+          gradient.addColorStop(0, '#ff0080');
+          gradient.addColorStop(0.33, '#7928ca');
+          gradient.addColorStop(0.66, '#0070f3');
+          gradient.addColorStop(1, '#ff0080');
 
           ctx.save();
           ctx.translate(canvas.width / 2, canvas.height / 2);
+
+          // Animate logo scale - elastic pop
+          let scale = 1;
+          if (progress < 0.15) {
+            scale = (progress / 0.15) * 1.15;
+          } else if (progress < 0.3) {
+            scale = 1.15 - ((progress - 0.15) / 0.15) * 0.15;
+          } else {
+            scale = 1 + Math.sin((progress - 0.3) * Math.PI * 2) * 0.01;
+          }
+
           ctx.scale(scale, scale);
-          ctx.rotate(rotation);
 
-          // Add Glow
-          ctx.shadowColor = 'rgba(255, 0, 128, 0.5)';
-          ctx.shadowBlur = 20 + Math.sin(progress * Math.PI * 4) * 10;
+          // Add Glow effect
+          ctx.shadowColor = 'rgba(255, 0, 128, 0.6)';
+          ctx.shadowBlur = 40 * baseScale * (1 + Math.sin(progress * Math.PI * 4) * 0.2);
 
-          // Main Logo
-          ctx.font = 'bold 100px "Satisfy", cursive';
+          // Main Logo - Massive Typography
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = `bold ${logoSize}px "Satisfy", cursive`;
           ctx.fillStyle = gradient;
-          ctx.fillText('VixReel', 0, -30);
+          ctx.fillText('VixReel', 0, -40 * baseScale);
 
           // Reset shadow for subtitle
           ctx.shadowBlur = 0;
           
-          // Subtitle with fade in
-          const subtitleOpacity = Math.min(1, Math.max(0, (progress - 0.3) * 2));
-          ctx.font = '600 24px "Plus Jakarta Sans", sans-serif';
-          ctx.fillStyle = `rgba(255, 255, 255, ${subtitleOpacity})`;
-          ctx.letterSpacing = '4px';
-          ctx.fillText(`@${username.toUpperCase()}`, 0, 60);
+          // Subtitle with fade in and slide up
+          const subtitleOpacity = Math.min(1, Math.max(0, (progress - 0.2) * 3));
+          const subtitleY = 80 * baseScale - (10 * baseScale * (1 - subtitleOpacity));
+          
+          ctx.font = `800 ${handleSize}px "Plus Jakarta Sans", sans-serif`;
+          ctx.fillStyle = `rgba(255, 255, 255, ${subtitleOpacity * 0.9})`;
+          ctx.letterSpacing = `${6 * baseScale}px`;
+          ctx.fillText(`@${username.toUpperCase()}`, 0, subtitleY);
           
           // Decorative line
+          const lineWidth = 120 * baseScale * subtitleOpacity;
           ctx.beginPath();
-          ctx.moveTo(-100 * subtitleOpacity, 100);
-          ctx.lineTo(100 * subtitleOpacity, 100);
+          ctx.moveTo(-lineWidth, subtitleY + 40 * baseScale);
+          ctx.lineTo(lineWidth, subtitleY + 40 * baseScale);
           ctx.strokeStyle = gradient;
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 4 * baseScale;
+          ctx.lineCap = 'round';
           ctx.stroke();
 
           ctx.restore();

@@ -10,6 +10,7 @@ import { Post as PostType, Comment as CommentType, UserProfile } from '../types'
 import { supabase } from '../lib/supabase';
 import { formatNumber, formatExternalLink } from '../lib/utils';
 import { translateContent } from '../services/geminiService';
+import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 import StickerPicker from './StickerPicker';
@@ -114,6 +115,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showOutro, setShowOutro] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const renderCaption = (text: string) => {
@@ -171,6 +174,25 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
         videoRef.current.play();
       }
     }, 2500);
+  };
+
+  const handleDownload = async () => {
+    if (post.media_type !== 'video') {
+      const a = document.createElement('a');
+      a.href = post.media_url;
+      a.download = `VixReel_${post.user.username}.jpg`;
+      a.click();
+      return;
+    }
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    try {
+      await downloadVideoWithWatermark(post.media_url, post.user.username, (p) => {
+        setDownloadProgress(Math.floor(p * 100));
+      });
+      setDownloadProgress(100);
+      await new Promise(res => setTimeout(res, 800));
+    } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
   };
 
   const handleLike = async () => {
@@ -375,6 +397,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
                 </button>
                 <button className="text-zinc-400 hover:text-white transition-all">
                   <Repeat2 className="w-7 h-7" />
+                </button>
+                <button onClick={handleDownload} disabled={isDownloading} className={`${isDownloading ? 'text-pink-500' : 'text-zinc-400 hover:text-white'} transition-all relative`}>
+                  {isDownloading ? (
+                    <div className="relative flex items-center justify-center">
+                      <Loader2 className="w-7 h-7 animate-spin" />
+                      <span className="absolute text-[8px] font-black">{downloadProgress}%</span>
+                    </div>
+                  ) : (
+                    <Download className="w-7 h-7" />
+                  )}
                 </button>
               </div>
               <div className="flex items-center gap-4">
