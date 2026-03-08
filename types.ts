@@ -20,8 +20,6 @@ export interface UserProfile {
   is_location_private?: boolean;
   website?: string;
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
-  is_live?: boolean;
-  live_channel_name?: string;
   is_business_mode?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -186,15 +184,15 @@ export interface Notification {
   post?: Post;
 }
 
-export interface LiveStream {
+export interface EngagingVideo {
   id: string;
   user_id: string;
-  token: string;
-  channel_name: string;
-  status: 'idle' | 'active' | 'disconnected';
-  viewer_count: number;
+  video_url: string;
+  platform: 'tiktok' | 'instagram';
+  caption?: string;
+  fake_username?: string;
+  fake_avatar_url?: string;
   created_at: string;
-  user?: UserProfile;
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'LIVE_BROADCAST' | 'LIVE_VIEWER' | 'LIVE';
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'ENGAGING_VIDEOS';

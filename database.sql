@@ -513,7 +513,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 21. STORAGE BUCKETS CONFIGURATION
+-- 23. ENGAGING VIDEOS TABLE
+CREATE TABLE IF NOT EXISTS public.engaging_videos (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    video_url TEXT NOT NULL,
+    platform TEXT CHECK (platform IN ('tiktok', 'instagram')) NOT NULL,
+    caption TEXT,
+    fake_username TEXT,
+    fake_avatar_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 24. ENGAGING VIDEOS POLICIES
+ALTER TABLE public.engaging_videos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Engaging videos are viewable by everyone" ON public.engaging_videos FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert engaging videos" ON public.engaging_videos FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Users can delete own engaging videos" ON public.engaging_videos FOR DELETE USING (auth.uid() = user_id);
+
+-- 25. STORAGE BUCKETS CONFIGURATION (Existing)
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO UPDATE SET public = true;

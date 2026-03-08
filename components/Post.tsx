@@ -26,10 +26,9 @@ interface PostProps {
   onDuet?: (post: PostType) => void;
   onStitch?: (post: PostType) => void;
   onExpand?: (post: PostType) => void;
-  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand, onJoinLive }) => {
+const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
   const { t, language } = useTranslation();
   const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
@@ -424,18 +423,6 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
         )}
 
         <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {post.user.is_live && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onJoinLive?.(post.user);
-              }}
-              className="px-4 py-2 bg-red-500 rounded-full text-white text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 transition-all border border-white/20 flex items-center gap-2"
-            >
-              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              Join Live
-            </button>
-          )}
           {post.media_type === 'video' && (
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-black/60 rounded-full text-white backdrop-blur-md border border-white/5">
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}

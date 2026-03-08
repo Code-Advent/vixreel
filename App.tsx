@@ -16,11 +16,9 @@ import Explore from './components/Explore';
 import SettingsPage from './components/SettingsPage';
 import Groups from './components/Groups';
 import PostDetail from './components/PostDetail';
-import LiveBroadcast from './components/LiveBroadcast';
-import LiveViewer from './components/LiveViewer';
-import LiveDiscovery from './components/LiveDiscovery';
+import EngagingVideos from './components/EngagingVideos';
 import { TranslationProvider, useTranslation } from './lib/translation';
-import { Zap, Radio } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { t, setUserId } = useTranslation();
@@ -37,8 +35,7 @@ const AppContent: React.FC = () => {
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
-  const [activeLiveStream, setActiveLiveStream] = useState<any>(null);
-  const [liveStreams, setLiveStreams] = useState<any[]>([]);
+  const [homeSubView, setHomeSubView] = useState<'REELS' | 'ENGAGING'>('REELS');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
     return (saved as 'light' | 'dark') || 'dark';
@@ -122,22 +119,6 @@ const AppContent: React.FC = () => {
         if (profile) {
           if (session.user.email === 'davidhen498@gmail.com') profile.is_admin = true;
           
-          // Reset is_live if no active stream exists
-          if (profile.is_live) {
-            const { data: activeStream } = await supabase
-              .from('live_streams')
-              .select('id')
-              .eq('user_id', profile.id)
-              .eq('is_live', true)
-              .maybeSingle();
-            
-            if (!activeStream) {
-              await supabase.from('profiles').update({ is_live: false, live_channel_name: null }).eq('id', profile.id);
-              profile.is_live = false;
-              profile.live_channel_name = undefined;
-            }
-          }
-
           setCurrentUser(profile);
           syncSavedAccount(profile, session);
           await fetchPosts();
@@ -246,14 +227,6 @@ const AppContent: React.FC = () => {
   const fetchPosts = async () => {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     
-    // Fetch active live streams
-    const { data: liveData } = await supabase
-      .from('live_streams')
-      .select('*, user:profiles(*)')
-      .eq('is_live', true);
-    
-    if (liveData) setLiveStreams(liveData);
-
     const { data } = await supabase
       .from('posts')
       .select('*, user:profiles(*)')
@@ -268,21 +241,8 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    // Real-time subscription for live streams
-    const channel = supabase
-      .channel('live-streams-discovery')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'live_streams' 
-      }, () => {
-        fetchPosts(); // Refresh both posts and live streams
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Refresh posts periodically or on specific events if needed
+    fetchPosts();
   }, []);
 
   const setView = (view: ViewType, explicitUser?: UserProfile) => {
@@ -339,51 +299,55 @@ const AppContent: React.FC = () => {
             {currentView === 'FEED' && (
               <div className="flex flex-col items-center pb-20 animate-vix-in">
                 <div className="w-full flex justify-between items-center mb-6 px-2">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-6">
                     <h1 className="logo-font text-3xl vix-text-gradient">VixReel</h1>
+                    <div className="flex items-center gap-4 ml-6">
+                      <button 
+                        onClick={() => setHomeSubView('REELS')}
+                        className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${homeSubView === 'REELS' ? 'text-pink-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        {t('Reels')}
+                      </button>
+                      <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                      <button 
+                        onClick={() => setHomeSubView('ENGAGING')}
+                        className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${homeSubView === 'ENGAGING' ? 'text-pink-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        {t('Engaging Videos')}
+                      </button>
+                    </div>
                   </div>
                   <button onClick={() => setIsAccountMenuOpen(true)} className="p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)] hover:border-[var(--vix-muted)] transition-all">
                     <Users className={`w-5 h-5 text-[var(--vix-muted)]`} />
                   </button>
                 </div>
 
-                <div className="w-full max-[470px] space-y-6">
-                  {posts.length > 0 ? (
-                    posts.map(p => (
-                      <Post 
-                        key={p.id} 
-                        post={p} 
-                        currentUser={currentUser} 
-                        onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
-                        onUpdate={fetchPosts} 
-                        onSelectUser={(u) => setView('PROFILE', u)}
-                        onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
-                        onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
-                        onExpand={(post) => setSelectedPost(post)}
-                        onJoinLive={async (u) => {
-                          const { data } = await supabase
-                            .from('live_streams')
-                            .select('*, user:profiles(*)')
-                            .eq('user_id', u.id)
-                            .eq('is_live', true)
-                            .order('created_at', { ascending: false })
-                            .limit(1)
-                            .maybeSingle();
-                          
-                          if (data) {
-                            setActiveLiveStream(data);
-                            setCurrentView('LIVE_VIEWER');
-                          }
-                        }}
-                      />
-                    ))
-                  ) : (
-                    <div className="py-32 text-center opacity-20 flex flex-col items-center">
-                      <Trash2 className="w-16 h-16 mb-4" />
-                      <p className="font-bold uppercase tracking-[0.3em] text-xs">{t('No posts yet')}</p>
-                    </div>
-                  )}
-                </div>
+                {homeSubView === 'REELS' ? (
+                  <div className="w-full max-[470px] space-y-6">
+                    {posts.length > 0 ? (
+                      posts.map(p => (
+                        <Post 
+                          key={p.id} 
+                          post={p} 
+                          currentUser={currentUser} 
+                          onDelete={(id) => setPosts(prev => prev.filter(x => x.id !== id))} 
+                          onUpdate={fetchPosts} 
+                          onSelectUser={(u) => setView('PROFILE', u)}
+                          onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
+                          onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
+                          onExpand={(post) => setSelectedPost(post)}
+                        />
+                      ))
+                    ) : (
+                      <div className="py-32 text-center opacity-20 flex flex-col items-center">
+                        <Trash2 className="w-16 h-16 mb-4" />
+                        <p className="font-bold uppercase tracking-[0.3em] text-xs">{t('No posts yet')}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <EngagingVideos />
+                )}
               </div>
             )}
             {currentView === 'EXPLORE' && (
@@ -391,21 +355,6 @@ const AppContent: React.FC = () => {
                 currentUserId={currentUser.id} 
                 onSelectUser={(u) => setView('PROFILE', u)} 
                 onExpand={(post) => setSelectedPost(post)} 
-                onJoinLive={async (u) => {
-                  const { data } = await supabase
-                    .from('live_streams')
-                    .select('*, user:profiles(*)')
-                    .eq('user_id', u.id)
-                    .eq('is_live', true)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (data) {
-                    setActiveLiveStream(data);
-                    setCurrentView('LIVE_VIEWER');
-                  }
-                }}
               />
             )}
             {currentView === 'PROFILE' && viewedUser && (
@@ -428,21 +377,6 @@ const AppContent: React.FC = () => {
                 onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
                 onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
                 onExpand={(post) => setSelectedPost(post)}
-                onJoinLive={async (u) => {
-                  const { data } = await supabase
-                    .from('live_streams')
-                    .select('*, user:profiles(*)')
-                    .eq('user_id', u.id)
-                    .eq('is_live', true)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (data) {
-                    setActiveLiveStream(data);
-                    setCurrentView('LIVE_VIEWER');
-                  }
-                }}
                 autoEdit={profileAutoEdit}
               />
             )}
@@ -462,38 +396,13 @@ const AppContent: React.FC = () => {
                   setDuetSource(null);
                   setStitchSource(null);
                 }} 
-                onStartLive={() => setCurrentView('LIVE_BROADCAST')}
                 duetSource={duetSource}
                 stitchSource={stitchSource}
               />
             )}
-            {currentView === 'LIVE' && (
-              <LiveDiscovery 
-                onJoinLive={(stream) => {
-                  setActiveLiveStream(stream);
-                  setCurrentView('LIVE_VIEWER');
-                }} 
-              />
-            )}
-            
             {currentView === 'SEARCH' && (
               <Search 
                 onSelectUser={(u) => setView('PROFILE', u)} 
-                onJoinLive={async (u) => {
-                  const { data } = await supabase
-                    .from('live_streams')
-                    .select('*, user:profiles(*)')
-                    .eq('user_id', u.id)
-                    .eq('is_live', true)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (data) {
-                    setActiveLiveStream(data);
-                    setCurrentView('LIVE_VIEWER');
-                  }
-                }}
               />
             )}
             {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
@@ -533,24 +442,6 @@ const AppContent: React.FC = () => {
                   setView('PROFILE', currentUser);
                   setProfileAutoEdit(true);
                 }}
-              />
-            )}
-
-            {currentView === 'LIVE_BROADCAST' && (
-              <LiveBroadcast 
-                currentUser={currentUser} 
-                onClose={() => setCurrentView('FEED')} 
-              />
-            )}
-
-            {currentView === 'LIVE_VIEWER' && activeLiveStream && (
-              <LiveViewer 
-                stream={activeLiveStream} 
-                currentUser={currentUser} 
-                onClose={() => {
-                  setActiveLiveStream(null);
-                  setCurrentView('FEED');
-                }} 
               />
             )}
           </div>
