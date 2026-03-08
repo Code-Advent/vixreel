@@ -113,6 +113,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
   const [isTranslating, setIsTranslating] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showOutro, setShowOutro] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const renderCaption = (text: string) => {
@@ -159,6 +160,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
   const fetchComments = async () => {
     const { data } = await supabase.from('comments').select('*, user:profiles(*)').eq('post_id', post.id).order('created_at', { ascending: true });
     if (data) setComments(data as any);
+  };
+
+  const handleVideoEnded = () => {
+    setShowOutro(true);
+    setTimeout(() => {
+      setShowOutro(false);
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play();
+      }
+    }, 2500);
   };
 
   const handleLike = async () => {
@@ -241,7 +253,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
               ref={videoRef}
               src={post.media_url} 
               autoPlay 
-              loop 
+              loop={false} 
+              onEnded={handleVideoEnded}
               muted={isMuted}
               playsInline
               className="w-full h-full object-contain"
@@ -260,6 +273,18 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
           {showLikeAnim && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <Heart className="w-32 h-32 text-white fill-white animate-vix-pop opacity-80" />
+            </div>
+          )}
+
+          {showOutro && (
+            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-40 animate-in fade-in duration-500">
+              <div className="relative">
+                <h2 className="text-5xl font-logo vix-text-gradient animate-vix-pop">VixReel</h2>
+                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full animate-pulse" />
+              </div>
+              <p className="mt-8 text-[10px] font-black text-white/60 uppercase tracking-[0.4em] animate-vix-in">
+                @{post.user.username}
+              </p>
             </div>
           )}
 

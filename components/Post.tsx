@@ -48,6 +48,7 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
   const [isReposting, setIsReposting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [showOutro, setShowOutro] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const [translatedCaption, setTranslatedCaption] = useState<string | null>(null);
@@ -55,6 +56,7 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const duetVideoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const canComment = post.user.allow_comments !== false;
@@ -183,6 +185,21 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       setDownloadProgress(100);
       await new Promise(res => setTimeout(res, 800));
     } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
+  };
+
+  const handleVideoEnded = () => {
+    setShowOutro(true);
+    setTimeout(() => {
+      setShowOutro(false);
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play();
+      }
+      if (duetVideoRef.current) {
+        duetVideoRef.current.currentTime = 0;
+        duetVideoRef.current.play();
+      }
+    }, 2500);
   };
 
   const handleDelete = async () => {
@@ -341,14 +358,39 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
         {post.duet_from_id ? (
           <div className="flex w-full h-full">
             <div className="flex-1 border-r border-[var(--vix-border)]">
-              <video src={post.media_url} loop muted={isMuted} autoPlay={isVisible} playsInline className="w-full h-full object-cover" />
+              <video 
+                ref={videoRef}
+                src={post.media_url} 
+                loop={false} 
+                onEnded={handleVideoEnded}
+                muted={isMuted} 
+                autoPlay={isVisible} 
+                playsInline 
+                className="w-full h-full object-cover" 
+              />
             </div>
             <div className="flex-1">
-              <video src={post.media_url.replace('posts/', 'posts/duet-')} loop muted={isMuted} autoPlay={isVisible} playsInline className="w-full h-full object-cover" />
+              <video 
+                ref={duetVideoRef}
+                src={post.media_url.replace('posts/', 'posts/duet-')} 
+                loop={false} 
+                muted={isMuted} 
+                autoPlay={isVisible} 
+                playsInline 
+                className="w-full h-full object-cover" 
+              />
             </div>
           </div>
         ) : post.media_type === 'video' ? (
-          <video ref={videoRef} src={post.media_url} loop muted={isMuted} playsInline className="w-full h-full object-cover" />
+          <video 
+            ref={videoRef} 
+            src={post.media_url} 
+            loop={false} 
+            onEnded={handleVideoEnded}
+            muted={isMuted} 
+            playsInline 
+            className="w-full h-full object-cover" 
+          />
         ) : (
           <img src={post.media_url} className="w-full h-full object-cover" alt="Post Content" />
         )}
@@ -369,6 +411,18 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{downloadProgress}%</div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">{t('Saving...')}</p>
+          </div>
+        )}
+
+        {showOutro && (
+          <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-40 animate-in fade-in duration-500">
+            <div className="relative">
+              <h2 className="text-5xl font-logo vix-text-gradient animate-vix-pop">VixReel</h2>
+              <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full animate-pulse" />
+            </div>
+            <p className="mt-8 text-[10px] font-black text-white/60 uppercase tracking-[0.4em] animate-vix-in">
+              @{post.user.username}
+            </p>
           </div>
         )}
 

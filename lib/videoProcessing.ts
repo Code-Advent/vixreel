@@ -76,7 +76,7 @@ export const downloadVideoWithWatermark = async (
 
       const drawOutro = () => {
         let startTime = Date.now();
-        const outroDuration = 2000; // 2 seconds
+        const outroDuration = 2500; // Slightly longer for better impact
 
         const animateOutro = () => {
           const elapsed = Date.now() - startTime;
@@ -91,29 +91,64 @@ export const downloadVideoWithWatermark = async (
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // VixReel Gradient Logo Text
-          const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-          gradient.addColorStop(0, '#ff0080');
-          gradient.addColorStop(0.5, '#7928ca');
-          gradient.addColorStop(1, '#0070f3');
+          // Animated Gradient for "Shimmer" effect
+          const shimmerOffset = Math.sin(progress * Math.PI * 2) * 0.2;
+          const gradient = ctx.createLinearGradient(
+            canvas.width * (0.2 + shimmerOffset), 0, 
+            canvas.width * (0.8 + shimmerOffset), canvas.height
+          );
+          gradient.addColorStop(0, '#ff0080'); // Vix Pink
+          gradient.addColorStop(0.5, '#7928ca'); // Vix Purple
+          gradient.addColorStop(1, '#0070f3'); // Vix Blue
 
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
-          // Animate logo scale
-          const scale = 1 + Math.sin(progress * Math.PI) * 0.1;
+          // Animate logo scale and rotation
+          // Elastic pop-in effect
+          let scale = 1;
+          if (progress < 0.2) {
+            scale = (progress / 0.2) * 1.2;
+          } else if (progress < 0.4) {
+            scale = 1.2 - ((progress - 0.2) / 0.2) * 0.2;
+          } else {
+            scale = 1 + Math.sin((progress - 0.4) * Math.PI * 4) * 0.02;
+          }
+
+          const rotation = Math.sin(progress * Math.PI * 2) * 0.02;
+
           ctx.save();
           ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.scale(scale, scale);
+          ctx.rotate(rotation);
 
-          ctx.font = 'bold 80px "Satisfy", cursive';
+          // Add Glow
+          ctx.shadowColor = 'rgba(255, 0, 128, 0.5)';
+          ctx.shadowBlur = 20 + Math.sin(progress * Math.PI * 4) * 10;
+
+          // Main Logo
+          ctx.font = 'bold 100px "Satisfy", cursive';
           ctx.fillStyle = gradient;
-          ctx.fillText('VixReel', 0, -20);
+          ctx.fillText('VixReel', 0, -30);
 
-          ctx.font = 'bold 20px "Plus Jakarta Sans", sans-serif';
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(`Created by @${username}`, 0, 60);
+          // Reset shadow for subtitle
+          ctx.shadowBlur = 0;
           
+          // Subtitle with fade in
+          const subtitleOpacity = Math.min(1, Math.max(0, (progress - 0.3) * 2));
+          ctx.font = '600 24px "Plus Jakarta Sans", sans-serif';
+          ctx.fillStyle = `rgba(255, 255, 255, ${subtitleOpacity})`;
+          ctx.letterSpacing = '4px';
+          ctx.fillText(`@${username.toUpperCase()}`, 0, 60);
+          
+          // Decorative line
+          ctx.beginPath();
+          ctx.moveTo(-100 * subtitleOpacity, 100);
+          ctx.lineTo(100 * subtitleOpacity, 100);
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
           ctx.restore();
 
           if (onProgress) {
