@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   UserPlus,
   Globe,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Plus
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Post, Group } from '../types';
@@ -27,7 +28,7 @@ import { useTranslation } from '../lib/translation';
 
 const Admin: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'USERS' | 'GROUPS'>('USERS');
+  const [activeTab, setActiveTab] = useState<'USERS' | 'GROUPS' | 'CONTENT'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -267,6 +268,55 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleSeedEngagingVideos = async () => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const platforms = ['tiktok', 'instagram'];
+      const usernames = ['vixreel_official', 'trending_now', 'viral_clips', 'daily_reels', 'tiktok_stars', 'insta_vibes', 'reel_master', 'clip_king'];
+      const captions = [
+        'Check this out! 🔥', 'Unbelievable talent! 😱', 'Daily dose of fun 😂', 'Wait for the end... ⏳',
+        'This is so satisfying! ✨', 'Incredible view! 🏔️', 'Best of the week! 🏆', 'You need to see this! 👀',
+        'Life hacks you need! 💡', 'Cute overload! 🐶', 'Amazing skills! ⚽', 'Travel goals! ✈️'
+      ];
+
+      const videos = [];
+      for (let i = 0; i < 100; i++) {
+        const platform = platforms[Math.floor(Math.random() * platforms.length)];
+        const username = usernames[Math.floor(Math.random() * usernames.length)];
+        const caption = captions[Math.floor(Math.random() * captions.length)];
+        const id = Math.random().toString(36).substring(2, 12);
+        
+        const url = platform === 'tiktok' 
+          ? `https://www.tiktok.com/@${username}/video/${Math.floor(Math.random() * 1000000000000000000)}`
+          : `https://www.instagram.com/reels/${id}/`;
+
+        videos.push({
+          user_id: session.user.id,
+          video_url: url,
+          platform: platform,
+          caption: caption,
+          fake_username: username,
+          fake_avatar_url: `https://ui-avatars.com/api/?name=${username}&background=random`
+        });
+      }
+
+      const { error: seedErr } = await supabase
+        .from('engaging_videos')
+        .insert(videos);
+
+      if (seedErr) throw seedErr;
+      alert("Successfully seeded 100 engaging videos!");
+    } catch (err: any) {
+      console.error("Seed Error:", err);
+      alert("Seed Failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === ADMIN_CODE) {
@@ -345,6 +395,12 @@ const Admin: React.FC = () => {
                 className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'GROUPS' ? 'vix-gradient text-white shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
               >
                 {t('Groups')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('CONTENT'); setSearchQuery(''); }}
+                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CONTENT' ? 'vix-gradient text-white shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
+              >
+                {t('Content')}
               </button>
            </div>
            <button onClick={activeTab === 'USERS' ? fetchUsers : fetchGroups} disabled={loading} className="p-3 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all">
@@ -512,7 +568,7 @@ const Admin: React.FC = () => {
                 <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">{t('Choose an account from the left to manage it.')}</p>
               </div>
             )
-          ) : (
+          ) : activeTab === 'GROUPS' ? (
             viewingGroup ? (
               <div className="bg-[var(--vix-card)] rounded-[3.5rem] border border-[var(--vix-border)] p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full"></div>
@@ -588,6 +644,46 @@ const Admin: React.FC = () => {
                 <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">{t('Choose a community from the left to manage it.')}</p>
               </div>
             )
+          ) : (
+            <div className="bg-[var(--vix-card)] rounded-[3.5rem] border border-[var(--vix-border)] p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5 h-full flex flex-col items-center justify-center text-center">
+              <div className="w-32 h-32 rounded-[2.5rem] bg-pink-500/10 flex items-center justify-center mb-10 border border-pink-500/20 shadow-2xl">
+                <Film className="w-12 h-12 text-pink-500" />
+              </div>
+              <h3 className="text-3xl font-black uppercase tracking-[0.2em] text-[var(--vix-text)] mb-4">{t('Content Management')}</h3>
+              <p className="text-zinc-600 text-[11px] font-bold uppercase tracking-[0.4em] mb-12 max-w-md">{t('Seed the application with engaging videos from TikTok and Instagram.')}</p>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={handleSeedEngagingVideos}
+                  disabled={loading}
+                  className="px-12 py-5 vix-gradient rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  {t('Seed 100 Engaging Videos')}
+                </button>
+                
+                <button 
+                  onClick={async () => {
+                    if (!confirm("Are you sure you want to clear all engaging videos?")) return;
+                    setLoading(true);
+                    try {
+                      const { error } = await supabase.from('engaging_videos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                      if (error) throw error;
+                      alert("Successfully cleared all engaging videos!");
+                    } catch (err: any) {
+                      alert("Clear Failed: " + err.message);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="px-12 py-5 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] text-red-500 font-black uppercase tracking-widest text-[11px] hover:bg-red-500 hover:text-white transition-all flex items-center gap-3 disabled:opacity-50"
+                >
+                  <AlertTriangle className="w-5 h-5" />
+                  {t('Clear All')}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
