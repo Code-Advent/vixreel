@@ -179,6 +179,9 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       await downloadVideoWithWatermark(post.media_url, post.user.username, (p) => {
         setDownloadProgress(Math.floor(p * 100));
       });
+      // Ensure it stays at 100% for a moment so it doesn't "skip" the final state
+      setDownloadProgress(100);
+      await new Promise(res => setTimeout(res, 800));
     } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
   };
 
@@ -365,7 +368,7 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
                </svg>
                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{downloadProgress}%</div>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">{t('Processing Watermark')}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500 animate-pulse">{t('Saving...')}</p>
           </div>
         )}
 

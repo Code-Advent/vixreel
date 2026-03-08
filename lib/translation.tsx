@@ -69,7 +69,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
 
   // Feed & Posts
   'No posts yet', 'Reposted', 'Duet', 'Stitch', 'likes', 'Comments', 'No signals detected',
-  'Processing Watermark', 'Post', 'Like', 'Comment', 'Share', 'Duet with', 'Stitch with',
+  'Processing Watermark', 'Saving...', 'Post', 'Like', 'Comment', 'Share', 'Duet with', 'Stitch with',
   'Post Details', 'Write a caption... Use @username to mention creators.', 'AI Caption Helper',
   'Post Settings', 'Max 50MB allowed.', 'Failed to share post.', 'Replace Media',
   'Select Media', 'High Resolution Photo or Video (max 50MB)', 'CHOOSE FILE',
