@@ -277,14 +277,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
           )}
 
           {showOutro && (
-            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-40 animate-in fade-in duration-500">
-              <div className="relative">
-                <h2 className="text-5xl font-logo vix-text-gradient animate-vix-pop">VixReel</h2>
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full animate-pulse" />
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-40 animate-vix-outro-bg">
+              <div className="relative text-center animate-vix-outro-text">
+                <h2 className="text-8xl sm:text-9xl font-logo vix-text-gradient drop-shadow-[0_0_40px_rgba(255,0,128,0.6)]">VixReel</h2>
+                <div className="mt-8 flex flex-col items-center gap-3">
+                  <div className="w-16 h-1 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full" />
+                  <p className="text-xs font-black text-white uppercase tracking-[0.5em] opacity-80">
+                    @{post.user.username}
+                  </p>
+                </div>
               </div>
-              <p className="mt-8 text-[10px] font-black text-white/60 uppercase tracking-[0.4em] animate-vix-in">
-                @{post.user.username}
-              </p>
             </div>
           )}
 

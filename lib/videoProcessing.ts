@@ -22,6 +22,12 @@ export const downloadVideoWithWatermark = async (
         video.onerror = () => reject(new Error("Failed to load video source."));
       });
 
+      // Ensure fonts are loaded for the watermark
+      try {
+        await document.fonts.load('bold 100px "Satisfy"');
+        await document.fonts.load('600 24px "Plus Jakarta Sans"');
+      } catch (e) { console.warn("Fonts could not be loaded for watermark, using fallback."); }
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { alpha: false });
       if (!ctx) return reject(new Error("Canvas context not available."));

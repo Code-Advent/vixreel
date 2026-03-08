@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Satisfy&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -44,9 +45,11 @@
   }
   
   .vix-text-gradient {
-    background: linear-gradient(135deg, #ff0080, #0070f3);
+    background: linear-gradient(135deg, #ff0080, #7928ca, #0070f3, #ff0080);
+    background-size: 300% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    animation: vix-shimmer 3s linear infinite;
   }
 
   .vix-indicator {
@@ -67,6 +70,14 @@
 
   .animate-vix-pop {
     animation: vix-pop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  .animate-vix-outro-text {
+    animation: vix-outro-text 2.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+
+  .animate-vix-outro-bg {
+    animation: vix-outro-bg 0.5s ease-out forwards;
   }
 
   .animate-vix-float-up {
@@ -106,5 +117,22 @@
   20% { opacity: 1; transform: scale(1.2); }
   40% { opacity: 1; transform: scale(1); }
   80% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes vix-outro-text {
+  0% { opacity: 0; transform: scale(0.8) translateY(20px); filter: blur(10px); }
+  20% { opacity: 1; transform: scale(1.1) translateY(0); filter: blur(0); }
+  30% { transform: scale(1); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); filter: blur(5px); }
+}
+
+@keyframes vix-outro-bg {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(20px); }
+}
+
+@keyframes vix-shimmer {
+  to { background-position: 300% center; }
 }

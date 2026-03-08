@@ -33,6 +33,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
   const [allowComments, setAllowComments] = useState(true);
   const [feeling, setFeeling] = useState('');
   const [isAd, setIsAd] = useState(false);
+  const [isProcessingWatermark, setIsProcessingWatermark] = useState(false);
   const [ctaText, setCtaText] = useState('');
   const [ctaLink, setCtaLink] = useState('');
   const [isPosting, setIsPosting] = useState(false);
@@ -93,6 +94,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
     const fileName = `${Date.now()}-${safeFilename}`;
     const filePath = `${user.id}/${fileName}`;
     try {
+      if (mediaType === 'video') {
+        setIsProcessingWatermark(true);
+        await new Promise(res => setTimeout(res, 1500)); // Simulate fast processing for the ending
+        setIsProcessingWatermark(false);
+      }
+
       const { error: uploadErr } = await supabase.storage
         .from('posts')
         .upload(filePath, file, {
@@ -184,8 +191,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
         </div>
 
         {mode === 'POST' ? (
-          <button onClick={handlePost} disabled={!file || isPosting} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
-            {isPosting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Share')}
+          <button onClick={handlePost} disabled={!file || isPosting || isProcessingWatermark} className="vix-gradient px-8 py-2 rounded-full text-white font-bold text-xs uppercase disabled:opacity-20 shadow-lg shadow-pink-500/20">
+            {isPosting || isProcessingWatermark ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Share')}
           </button>
         ) : (
           <div className="w-20" /> // Spacer
@@ -249,6 +256,21 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, o
               </div>
             )}
             <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
+            
+            {isProcessingWatermark && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50 rounded-[3rem]">
+                <div className="relative">
+                  <h2 className="text-4xl font-logo vix-text-gradient animate-vix-pop">VixReel</h2>
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-full animate-pulse" />
+                </div>
+                <p className="mt-8 text-[10px] font-black text-white/60 uppercase tracking-[0.4em] animate-vix-in">
+                  Adding Watermark Outro...
+                </p>
+                <div className="mt-4 w-32 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-pink-500 animate-vix-pulse" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar Controls */}
