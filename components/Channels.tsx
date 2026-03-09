@@ -4,31 +4,33 @@ import {
   Users, Plus, Search, Globe, Lock, ArrowLeft, 
   MoreHorizontal, MessageSquare, Image as ImageIcon, 
   Video, Send, Heart, X, Loader2, Camera, Shield, ChevronLeft,
-  Link as LinkIcon, CheckCircle2, Bell, Share2, Download, LogOut, Trash2
+  Link as LinkIcon, CheckCircle2, Bell, Share2, Download, LogOut, Trash2,
+  Smile, UserPlus, ShieldCheck, UserMinus
 } from 'lucide-react';
+import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
-import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment } from '../types';
+import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment, GroupPostReaction } from '../types';
 import { sanitizeFilename, formatNumber, formatFileSize } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 
-interface GroupsProps {
+interface ChannelsProps {
   currentUser: UserProfile;
   onBack: () => void;
-  initialGroup?: Group | null;
+  initialChannel?: Group | null;
 }
 
-const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) => {
+const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel }) => {
   const { t } = useTranslation();
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [channels, setChannels] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialGroup ? 'DETAILS' : 'LIST');
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(initialGroup || null);
-  const [groupPosts, setGroupPosts] = useState<GroupPost[]>([]);
+  const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialChannel ? 'DETAILS' : 'LIST');
+  const [selectedChannel, setSelectedChannel] = useState<Group | null>(initialChannel || null);
+  const [channelPosts, setChannelPosts] = useState<GroupPost[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   
-  // Create Group State
+  // Create Channel State
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newPrivacy, setNewPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
@@ -50,61 +52,69 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [newComment, setNewComment] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
   const [showChannelInfo, setShowChannelInfo] = useState(false);
-  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+  const [isChannelAdmin, setIsChannelAdmin] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<GroupMember[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   useEffect(() => {
-    fetchGroups();
+    fetchChannels();
     
-    // Real-time Groups Subscription
-    const groupsSubscription = supabase
+    // Real-time Channels Subscription
+    const channelsSubscription = supabase
       .channel('groups_realtime')
-      .on('postgres_changes' as any, { event: '*', table: 'groups' }, () => fetchGroups())
-      .on('postgres_changes' as any, { event: '*', table: 'group_members' }, () => fetchGroups())
+      .on('postgres_changes' as any, { event: '*', table: 'groups' }, () => fetchChannels())
+      .on('postgres_changes' as any, { event: '*', table: 'group_members' }, () => fetchChannels())
       .subscribe();
 
-    if (initialGroup) {
-      fetchGroupData(initialGroup.id);
+    if (initialChannel) {
+      fetchChannelData(initialChannel.id);
     }
 
     return () => {
-      supabase.removeChannel(groupsSubscription);
+      supabase.removeChannel(channelsSubscription);
     };
-  }, [initialGroup]);
+  }, [initialChannel]);
 
   useEffect(() => {
-    if (view === 'DETAILS' && selectedGroup) {
-      // Real-time Group Data Subscription
-      const groupDataSubscription = supabase
-        .channel(`group_data_${selectedGroup.id}`)
+    if (view === 'DETAILS' && selectedChannel) {
+      // Real-time Channel Data Subscription
+      const channelDataSubscription = supabase
+        .channel(`group_data_${selectedChannel.id}`)
         .on('postgres_changes' as any, { 
           event: '*', 
           table: 'group_posts', 
-          filter: `group_id=eq.${selectedGroup.id}` 
-        }, () => fetchGroupData(selectedGroup.id))
+          filter: `group_id=eq.${selectedChannel.id}` 
+        }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
           table: 'group_post_likes'
-        }, () => fetchGroupData(selectedGroup.id))
+        }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
           table: 'group_post_comments'
-        }, () => fetchGroupData(selectedGroup.id))
+        }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
           table: 'group_post_reactions'
-        }, () => fetchGroupData(selectedGroup.id))
+        }, () => fetchChannelData(selectedChannel.id))
+        .on('postgres_changes' as any, { 
+          event: '*', 
+          table: 'group_members',
+          filter: `group_id=eq.${selectedChannel.id}`
+        }, () => fetchChannelData(selectedChannel.id))
         .subscribe();
 
       return () => {
-        supabase.removeChannel(groupDataSubscription);
+        supabase.removeChannel(channelDataSubscription);
       };
     }
-  }, [view, selectedGroup]);
+  }, [view, selectedChannel]);
 
-  const copyGroupLink = (groupId: string) => {
+  const copyChannelLink = (groupId: string) => {
     const url = `${window.location.origin}/groups/${groupId}`;
     navigator.clipboard.writeText(url);
-    alert(t('Community link copied to clipboard!'));
+    alert(t('Channel link copied to clipboard!'));
   };
 
   const handleDownload = async (postId: string, url: string, filename: string) => {
@@ -128,7 +138,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
     }
   };
 
-  const fetchGroups = async () => {
+  const fetchChannels = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -142,7 +152,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       if (error) throw error;
       
       // Get member counts (simplified for demo)
-      const groupsWithCounts = await Promise.all((data || []).map(async (g) => {
+      const channelsWithCounts = await Promise.all((data || []).map(async (g) => {
         const { count } = await supabase
           .from('group_members')
           .select('*', { count: 'exact', head: true })
@@ -150,15 +160,15 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         return { ...g, member_count: count || 0 };
       }));
 
-      setGroups(groupsWithCounts);
+      setChannels(channelsWithCounts);
     } catch (err) {
-      console.error('Error fetching groups:', err);
+      console.error('Error fetching channels:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || isCreating) return;
     setIsCreating(true);
@@ -207,30 +217,38 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       setNewCoverFile(null);
       setNewCoverPreview(null);
       setView('LIST');
-      fetchGroups();
+      fetchChannels();
     } catch (err) {
-      console.error('Error creating group:', err);
+      console.error('Error creating channel:', err);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const selectGroup = async (group: Group) => {
-    setSelectedGroup(group);
+  const selectChannel = async (group: Group) => {
+    setSelectedChannel(group);
     setView('DETAILS');
-    fetchGroupData(group.id);
+    fetchChannelData(group.id);
   };
 
-  const fetchGroupData = async (groupId: string) => {
+  const fetchChannelData = async (groupId: string) => {
     try {
-      // Fetch group details to get only_admin_can_post
+      // Fetch channel details to get only_admin_can_post, boosted_members, is_verified
       const { data: groupDetails } = await supabase
         .from('groups')
         .select('*')
         .eq('id', groupId)
         .single();
       
-      if (groupDetails) setSelectedGroup(groupDetails);
+      if (groupDetails) {
+        // Fetch member count
+        const { count } = await supabase
+          .from('group_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', groupId);
+        
+        setSelectedChannel({ ...groupDetails, member_count: count || 0 });
+      }
 
       // Check membership
       const { data: memberData } = await supabase
@@ -241,8 +259,17 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         .maybeSingle();
       
       setIsMember(!!memberData);
-      setIsGroupAdmin(memberData?.role === 'ADMIN');
+      setIsChannelAdmin(memberData?.role === 'ADMIN');
       
+      // Fetch members if admin
+      if (memberData?.role === 'ADMIN') {
+        const { data: members } = await supabase
+          .from('group_members')
+          .select('*, user:profiles(*)')
+          .eq('group_id', groupId);
+        setChannelMembers(members || []);
+      }
+
       // Fetch posts
       const { data: posts, error } = await supabase
         .from('group_posts')
@@ -255,7 +282,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setGroupPosts(posts || []);
+      setChannelPosts(posts || []);
 
       // Fetch likes and comments counts for each post
       const postsWithEngagement = await Promise.all((posts || []).map(async (p) => {
@@ -264,59 +291,59 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         const { data: myLike } = await supabase.from('group_post_likes').select('*').eq('post_id', p.id).eq('user_id', currentUser.id).maybeSingle();
         return { ...p, likes_count: lCount || 0, comments_count: cCount || 0, is_liked: !!myLike };
       }));
-      setGroupPosts(postsWithEngagement);
+      setChannelPosts(postsWithEngagement);
     } catch (err) {
-      console.error('Error fetching group data:', err);
+      console.error('Error fetching channel data:', err);
     }
   };
 
-  const joinGroup = async () => {
-    if (!selectedGroup) return;
+  const joinChannel = async () => {
+    if (!selectedChannel) return;
     try {
       const { error } = await supabase.from('group_members').insert({
-        group_id: selectedGroup.id,
+        group_id: selectedChannel.id,
         user_id: currentUser.id
       });
       if (error) throw error;
       setIsMember(true);
-      fetchGroupData(selectedGroup.id);
+      fetchChannelData(selectedChannel.id);
     } catch (err) {
-      console.error('Error joining group:', err);
+      console.error('Error joining channel:', err);
     }
   };
 
-  const leaveGroup = async () => {
-    if (!selectedGroup || isLeaving) return;
-    if (!confirm('Are you sure you want to leave this community?')) return;
+  const leaveChannel = async () => {
+    if (!selectedChannel || isLeaving) return;
+    if (!confirm('Are you sure you want to leave this channel?')) return;
     setIsLeaving(true);
     try {
       const { error } = await supabase
         .from('group_members')
         .delete()
-        .eq('group_id', selectedGroup.id)
+        .eq('group_id', selectedChannel.id)
         .eq('user_id', currentUser.id);
       
       if (error) throw error;
       setIsMember(false);
-      fetchGroupData(selectedGroup.id);
+      fetchChannelData(selectedChannel.id);
     } catch (err) {
-      console.error('Error leaving group:', err);
+      console.error('Error leaving channel:', err);
     } finally {
       setIsLeaving(false);
     }
   };
 
   const toggleLikePost = async (postId: string) => {
-    const post = groupPosts.find(p => p.id === postId);
+    const post = channelPosts.find(p => p.id === postId);
     if (!post) return;
 
     try {
       if (post.is_liked) {
         await supabase.from('group_post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
-        setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: false, likes_count: (p.likes_count || 1) - 1 } : p));
+        setChannelPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: false, likes_count: (p.likes_count || 1) - 1 } : p));
       } else {
         await supabase.from('group_post_likes').insert({ post_id: postId, user_id: currentUser.id });
-        setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 } : p));
+        setChannelPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 } : p));
       }
     } catch (err) {
       console.error('Error toggling like:', err);
@@ -354,7 +381,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       
       if (error) throw error;
       setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
-      setGroupPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
+      setChannelPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
       setNewComment('');
     } catch (err) {
       console.error('Error adding comment:', err);
@@ -368,13 +395,13 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
     try {
       const { error } = await supabase.from('group_posts').delete().eq('id', postId);
       if (error) throw error;
-      setGroupPosts(prev => prev.filter(p => p.id !== postId));
+      setChannelPosts(prev => prev.filter(p => p.id !== postId));
     } catch (err) {
       console.error('Error deleting post:', err);
     }
   };
 
-  const togglePostReaction = async (postId: string, reaction: string) => {
+  const toggleReaction = async (postId: string, reaction: string) => {
     try {
       const { data: existing } = await supabase
         .from('group_post_reactions')
@@ -398,15 +425,66 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             reaction
           });
       }
-      if (selectedGroup) fetchGroupData(selectedGroup.id);
+      if (selectedChannel) fetchChannelData(selectedChannel.id);
+      setShowEmojiPicker(null);
     } catch (err) {
       console.error("Error toggling post reaction:", err);
     }
   };
 
+  const transferAdmin = async (targetUserId: string) => {
+    if (!confirm(t('Are you sure you want to promote this user to admin?'))) return;
+    setIsTransferring(true);
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ role: 'ADMIN' })
+        .eq('group_id', selectedChannel!.id)
+        .eq('user_id', targetUserId);
+      
+      if (error) throw error;
+      
+      if (selectedChannel) fetchChannelData(selectedChannel.id);
+    } catch (err) {
+      console.error("Transfer admin error:", err);
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const boostChannel = async () => {
+    if (!selectedChannel) return;
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({ boosted_members: (selectedChannel.boosted_members || 0) + 100 })
+        .eq('id', selectedChannel.id);
+      if (error) throw error;
+      fetchChannelData(selectedChannel.id);
+      alert(t('Channel boosted by 100 followers!'));
+    } catch (err) {
+      console.error("Boost error:", err);
+    }
+  };
+
+  const verifyChannel = async () => {
+    if (!selectedChannel) return;
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({ is_verified: true })
+        .eq('id', selectedChannel.id);
+      if (error) throw error;
+      fetchChannelData(selectedChannel.id);
+      alert(t('Channel verified successfully!'));
+    } catch (err) {
+      console.error("Verify error:", err);
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postContent.trim() || !selectedGroup || isPosting) return;
+    if (!postContent.trim() || !selectedChannel || isPosting) return;
     setIsPosting(true);
 
     try {
@@ -428,7 +506,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       }
 
       const { error } = await supabase.from('group_posts').insert({
-        group_id: selectedGroup.id,
+        group_id: selectedChannel.id,
         user_id: currentUser.id,
         content: postContent.trim(),
         media_url: mediaUrl,
@@ -439,9 +517,9 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
       setPostContent('');
       setPostFile(null);
       setPostPreview(null);
-      fetchGroupData(selectedGroup.id);
+      fetchChannelData(selectedChannel.id);
     } catch (err) {
-      console.error('Error creating group post:', err);
+      console.error('Error creating channel post:', err);
     } finally {
       setIsPosting(false);
     }
@@ -486,7 +564,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin vix-loader" />
               </div>
-            ) : groups.length === 0 ? (
+            ) : channels.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-32 text-center px-6">
                 <div className="w-24 h-24 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-8 shadow-inner">
                   <Globe className="w-12 h-12 text-[var(--vix-muted)]" />
@@ -496,16 +574,16 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-8">
-                {groups.map(group => (
+                {channels.map(channel => (
                   <div 
-                    key={group.id}
-                    onClick={() => selectGroup(group)}
+                    key={channel.id}
+                    onClick={() => selectChannel(channel)}
                     className="group bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 cursor-pointer hover:border-pink-500/50 transition-all hover:shadow-2xl hover:-translate-y-2"
                   >
                     <div className="flex flex-col items-center text-center gap-4">
                       <div className="relative">
-                        <img src={group.cover_url} className="w-24 h-24 rounded-[2rem] object-cover border-2 border-[var(--vix-border)] shadow-xl group-hover:scale-105 transition-transform" alt={group.name} />
-                        {group.is_verified && (
+                        <img src={channel.cover_url} className="w-24 h-24 rounded-[2rem] object-cover border-2 border-[var(--vix-border)] shadow-xl group-hover:scale-105 transition-transform" alt={channel.name} />
+                        {channel.is_verified && (
                           <div className="absolute -bottom-2 -right-2 bg-[var(--vix-bg)] rounded-full p-1 shadow-xl">
                             <CheckCircle2 className="w-5 h-5 fill-[#ec4899] text-white" />
                           </div>
@@ -513,10 +591,10 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                       </div>
                       <div className="flex-1 min-w-0 w-full">
                         <h3 className="text-lg font-black text-[var(--vix-text)] truncate uppercase tracking-tight mb-1">
-                          {group.name}
+                          {channel.name}
                         </h3>
                         <p className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
-                          {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('followers')}
+                          {formatNumber((channel.member_count || 0) + (channel.boosted_members || 0))} {t('followers')}
                         </p>
                         <div className="mt-6 flex items-center justify-center gap-2">
                           <button className="bg-gradient-to-r from-pink-500 to-blue-500 text-white px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all">
@@ -533,7 +611,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         )}
 
         {view === 'CREATE' && (
-          <form onSubmit={handleCreateGroup} className="p-6 space-y-8 max-w-lg mx-auto">
+          <form onSubmit={handleCreateChannel} className="p-6 space-y-8 max-w-lg mx-auto">
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Cover Image')}</label>
               <div 
@@ -582,7 +660,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <textarea 
                   value={newDescription}
                   onChange={e => setNewDescription(e.target.value)}
-                  placeholder={t('What is this community about?')}
+                  placeholder={t('What is this channel about?')}
                   className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all min-h-[120px] resize-none"
                 />
               </div>
@@ -628,12 +706,12 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               disabled={isCreating}
               className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 flex items-center justify-center gap-3"
             >
-              {isCreating ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : t('Establish Community')}
+              {isCreating ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : t('Establish Channel')}
             </button>
           </form>
         )}
 
-        {view === 'DETAILS' && selectedGroup && (
+        {view === 'DETAILS' && selectedChannel && (
           <div className="flex flex-col h-full animate-vix-in bg-[var(--vix-bg)]">
             {/* WhatsApp Style Header */}
             <div className="flex items-center justify-between p-3 bg-[var(--vix-card)] border-b border-[var(--vix-border)] sticky top-0 z-50">
@@ -642,18 +720,18 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                   <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
                 </button>
                 <div onClick={() => setShowChannelInfo(true)} className="flex items-center gap-3 cursor-pointer group/header">
-                  <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] group-hover/header:scale-105 transition-transform" alt={selectedGroup.name} />
+                  <img src={selectedChannel.cover_url} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] group-hover/header:scale-105 transition-transform" alt={selectedChannel.name} />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1">
                       <h3 className="text-base font-bold text-[var(--vix-text)] leading-tight group-hover/header:text-pink-500 transition-colors">
-                        {selectedGroup.name}
+                        {selectedChannel.name}
                       </h3>
-                      {selectedGroup.is_verified && (
+                      {selectedChannel.is_verified && (
                         <CheckCircle2 className="w-4 h-4 fill-[#ec4899] text-white" />
                       )}
                     </div>
                     <p className="text-[11px] text-[var(--vix-muted)] font-medium">
-                      {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('followers')}
+                      {formatNumber((selectedChannel.member_count || 0) + (selectedChannel.boosted_members || 0))} {t('followers')}
                     </p>
                   </div>
                 </div>
@@ -661,14 +739,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
               <div className="flex items-center gap-2">
                 {!isMember ? (
                   <button 
-                    onClick={joinGroup}
+                    onClick={joinChannel}
                     className="bg-pink-500 text-white px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg hover:bg-pink-600 transition-all"
                   >
                     {t('Follow')}
                   </button>
                 ) : (
                   <button 
-                    onClick={leaveGroup}
+                    onClick={leaveChannel}
                     className="bg-[var(--vix-secondary)] text-[var(--vix-text)] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-border)] transition-all"
                   >
                     {t('Following')}
@@ -682,21 +760,21 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     <MoreHorizontal className="w-5 h-5" />
                   </button>
                   <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
-                    {selectedGroup.creator_id === currentUser.id && (
+                    {selectedChannel.creator_id === currentUser.id && (
                       <button 
                         onClick={async () => {
-                          const newVal = !selectedGroup.only_admin_can_post;
-                          const { error } = await supabase.from('groups').update({ only_admin_can_post: newVal }).eq('id', selectedGroup.id);
-                          if (!error) setSelectedGroup({ ...selectedGroup, only_admin_can_post: newVal });
+                          const newVal = !selectedChannel.only_admin_can_post;
+                          const { error } = await supabase.from('groups').update({ only_admin_can_post: newVal }).eq('id', selectedChannel.id);
+                          if (!error) setSelectedChannel({ ...selectedChannel, only_admin_can_post: newVal });
                         }}
                         className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
                       >
                         <Shield className="w-4 h-4" />
-                        {selectedGroup.only_admin_can_post ? t('Allow everyone to post') : t('Only admins can post')}
+                        {selectedChannel.only_admin_can_post ? t('Allow everyone to post') : t('Only admins can post')}
                       </button>
                     )}
                     <button 
-                      onClick={() => copyGroupLink(selectedGroup.id)}
+                      onClick={() => copyChannelLink(selectedChannel.id)}
                       className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
                     >
                       <LinkIcon className="w-4 h-4" />
@@ -704,7 +782,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                     </button>
                     {isMember && (
                       <button 
-                        onClick={leaveGroup}
+                        onClick={leaveChannel}
                         className="w-full px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-500/5 transition-all flex items-center gap-2"
                       >
                         <LogOut className="w-4 h-4" />
@@ -726,14 +804,14 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                    </div>
                    
                    <div className="flex flex-col items-center text-center gap-6">
-                      <img src={selectedGroup.cover_url} className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-[var(--vix-border)] shadow-2xl" alt={selectedGroup.name} />
+                      <img src={selectedChannel.cover_url} className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-[var(--vix-border)] shadow-2xl" alt={selectedChannel.name} />
                       <div className="space-y-2">
                         <div className="flex items-center justify-center gap-2">
-                          <h4 className="text-2xl font-black text-[var(--vix-text)] uppercase tracking-tight">{selectedGroup.name}</h4>
-                          {selectedGroup.is_verified && <CheckCircle2 className="w-6 h-6 fill-[#ec4899] text-white" />}
+                          <h4 className="text-2xl font-black text-[var(--vix-text)] uppercase tracking-tight">{selectedChannel.name}</h4>
+                          {selectedChannel.is_verified && <CheckCircle2 className="w-6 h-6 fill-[#ec4899] text-white" />}
                         </div>
                         <p className="text-sm text-[var(--vix-muted)] font-bold uppercase tracking-widest">
-                          {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('followers')}
+                          {formatNumber((selectedChannel.member_count || 0) + (selectedChannel.boosted_members || 0))} {t('followers')}
                         </p>
                       </div>
                    </div>
@@ -743,7 +821,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                         <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
                         <div className="bg-[var(--vix-secondary)] rounded-2xl p-6 border border-[var(--vix-border)]">
                           <p className="text-sm text-[var(--vix-text)] leading-relaxed font-medium">
-                            {selectedGroup.description || t('No description provided.')}
+                            {selectedChannel.description || t('No description provided.')}
                           </p>
                         </div>
                       </div>
@@ -763,25 +841,89 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                               <Shield className="w-4 h-4 text-zinc-500" />
                               <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Admin Only Posting')}</span>
                             </div>
-                            <span className={`text-[10px] font-black uppercase ${selectedGroup.only_admin_can_post ? 'text-pink-500' : 'text-zinc-500'}`}>
-                              {selectedGroup.only_admin_can_post ? t('Enabled') : t('Disabled')}
+                            <span className={`text-[10px] font-black uppercase ${selectedChannel.only_admin_can_post ? 'text-pink-500' : 'text-zinc-500'}`}>
+                              {selectedChannel.only_admin_can_post ? t('Enabled') : t('Disabled')}
                             </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <LinkIcon className="w-4 h-4 text-zinc-500" />
+                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Channel Link')}</span>
+                            </div>
+                            <button 
+                              onClick={() => copyChannelLink(selectedChannel.id)}
+                              className="text-[10px] font-black text-blue-500 uppercase hover:underline"
+                            >
+                              {t('Copy')}
+                            </button>
                           </div>
                         </div>
                       </div>
-                   </div>
+
+                      {isChannelAdmin && (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Admin Actions')}</label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <button 
+                                onClick={boostChannel}
+                                className="flex items-center justify-center gap-2 p-4 bg-pink-500/10 text-pink-500 rounded-2xl border border-pink-500/20 hover:bg-pink-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                              >
+                                <Plus className="w-4 h-4" />
+                                {t('Boost')}
+                              </button>
+                              {!selectedChannel.is_verified && (
+                                <button 
+                                  onClick={verifyChannel}
+                                  className="flex items-center justify-center gap-2 p-4 bg-blue-500/10 text-blue-500 rounded-2xl border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+                                >
+                                  <ShieldCheck className="w-4 h-4" />
+                                  {t('Verify')}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Members')}</label>
+                            <div className="bg-[var(--vix-secondary)] rounded-2xl p-4 border border-[var(--vix-border)] space-y-3 max-h-60 overflow-y-auto no-scrollbar">
+                            {channelMembers.map(member => (
+                              <div key={member.id} className="flex items-center justify-between group/member">
+                                <div className="flex items-center gap-3">
+                                  <img src={member.user?.avatar_url || `https://ui-avatars.com/api/?name=${member.user?.username}`} className="w-8 h-8 rounded-full object-cover" />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-[var(--vix-text)]">@{member.user?.username}</span>
+                                    <span className="text-[8px] font-black text-zinc-500 uppercase">{member.role}</span>
+                                  </div>
+                                </div>
+                                {selectedChannel.creator_id === currentUser.id && member.user_id !== currentUser.id && member.role !== 'ADMIN' && (
+                                  <button 
+                                    onClick={() => transferAdmin(member.user_id)}
+                                    disabled={isTransferring}
+                                    className="p-2 text-zinc-500 hover:text-pink-500 transition-all opacity-0 group-hover/member:opacity-100"
+                                    title={t('Promote to Admin')}
+                                  >
+                                    <ShieldCheck className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                    <div className="flex flex-col gap-3">
                       {isMember ? (
                         <button 
-                          onClick={() => { leaveGroup(); setShowChannelInfo(false); }}
+                          onClick={() => { leaveChannel(); setShowChannelInfo(false); }}
                           className="w-full py-5 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
                         >
                           {t('Unfollow Channel')}
                         </button>
                       ) : (
                         <button 
-                          onClick={() => { joinGroup(); setShowChannelInfo(false); }}
+                          onClick={() => { joinChannel(); setShowChannelInfo(false); }}
                           className="w-full py-5 vix-gradient text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-pink-500/20"
                         >
                           {t('Follow Channel')}
@@ -796,23 +938,24 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                    </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
             {/* Channel Feed */}
             <div id="channel-feed" className="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] relative scroll-smooth">
               {/* Background Pattern Overlay (Optional) */}
               <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:invert"></div>
 
-              {groupPosts.length === 0 ? (
+              {channelPosts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
                   <MessageSquare className="w-12 h-12 text-[var(--vix-text)]" />
                   <p className="text-[var(--vix-muted)] font-bold uppercase tracking-widest text-[10px]">{t('No updates yet')}</p>
                 </div>
               ) : (
                 <div className="space-y-8 relative z-10">
-                  {groupPosts.map((post, index) => {
+                  {channelPosts.map((post, index) => {
                     const postDate = new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                    const prevPostDate = index > 0 ? new Date(groupPosts[index - 1].created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null;
+                    const prevPostDate = index > 0 ? new Date(channelPosts[index - 1].created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null;
                     const showDateSeparator = postDate !== prevPostDate;
 
                     return (
@@ -867,13 +1010,13 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-black text-[var(--vix-text)] uppercase tracking-widest">
-                                    {selectedGroup.name}
+                                    {selectedChannel.name}
                                   </span>
-                                  {selectedGroup.is_verified && (
+                                  {selectedChannel.is_verified && (
                                     <CheckCircle2 className="w-3.5 h-3.5 fill-[#ec4899] text-white" />
                                   )}
                                 </div>
-                                {(selectedGroup.creator_id === currentUser.id) && (
+                                {(selectedChannel.creator_id === currentUser.id || isChannelAdmin) && (
                                   <button 
                                     onClick={() => handleDeletePost(post.id)}
                                     className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all opacity-0 group-hover:opacity-100"
@@ -912,7 +1055,47 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                                 </div>
                               )}
                               
-                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--vix-border)]/10">
+                              <div className="flex items-center justify-between pt-2 border-t border-[var(--vix-border)]/10">
+                                <div className="flex items-center gap-2">
+                                  {post.reactions && post.reactions.length > 0 && (
+                                    <div className="flex -space-x-1">
+                                      {Array.from(new Set(post.reactions.map(r => r.reaction))).slice(0, 3).map(emoji => (
+                                        <div key={emoji} className="w-5 h-5 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center text-[10px] border border-[var(--vix-border)] shadow-sm">
+                                          {emoji}
+                                        </div>
+                                      ))}
+                                      {post.reactions.length > 0 && (
+                                        <span className="text-[9px] text-[var(--vix-muted)] font-black ml-2 self-center">
+                                          {post.reactions.length}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="relative">
+                                    <button 
+                                      onClick={() => setShowEmojiPicker(showEmojiPicker === post.id ? null : post.id)}
+                                      className="p-1.5 text-[var(--vix-muted)] hover:text-pink-500 transition-all rounded-full hover:bg-[var(--vix-secondary)]"
+                                    >
+                                      <Smile className="w-4 h-4" />
+                                    </button>
+                                    {showEmojiPicker === post.id && (
+                                      <div className="absolute bottom-full left-0 mb-2 z-[70]">
+                                        <div className="fixed inset-0" onClick={() => setShowEmojiPicker(null)}></div>
+                                        <div className="relative">
+                                          <EmojiPicker 
+                                            onEmojiClick={(emojiData) => toggleReaction(post.id, emojiData.emoji)}
+                                            theme={EmojiTheme.DARK}
+                                            lazyLoadEmojis={true}
+                                            skinTonesDisabled={true}
+                                            searchDisabled={true}
+                                            height={350}
+                                            width={300}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                                 <span className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest">
                                   {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </span>
@@ -922,7 +1105,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                             {/* Share Bar */}
                             <div className="flex items-center justify-end px-6 pb-6">
                               <button 
-                                onClick={() => copyGroupLink(selectedGroup.id)}
+                                onClick={() => copyChannelLink(selectedChannel.id)}
                                 className="p-3 bg-[var(--vix-secondary)] rounded-full text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)] shadow-md"
                               >
                                 <Share2 className="w-5 h-5" />
@@ -946,7 +1129,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             </button>
 
             {/* Broadcast Input (Admin Only) */}
-            {isMember && (!selectedGroup.only_admin_can_post || selectedGroup.creator_id === currentUser.id) ? (
+            {isMember && (!selectedChannel.only_admin_can_post || selectedChannel.creator_id === currentUser.id) ? (
               <div className="p-6 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
                 <div className="flex items-end gap-4 max-w-4xl mx-auto">
                   <div className="flex-1 bg-[var(--vix-secondary)] rounded-[2rem] flex flex-col p-2 border border-[var(--vix-border)] shadow-inner">
@@ -995,7 +1178,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                   </button>
                 </div>
               </div>
-            ) : isMember && selectedGroup.only_admin_can_post ? (
+            ) : isMember && selectedChannel.only_admin_can_post ? (
               <div className="p-8 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
                 <p className="text-[11px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
                   {t('Only administrators can send messages to this channel')}
@@ -1004,7 +1187,7 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
             ) : !isMember && (
               <div className="p-8 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
                 <button 
-                  onClick={joinGroup}
+                  onClick={joinChannel}
                   className="bg-gradient-to-r from-pink-500 to-blue-500 px-16 py-4 rounded-full text-white text-xs font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
                 >
                   {t('Follow to see updates')}
@@ -1018,4 +1201,4 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   );
 };
 
-export default Groups;
+export default Channels;

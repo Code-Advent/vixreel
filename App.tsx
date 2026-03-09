@@ -14,7 +14,7 @@ import Admin from './components/Admin';
 import Notifications from './components/Notifications';
 import Explore from './components/Explore';
 import SettingsPage from './components/SettingsPage';
-import Groups from './components/Groups';
+import Channels from './components/Channels';
 import PostDetail from './components/PostDetail';
 import EngagingVideos from './components/EngagingVideos';
 import { TranslationProvider, useTranslation } from './lib/translation';
@@ -33,7 +33,7 @@ const AppContent: React.FC = () => {
   const [profileAutoEdit, setProfileAutoEdit] = useState(false);
   const [duetSource, setDuetSource] = useState<PostType | null>(null);
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<Group | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
   const [homeSubView, setHomeSubView] = useState<'REELS' | 'ENGAGING'>('REELS');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -374,14 +374,14 @@ const AppContent: React.FC = () => {
                 onMessageUser={(u) => { setInitialChatUser(u); setCurrentView('MESSAGES'); }} 
                 onLogout={() => setIsAccountMenuOpen(true)}
                 onOpenSettings={() => setCurrentView('SETTINGS')}
-                onNavigateToGroups={() => { setSelectedGroup(null); setCurrentView('GROUPS'); }}
-                onSelectGroup={(g) => { setSelectedGroup(g); setCurrentView('GROUP_DETAILS'); }}
+                onNavigateToChannels={() => { setSelectedChannel(null); setCurrentView('CHANNELS'); }}
+                onSelectChannel={(channel) => { setSelectedChannel(channel); setCurrentView('CHANNEL_DETAILS'); }}
                 onExpand={(post) => setSelectedPost(post)}
                 autoEdit={profileAutoEdit}
               />
             )}
             
-            {(currentView === 'GROUPS' || currentView === 'GROUP_DETAILS') && <Groups currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedGroup} />}
+            {(currentView === 'CHANNELS' || currentView === 'CHANNEL_DETAILS') && <Channels currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedChannel} />}
             
             {currentView === 'CREATE' && (
               <CreatePost 

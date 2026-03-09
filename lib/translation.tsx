@@ -63,7 +63,7 @@ export const SUPPORTED_LANGUAGES = [
 const CORE_UI_STRINGS = Array.from(new Set([
   // Navigation & General
   'Feed', 'Explore', 'Search', 'Notifications', 'Profile', 'Create', 'Messages', 'Settings',
-  'Home', 'Groups', 'Admin Panel', 'Active', 'Admin', 'Member', 'from', 'VERISAZ',
+  'Home', 'Channels', 'Admin Panel', 'Active', 'Admin', 'Member', 'from', 'VERISAZ',
   'Logout', 'Switch Account', 'Add Account', 'Relinquish Primary Session', 'Understood',
   'light', 'dark', 'Registry', 'Individual Creator', 'You',
 
@@ -79,7 +79,7 @@ const CORE_UI_STRINGS = Array.from(new Set([
 
   // Profile
   'Edit Profile', 'Follow', 'Following', 'Followers', 'Likes', 'Message', 'Posts', 'Liked',
-  'No groups created yet', 'Members', 'Modify Identity', 'Cover Banner', 'Handle',
+  'No channels created yet', 'Members', 'Modify Identity', 'Cover Banner', 'Handle',
   'Date of Birth', 'Country', 'State/Region', 'Select Country', 'Select State',
   'Narrative bio...', 'Transmitting...', 'Synchronize Identity', 'Registry',
   'Initial bio signal pending...',
@@ -127,18 +127,18 @@ const CORE_UI_STRINGS = Array.from(new Set([
   // Notifications
   'No signals detected', 'When creators interact with your narrative, alerts will manifest here.',
 
-  // Groups
-  'Communities', 'New Group', 'No communities found', 'PUBLIC', 'PRIVATE', 'View',
-  'Cover Image', 'Upload Cover', 'Group Name', 'e.g. VixReel Creators', 'Description',
-  'What is this community about?', 'Privacy', 'Public', 'Private', 'Establish Community',
+  // Channels
+  'Channels', 'New Channel', 'No channels found', 'PUBLIC', 'PRIVATE', 'View',
+  'Cover Image', 'Upload Cover', 'Channel Name', 'e.g. VixReel Creators', 'Description',
+  'What is this channel about?', 'Privacy', 'Public', 'Private', 'Establish Channel',
   'Joined', 'Join', 'Share something with', 'Write a comment...',
 
   // Admin
   'Admin Login', 'Restricted Access', 'Unlock Panel', 'Manage Users & Boost Content',
-  'Logout Admin', 'Boosted', 'No email', 'Remove Verification', 'Verify User',
+  'Logout Admin', 'Boosted', 'No email', 'Remove Verification', 'Verify User', 'Verify Channel', 'Revoke Verification', 'Channel Control', 'Channel Info',
   'Add Likes (Post)', 'LIKES', 'Select a post below to add likes.', 'Add Followers (Account)',
-  'FOLLOWERS', 'Add Followers', 'User Posts', 'Add', 'Select a user',
-  'Choose an account from the left to manage it.',
+  'FOLLOWERS', 'Add Followers', 'User Posts', 'Add', 'Select a user', 'Select a channel',
+  'Choose an account from the left to manage it.', 'Choose a community from the left to manage it.',
 
   // Stories
   'Story file is too large (max 50MB).', 'Story upload failed: ',

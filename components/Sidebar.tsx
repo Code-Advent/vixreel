@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
     { id: 'NOTIFICATIONS' as ViewType, label: t('Notifications'), icon: 'fa-solid fa-bell', badge: unreadCount },
     { id: 'CREATE' as ViewType, label: t('Create'), icon: 'fa-solid fa-square-plus' },
     { id: 'MESSAGES' as ViewType, label: t('Messages'), icon: 'fa-solid fa-paper-plane' },
-    { id: 'GROUPS' as ViewType, label: t('Groups'), icon: 'fa-solid fa-users' },
+    { id: 'CHANNELS' as ViewType, label: t('Channels'), icon: 'fa-solid fa-users' },
     { id: 'PROFILE' as ViewType, label: t('Profile'), icon: 'fa-solid fa-user' },
   ];
 

@@ -1,6 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, Image as ImageIcon, Smile, MoreVertical, Trash2, Sticker as StickerIcon } from 'lucide-react';
+import { 
+  Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, 
+  Image as ImageIcon, Smile, MoreVertical, Trash2, Sticker as StickerIcon,
+  Check, CheckCheck, Clock, Paperclip, Phone, Video as VideoIcon, Info
+} from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, Message, MessageReaction } from '../types';
@@ -376,70 +380,98 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
 
             {/* Messages List */}
-            <div className="flex-1 p-8 overflow-y-auto space-y-8 no-scrollbar" dir="ltr">
+            <div className="flex-1 p-4 md:p-8 overflow-y-auto space-y-4 no-scrollbar bg-[#0e1621] relative" dir="ltr">
+              {/* Telegram-style background pattern (optional) */}
+              <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] invert"></div>
+              
               {loading && messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin vix-loader" /></div>
               ) : (
                 messages.map((m, i) => {
                   const isOwn = m.sender_id === currentUser.id;
+                  const postDate = new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+                  const prevPostDate = i > 0 ? new Date(messages[i - 1].created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : null;
+                  const showDateSeparator = postDate !== prevPostDate;
+
                   return (
-                    <div key={m.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in`}>
-                      <div 
-                        dir="auto"
-                        className={`group relative max-w-[85%] p-5 px-8 rounded-[2.5rem] text-[14px] font-medium shadow-2xl transition-all whitespace-pre-wrap break-words ${
-                        isOwn ? 'vix-gradient text-white rounded-tr-none' : 'bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-tl-none border border-[var(--vix-border)]'
-                      }`}>
-                        {m.media_url && (
-                          <div className="mb-3 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
-                            {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-80" /> : <img src={m.media_url} className="max-h-80" />}
+                    <React.Fragment key={m.id}>
+                      {showDateSeparator && (
+                        <div className="flex justify-center my-6 sticky top-2 z-10">
+                          <div className="bg-black/30 backdrop-blur-md text-white/70 text-[11px] px-4 py-1 rounded-full font-bold uppercase tracking-widest">
+                            {postDate}
                           </div>
-                        )}
-                        {m.sticker_url && (
-                          <div className="mb-3 w-40 h-40">
-                            <img src={m.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
+                        </div>
+                      )}
+                      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in relative z-10`}>
+                        <div 
+                          dir="auto"
+                          className={`group relative max-w-[85%] md:max-w-[70%] p-3 px-4 rounded-2xl text-[14px] font-medium shadow-lg transition-all whitespace-pre-wrap break-words ${
+                          isOwn ? 'bg-[#2b5278] text-white rounded-tr-none' : 'bg-[#182533] text-white rounded-tl-none'
+                        }`}>
+                          {m.media_url && (
+                            <div className="mb-2 rounded-xl overflow-hidden border border-white/5 shadow-md">
+                              {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-80 w-full object-cover" /> : <img src={m.media_url} className="max-h-80 w-full object-cover" />}
+                            </div>
+                          )}
+                          {m.sticker_url && (
+                            <div className="mb-2 w-32 h-32">
+                              <img src={m.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
+                            </div>
+                          )}
+                          <div className="pr-12">
+                            {m.content}
                           </div>
-                        )}
-                        {m.content}
-                        
-                        {/* Reaction Trigger */}
-                        <div className={`absolute ${isOwn ? '-left-20' : '-right-20'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
-                          <button 
-                            onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
-                            className="text-zinc-500 hover:text-pink-500 p-2"
-                          >
-                            <Smile className="w-5 h-5" />
-                          </button>
-                          {isOwn && (
+                          
+                          <div className="absolute bottom-1.5 right-2 flex items-center gap-1 opacity-60">
+                            <span className="text-[9px] font-bold">
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </span>
+                            {isOwn && (
+                              m.is_read ? <CheckCheck className="w-3 h-3 text-[#40a7e3]" /> : <Check className="w-3 h-3" />
+                            )}
+                          </div>
+
+                          {/* Reaction Trigger */}
+                          <div className={`absolute ${isOwn ? '-left-16' : '-right-16'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
                             <button 
-                              onClick={() => deleteMessage(m.id)}
-                              className="text-zinc-500 hover:text-red-500 p-2"
+                              onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
+                              className="text-zinc-500 hover:text-pink-500 p-2"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Smile className="w-4 h-4" />
                             </button>
+                            {isOwn && (
+                              <button 
+                                onClick={() => deleteMessage(m.id)}
+                                className="text-zinc-500 hover:text-red-500 p-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Reactions Display */}
+                          {m.reactions && m.reactions.length > 0 && (
+                            <div className={`absolute -bottom-3 ${isOwn ? 'right-2' : 'left-2'} flex gap-1 z-20`}>
+                              {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
+                                <div key={emoji} className="bg-[#1c2938] border border-white/5 rounded-full px-1.5 py-0.5 text-[10px] shadow-lg flex items-center gap-1">
+                                  <span>{emoji}</span>
+                                  <span className="text-[8px] opacity-50">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reaction Picker */}
+                          {showReactionPicker === m.id && (
+                            <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[#1c2938] border border-white/5 rounded-full p-1.5 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
+                              {REACTION_OPTIONS.map(emoji => (
+                                <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-full transition-all text-base">{emoji}</button>
+                              ))}
+                            </div>
                           )}
                         </div>
-
-                        {/* Reactions Display */}
-                        {m.reactions && m.reactions.length > 0 && (
-                          <div className={`absolute -bottom-3 ${isOwn ? 'right-2' : 'left-2'} flex gap-1`}>
-                            {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
-                              <div key={emoji} className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full px-1.5 py-0.5 text-[10px] shadow-lg">
-                                {emoji} <span className="text-[8px] opacity-50">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reaction Picker */}
-                        {showReactionPicker === m.id && (
-                          <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-full p-1.5 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
-                            {REACTION_OPTIONS.map(emoji => (
-                              <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="w-7 h-7 flex items-center justify-center hover:bg-[var(--vix-secondary)] rounded-full transition-all text-base">{emoji}</button>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })
               )}

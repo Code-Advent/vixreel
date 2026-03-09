@@ -21,13 +21,13 @@ interface ProfileProps {
   onMessageUser?: (user: UserProfile) => void;
   onOpenSettings?: () => void;
   onLogout?: () => void;
-  onNavigateToGroups?: () => void;
-  onSelectGroup?: (group: Group) => void;
+  onNavigateToChannels?: () => void;
+  onSelectChannel?: (group: Group) => void;
   onExpand?: (post: PostType) => void;
   autoEdit?: boolean;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToGroups, onSelectGroup, onExpand, autoEdit }) => {
+const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToChannels, onSelectChannel, onExpand, autoEdit }) => {
   const { t } = useTranslation();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
@@ -649,9 +649,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             <div className="flex items-center gap-3">
               <button onClick={() => setIsEditModalOpen(true)} className="bg-[var(--vix-secondary)] px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-card)] text-[var(--vix-text)] transition-all shadow-xl">{t('Edit Profile')}</button>
               <button 
-                onClick={onNavigateToGroups}
+                onClick={onNavigateToChannels}
                 className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-zinc-700 hover:text-pink-500 transition-all border border-[var(--vix-border)] shadow-xl"
-                title={t('Communities')}
+                title={t('Channels')}
               >
                 <Users className="w-5 h-5" />
               </button>
@@ -675,22 +675,22 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
           <button onClick={() => setActiveTab('POSTS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'POSTS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Grid className="w-4 h-4" /> {t('Posts')}</button>
           <button onClick={() => setActiveTab('LIKES')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'LIKES' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Heart className="w-4 h-4" /> {t('Liked')}</button>
           {!isOwnProfile && (
-            <button onClick={() => setActiveTab('GROUPS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'GROUPS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> {t('Groups')}</button>
+            <button onClick={() => setActiveTab('CHANNELS')} className={`flex items-center gap-2 py-4 border-t-2 transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === 'CHANNELS' ? 'border-[var(--vix-text)] text-[var(--vix-text)]' : 'border-transparent text-zinc-500'}`}><Users className="w-4 h-4" /> {t('Channels')}</button>
           )}
         </div>
 
-        {activeTab === 'GROUPS' ? (
+        {activeTab === 'CHANNELS' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             {userGroups.length === 0 ? (
               <div className="col-span-full py-20 text-center space-y-4 opacity-20">
                 <Users className="w-16 h-16 mx-auto" />
-                <p className="font-black uppercase tracking-widest text-xs">{t('No groups created yet')}</p>
+                <p className="font-black uppercase tracking-widest text-xs">{t('No channels created yet')}</p>
               </div>
             ) : (
               userGroups.map(group => (
                 <div 
                   key={group.id} 
-                  onClick={() => onSelectGroup?.(group)}
+                  onClick={() => onSelectChannel?.(group)}
                   className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] overflow-hidden shadow-xl hover:border-pink-500/30 transition-all cursor-pointer group"
                 >
                   <div className="h-24 relative">
@@ -715,10 +715,11 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
             {(activeTab === 'POSTS' ? posts : likedPosts).map((post) => (
               <div 
                 key={post.id} 
-                onClick={() => onExpand?.(post)}
                 className="aspect-square bg-[var(--vix-card)] relative group cursor-pointer overflow-hidden rounded-xl border border-[var(--vix-border)] shadow-xl transition-transform hover:scale-[1.02]"
               >
-                {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
+                <div onClick={() => onExpand?.(post)} className="w-full h-full">
+                  {post.media_type === 'video' ? <video src={post.media_url} className="w-full h-full object-cover" /> : <img src={post.media_url} className="w-full h-full object-cover" />}
+                </div>
                 
                 {post.is_ad && (
                   <div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 z-10">
@@ -726,7 +727,23 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
                   </div>
                 )}
 
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
+                {isOwnProfile && activeTab === 'POSTS' && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(t('Are you sure you want to delete this post?'))) {
+                        supabase.from('posts').delete().eq('id', post.id).then(() => {
+                          window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
+                        });
+                      }
+                    }}
+                    className="absolute top-2 left-2 p-2 bg-black/50 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all z-20"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+
+                <div onClick={() => onExpand?.(post)} className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all backdrop-blur-sm">
                   <Heart className="w-8 h-8 text-white fill-white shadow-2xl" />
                 </div>
               </div>

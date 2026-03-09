@@ -28,13 +28,13 @@ import { useTranslation } from '../lib/translation';
 
 const Admin: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'USERS' | 'GROUPS' | 'CONTENT'>('USERS');
+  const [activeTab, setActiveTab] = useState<'USERS' | 'CHANNELS' | 'CONTENT'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [channels, setChannels] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserPosts, setSelectedUserPosts] = useState<Post[]>([]);
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
-  const [viewingGroup, setViewingGroup] = useState<Group | null>(null);
+  const [viewingChannel, setViewingChannel] = useState<Group | null>(null);
   const [boostAmount, setBoostAmount] = useState<string>('500');
   const [followerBoostAmount, setFollowerBoostAmount] = useState<string>('1000');
   const [groupBoostAmount, setGroupBoostAmount] = useState<string>('1000');
@@ -68,7 +68,7 @@ const Admin: React.FC = () => {
     }
   }, []);
 
-  const fetchGroups = useCallback(async () => {
+  const fetchChannels = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error: fetchError } = await supabase
@@ -77,9 +77,9 @@ const Admin: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (fetchError) throw fetchError;
-      setGroups((data as Group[]) || []);
+      setChannels((data as Group[]) || []);
     } catch (err: any) {
-      console.error("Admin Group Fetch Failure:", err);
+      console.error("Admin Channel Fetch Failure:", err);
     } finally {
       setLoading(false);
     }
@@ -88,9 +88,9 @@ const Admin: React.FC = () => {
   useEffect(() => {
     if (isUnlocked) {
       if (activeTab === 'USERS') fetchUsers();
-      else fetchGroups();
+      else fetchChannels();
     }
-  }, [isUnlocked, activeTab, fetchUsers, fetchGroups]);
+  }, [isUnlocked, activeTab, fetchUsers, fetchChannels]);
 
   const fetchUserPosts = async (userId: string) => {
     setPostsLoading(true);
@@ -212,7 +212,7 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleVerifyGroup = async (groupId: string, status: boolean) => {
+  const handleVerifyChannel = async (groupId: string, status: boolean) => {
     try {
       const { error: updateError } = await supabase
         .from('groups')
@@ -221,19 +221,19 @@ const Admin: React.FC = () => {
       
       if (updateError) throw updateError;
 
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, is_verified: status } : g));
-      if (viewingGroup?.id === groupId) {
-        setViewingGroup(prev => prev ? { ...prev, is_verified: status } : null);
+      setChannels(prev => prev.map(g => g.id === groupId ? { ...g, is_verified: status } : g));
+      if (viewingChannel?.id === groupId) {
+        setViewingChannel(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
-      alert(status ? "Group Verified" : "Verification Removed");
+      alert(status ? "Channel Verified" : "Verification Removed");
     } catch (err: any) {
       alert("Update Failed: " + (err.message || "Error saving verification"));
     }
   };
 
-  const handleGroupBoost = async () => {
-    if (!viewingGroup) return;
+  const handleChannelBoost = async () => {
+    if (!viewingChannel) return;
     const amount = parseInt(groupBoostAmount);
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid amount.");
@@ -244,7 +244,7 @@ const Admin: React.FC = () => {
       const { data: group, error: getErr } = await supabase
         .from('groups')
         .select('boosted_members')
-        .eq('id', viewingGroup.id)
+        .eq('id', viewingChannel.id)
         .maybeSingle();
 
       if (getErr) throw getErr;
@@ -255,16 +255,16 @@ const Admin: React.FC = () => {
       const { error: updateErr } = await supabase
         .from('groups')
         .update({ boosted_members: newBoost })
-        .eq('id', viewingGroup.id);
+        .eq('id', viewingChannel.id);
       
       if (updateErr) throw updateErr;
 
-      setViewingGroup(prev => prev ? { ...prev, boosted_members: newBoost } : null);
-      setGroups(prev => prev.map(g => g.id === viewingGroup.id ? { ...g, boosted_members: newBoost } : g));
+      setViewingChannel(prev => prev ? { ...prev, boosted_members: newBoost } : null);
+      setChannels(prev => prev.map(g => g.id === viewingChannel.id ? { ...g, boosted_members: newBoost } : g));
       
-      alert(`Added ${amount} members to ${viewingGroup.name}.`);
+      alert(`Added ${amount} members to ${viewingChannel.name}.`);
     } catch (err: any) {
-      alert("Group Boost Failed: " + (err.message || "Error adding members"));
+      alert("Channel Boost Failed: " + (err.message || "Error adding members"));
     }
   };
 
@@ -364,7 +364,7 @@ const Admin: React.FC = () => {
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredGroups = groups.filter(g => 
+  const filteredChannels = channels.filter(g => 
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -391,10 +391,10 @@ const Admin: React.FC = () => {
                 {t('Users')}
               </button>
               <button 
-                onClick={() => { setActiveTab('GROUPS'); setSearchQuery(''); }}
-                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'GROUPS' ? 'vix-gradient text-white shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
+                onClick={() => { setActiveTab('CHANNELS'); setSearchQuery(''); }}
+                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CHANNELS' ? 'vix-gradient text-white shadow-lg' : 'text-zinc-500 hover:text-[var(--vix-text)]'}`}
               >
-                {t('Groups')}
+                {t('Channels')}
               </button>
               <button 
                 onClick={() => { setActiveTab('CONTENT'); setSearchQuery(''); }}
@@ -403,7 +403,7 @@ const Admin: React.FC = () => {
                 {t('Content')}
               </button>
            </div>
-           <button onClick={activeTab === 'USERS' ? fetchUsers : fetchGroups} disabled={loading} className="p-3 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all">
+           <button onClick={activeTab === 'USERS' ? fetchUsers : fetchChannels} disabled={loading} className="p-3 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl text-zinc-400 hover:text-[var(--vix-text)] transition-all">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
            </button>
            <button onClick={() => setIsUnlocked(false)} className="bg-red-500/10 border border-red-500/20 px-8 py-3 rounded-2xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-all">{t('Logout Admin')}</button>
@@ -418,7 +418,7 @@ const Admin: React.FC = () => {
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[1.5rem] py-4 pl-14 pr-6 text-xs outline-none focus:border-purple-500/40 transition-all text-[var(--vix-text)] placeholder:text-zinc-800 font-medium" 
-              placeholder={activeTab === 'USERS' ? t('Search by username...') : t('Search by group name...')}
+              placeholder={activeTab === 'USERS' ? t('Search by username...') : t('Search by channel name...')}
              />
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-2">
@@ -441,11 +441,11 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )) : filteredGroups.map(g => (
+            )) : filteredChannels.map(g => (
               <div 
                 key={g.id} 
-                onClick={() => setViewingGroup(g)}
-                className={`p-5 flex items-center justify-between cursor-pointer rounded-[2rem] transition-all border ${viewingGroup?.id === g.id ? 'bg-purple-500/10 border-purple-500/30' : 'hover:bg-[var(--vix-secondary)] border-transparent'}`}
+                onClick={() => setViewingChannel(g)}
+                className={`p-5 flex items-center justify-between cursor-pointer rounded-[2rem] transition-all border ${viewingChannel?.id === g.id ? 'bg-purple-500/10 border-purple-500/30' : 'hover:bg-[var(--vix-secondary)] border-transparent'}`}
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-full p-[2px] ${g.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-[var(--vix-secondary)]'}`}>
@@ -568,28 +568,28 @@ const Admin: React.FC = () => {
                 <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">{t('Choose an account from the left to manage it.')}</p>
               </div>
             )
-          ) : activeTab === 'GROUPS' ? (
-            viewingGroup ? (
+          ) : activeTab === 'CHANNELS' ? (
+            viewingChannel ? (
               <div className="bg-[var(--vix-card)] rounded-[3.5rem] border border-[var(--vix-border)] p-8 sm:p-16 shadow-2xl animate-vix-in relative overflow-hidden ring-1 ring-white/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full"></div>
                 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-10 mb-16 relative z-10">
                   <div className="flex items-center gap-8">
                     <div className="w-32 h-32 rounded-full vix-gradient p-1.5 shadow-[0_20px_60px_rgba(255,0,128,0.2)]">
-                      <img src={viewingGroup.cover_url} className="w-full h-full rounded-full border-[6px] border-[var(--vix-bg)] object-cover bg-[var(--vix-secondary)]" />
+                      <img src={viewingChannel.cover_url} className="w-full h-full rounded-full border-[6px] border-[var(--vix-bg)] object-cover bg-[var(--vix-secondary)]" />
                     </div>
                     <div className="space-y-2">
                       <h3 className="text-4xl font-black flex items-center gap-4 text-[var(--vix-text)]">
-                        {viewingGroup.name} {viewingGroup.is_verified && <VerificationBadge size="w-10 h-10" />}
+                        {viewingChannel.name} {viewingChannel.is_verified && <VerificationBadge size="w-10 h-10" />}
                       </h3>
-                      <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">{viewingGroup.privacy} {t('Community')}</p>
+                      <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">{viewingChannel.privacy} {t('Channel')}</p>
                     </div>
                   </div>
                   <button 
-                    onClick={() => handleVerifyGroup(viewingGroup.id, !viewingGroup.is_verified)}
-                    className={`px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all shadow-2xl ${viewingGroup.is_verified ? 'bg-[var(--vix-secondary)] text-red-500 border border-red-500/20' : 'vix-gradient text-white'}`}
+                    onClick={() => handleVerifyChannel(viewingChannel.id, !viewingChannel.is_verified)}
+                    className={`px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all shadow-2xl ${viewingChannel.is_verified ? 'bg-[var(--vix-secondary)] text-red-500 border border-red-500/20' : 'vix-gradient text-white'}`}
                   >
-                    {viewingGroup.is_verified ? t('Remove Verification') : t('Verify Group')}
+                    {viewingChannel.is_verified ? t('Remove Verification') : t('Verify Channel')}
                   </button>
                 </div>
 
@@ -608,28 +608,28 @@ const Admin: React.FC = () => {
                           <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-zinc-700 uppercase">{t('MEMBERS')}</span>
                         </div>
                         <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest px-2">
-                          {t('Current Boosted')}: {formatNumber(viewingGroup.boosted_members || 0)}
+                          {t('Current Boosted')}: {formatNumber(viewingChannel.boosted_members || 0)}
                         </p>
-                        <button onClick={handleGroupBoost} className="w-full py-4 bg-purple-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-purple-500 transition-all flex items-center justify-center gap-2 group shadow-xl hover:shadow-purple-500/20 active:scale-95">
+                        <button onClick={handleChannelBoost} className="w-full py-4 bg-purple-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-purple-500 transition-all flex items-center justify-center gap-2 group shadow-xl hover:shadow-purple-500/20 active:scale-95">
                           <UserPlus className="w-4 h-4 group-hover:rotate-12 transition-transform" /> {t('Add Members')}
                         </button>
                       </div>
                    </div>
 
                    <div className="bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-[2.5rem] p-10 space-y-8 shadow-inner">
-                      <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">{t('Group Info')}</h4>
+                      <h4 className="text-[11px] font-black text-zinc-700 uppercase tracking-[0.5em]">{t('Channel Info')}</h4>
                       <div className="space-y-4">
                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                           <span className="text-zinc-600">{t('Creator')}</span>
-                          <span className="text-[var(--vix-text)]">@{viewingGroup.creator?.username}</span>
+                          <span className="text-[var(--vix-text)]">@{viewingChannel.creator?.username}</span>
                         </div>
                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                           <span className="text-zinc-600">{t('Created')}</span>
-                          <span className="text-[var(--vix-text)]">{new Date(viewingGroup.created_at).toLocaleDateString()}</span>
+                          <span className="text-[var(--vix-text)]">{new Date(viewingChannel.created_at).toLocaleDateString()}</span>
                         </div>
                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                           <span className="text-zinc-600">{t('Privacy')}</span>
-                          <span className="text-[var(--vix-text)]">{viewingGroup.privacy}</span>
+                          <span className="text-[var(--vix-text)]">{viewingChannel.privacy}</span>
                         </div>
                       </div>
                    </div>
@@ -640,7 +640,7 @@ const Admin: React.FC = () => {
                 <div className="w-32 h-32 rounded-[2.5rem] bg-[var(--vix-secondary)] flex items-center justify-center mb-10 border border-[var(--vix-border)] shadow-2xl">
                   <Globe className="w-12 h-12 text-zinc-800" />
                 </div>
-                <h3 className="text-zinc-500 font-black uppercase tracking-[0.6em] text-sm">{t('Select a group')}</h3>
+                <h3 className="text-zinc-500 font-black uppercase tracking-[0.6em] text-sm">{t('Select a channel')}</h3>
                 <p className="text-zinc-800 text-xs mt-4 font-bold uppercase tracking-tighter">{t('Choose a community from the left to manage it.')}</p>
               </div>
             )
