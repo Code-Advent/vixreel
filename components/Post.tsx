@@ -105,8 +105,19 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       fetchLikesCount();
       fetchRepostsCount();
     };
+    
+    const handlePostUpdate = (e: any) => {
+      if (e.detail?.id === post.id) {
+        fetchLikesCount();
+      }
+    };
+
     window.addEventListener('vixreel-engagement-updated', handleEngagement);
-    return () => window.removeEventListener('vixreel-engagement-updated', handleEngagement);
+    window.addEventListener('vixreel-post-updated', handlePostUpdate);
+    return () => {
+      window.removeEventListener('vixreel-engagement-updated', handleEngagement);
+      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
+    };
   }, [post.id, showComments, post.boosted_likes]);
 
   const checkStatus = async () => {
@@ -121,6 +132,12 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
   const fetchLikesCount = async () => {
     const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
     setRealLikesCount(count || 0);
+    
+    // Also fetch latest boosted_likes
+    const { data } = await supabase.from('posts').select('boosted_likes').eq('id', post.id).maybeSingle();
+    if (data && data.boosted_likes !== undefined) {
+      post.boosted_likes = data.boosted_likes;
+    }
   };
 
   const fetchCommentsCount = async () => {

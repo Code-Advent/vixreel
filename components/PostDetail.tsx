@@ -68,7 +68,9 @@ const CommentItem: React.FC<{ comment: CommentType, language: string, t: any, on
       />
       <div className="space-y-1 flex-1">
         <p className="text-sm">
-          <span className="font-bold mr-2 text-[var(--vix-text)]">@{comment.user.username}</span>
+          <span className="font-bold mr-2 text-[var(--vix-text)] flex items-center gap-1 inline-flex">
+            @{comment.user.username} {comment.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+          </span>
           <span className="text-zinc-400 leading-relaxed">
             {comment.sticker_url && (
               <div className="w-24 h-24 mb-2">
@@ -139,6 +141,27 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
     fetchLikesCount();
     fetchCommentsCount();
     fetchComments();
+
+    const handlePostUpdate = (e: any) => {
+      if (e.detail?.id === post.id) {
+        fetchLikesCount();
+      }
+    };
+
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      if (post.user_id === id) {
+        post.user = { ...post.user, ...updates };
+        // Force re-render by updating a dummy state if needed, but let's see if this works
+      }
+    };
+
+    window.addEventListener('vixreel-post-updated', handlePostUpdate);
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    return () => {
+      window.removeEventListener('vixreel-post-updated', handlePostUpdate);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+    };
   }, [post.id]);
 
   const checkStatus = async () => {
@@ -152,6 +175,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
 
   const fetchLikesCount = async () => {
     const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
+    const { data } = await supabase.from('posts').select('boosted_likes').eq('id', post.id).maybeSingle();
+    if (data) post.boosted_likes = data.boosted_likes;
     setLikesCount((count || 0) + (post.boosted_likes || 0));
   };
 
@@ -360,7 +385,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
               />
               <div className="space-y-1">
                 <div className="text-sm">
-                  <span className="font-bold mr-2 text-[var(--vix-text)]">@{post.user.username}</span>
+                  <span className="font-bold mr-2 text-[var(--vix-text)] flex items-center gap-1 inline-flex">
+                    @{post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
+                  </span>
                   <span className="text-zinc-400 leading-relaxed">{renderCaption(translatedCaption || post.caption)}</span>
                 </div>
                 <div className="flex items-center gap-4">

@@ -174,19 +174,33 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       
       if (sData) setStories(sData as any);
 
-      // CORRECTED: Count followers (people following this user)
+      // Count followers (people following this user)
       const { count: fCount } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
         .eq('following_id', user.id);
 
-      // CORRECTED: Count following (people this user follows)
+      // Count following (people this user follows)
       const { count: ingCount } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
         .eq('follower_id', user.id);
 
-      const { data: freshProfile } = await supabase.from('profiles').select('boosted_followers').eq('id', user.id).maybeSingle();
+      // Fetch full profile to get latest verification status and boosted followers
+      const { data: freshProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (freshProfile) {
+        // If it's the own profile, we might want to update the parent state too
+        // but for now let's just ensure local display is correct
+        if (freshProfile.is_verified !== user.is_verified) {
+          onUpdateProfile({ is_verified: freshProfile.is_verified });
+        }
+      }
+
       const boostedFollowers = freshProfile?.boosted_followers || 0;
       
       let totalLikesSum = 0;
