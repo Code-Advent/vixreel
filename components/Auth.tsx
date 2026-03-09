@@ -20,7 +20,8 @@ import {
   Plus,
   Trash2,
   ChevronRight,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import VerificationBadge from './VerificationBadge';
 import { COUNTRIES_DATA } from '../constants';
@@ -63,6 +64,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [foundProfile, setFoundProfile] = useState<UserProfile | null>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
   const otpInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -648,7 +651,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
                         required
                       />
                       <label htmlFor="terms" className="text-[10px] text-zinc-600 font-medium text-left leading-relaxed">
-                        {t('I agree to the')} <a href="#" className="text-pink-500 font-black hover:underline">{t('Terms of Use')}</a> {t('and')} <a href="#" className="text-pink-500 font-black hover:underline">{t('Privacy Policy')}</a>.
+                        {t('I agree to the')} <button type="button" onClick={() => setShowTermsModal(true)} className="text-pink-500 font-black hover:underline">{t('Terms of Use')}</button> {t('and')} <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-pink-500 font-black hover:underline">{t('Privacy Policy')}</button>.
                       </label>
                     </div>
                   </div>
@@ -669,6 +672,52 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
           
           {error && <div className="mt-8 text-red-500 text-[9px] font-black uppercase tracking-[0.2em] bg-red-500/5 p-4 rounded-xl border border-red-500/10 w-full text-center animate-shake">{error}</div>}
         </div>
+
+        {/* Terms of Use Modal */}
+        {showTermsModal && (
+          <div className="fixed inset-0 z-[20000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+            <div className="w-full max-w-2xl bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-6 shadow-2xl animate-vix-in max-h-[80vh] flex flex-col">
+               <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{t('Terms of Use')}</h3>
+                  <button onClick={() => setShowTermsModal(false)} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
+               </div>
+               <div className="flex-1 overflow-y-auto pr-4 space-y-4 text-zinc-400 text-sm leading-relaxed no-scrollbar">
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('1. Acceptance of Protocol')}</p>
+                  <p>{t('By accessing the VixReel Narrative Protocol, you agree to be bound by these terms. VixReel is a high-performance content sharing environment.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('2. Identity Signal Integrity')}</p>
+                  <p>{t('Users are responsible for maintaining the integrity of their visual and narrative signals. Impersonation of other creators is strictly prohibited.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('3. Content Ownership')}</p>
+                  <p>{t('You retain full ownership of the signals you broadcast. However, by posting, you grant VixReel a non-exclusive license to distribute your content across the protocol.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('4. Prohibited Signals')}</p>
+                  <p>{t('Illegal content, harassment, and malicious code are forbidden. Violations will result in immediate identity termination.')}</p>
+               </div>
+               <button onClick={() => setShowTermsModal(false)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">{t('Understood')}</button>
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Policy Modal */}
+        {showPrivacyModal && (
+          <div className="fixed inset-0 z-[20000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+            <div className="w-full max-w-2xl bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-6 shadow-2xl animate-vix-in max-h-[80vh] flex flex-col">
+               <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{t('Privacy Policy')}</h3>
+                  <button onClick={() => setShowPrivacyModal(false)} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
+               </div>
+               <div className="flex-1 overflow-y-auto pr-4 space-y-4 text-zinc-400 text-sm leading-relaxed no-scrollbar">
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('1. Data Collection')}</p>
+                  <p>{t('We collect minimal identity data required for protocol operation: email, phone, and narrative metadata.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('2. Signal Privacy')}</p>
+                  <p>{t('Your private signals (private account mode) are only visible to authorized followers. We do not sell your identity data to third-party entities.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('3. Tracking & Cookies')}</p>
+                  <p>{t('We use essential cookies to maintain your session state. No invasive tracking protocols are active.')}</p>
+                  <p className="font-bold text-white uppercase tracking-widest text-[10px]">{t('4. Right to Termination')}</p>
+                  <p>{t('You have the right to terminate your identity at any time via the Settings protocol, which will erase all associated data from our active registry.')}</p>
+               </div>
+               <button onClick={() => setShowPrivacyModal(false)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">{t('Understood')}</button>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-center gap-4 text-[10px] text-zinc-700 font-black uppercase tracking-[0.4em]">
            <ShieldCheck className="w-4 h-4 text-green-500" /> {t('Secure Encryption Active')}

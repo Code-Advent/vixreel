@@ -101,6 +101,25 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
     fetchRepostsCount();
     if (showComments && canComment) fetchComments();
 
+    // Real-time subscription for post updates (e.g. boosted_likes)
+    const postSub = supabase
+      .channel(`post_${post.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'posts', 
+        filter: `id=eq.${post.id}` 
+      }, (payload) => {
+        if (payload.new) {
+          const updatedPost = payload.new as PostType;
+          if (updatedPost.boosted_likes !== undefined) {
+            post.boosted_likes = updatedPost.boosted_likes;
+            fetchLikesCount();
+          }
+        }
+      })
+      .subscribe();
+
     const handleEngagement = () => {
       fetchLikesCount();
       fetchRepostsCount();
@@ -115,6 +134,7 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
     window.addEventListener('vixreel-engagement-updated', handleEngagement);
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
     return () => {
+      supabase.removeChannel(postSub);
       window.removeEventListener('vixreel-engagement-updated', handleEngagement);
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
     };

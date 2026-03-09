@@ -4,7 +4,7 @@ import {
   X, Heart, MessageCircle, Download, Bookmark, 
   Repeat2, Columns2, Scissors, Volume2, VolumeX, 
   Loader2, MapPin, Smile, MoreHorizontal, ChevronLeft, ChevronRight,
-  Sticker as StickerIcon, ExternalLink
+  Sticker as StickerIcon, ExternalLink, Trash2
 } from 'lucide-react';
 import { Post as PostType, Comment as CommentType, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -119,6 +119,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
   const [showOutro, setShowOutro] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const renderCaption = (text: string) => {
@@ -142,6 +143,25 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
     fetchCommentsCount();
     fetchComments();
 
+    // Real-time subscription for post updates (e.g. boosted_likes)
+    const postSub = supabase
+      .channel(`post_detail_${post.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'posts', 
+        filter: `id=eq.${post.id}` 
+      }, (payload) => {
+        if (payload.new) {
+          const updatedPost = payload.new as PostType;
+          if (updatedPost.boosted_likes !== undefined) {
+            post.boosted_likes = updatedPost.boosted_likes;
+            fetchLikesCount();
+          }
+        }
+      })
+      .subscribe();
+
     const handlePostUpdate = (e: any) => {
       if (e.detail?.id === post.id) {
         fetchLikesCount();
@@ -159,6 +179,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
+      supabase.removeChannel(postSub);
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
@@ -280,6 +301,24 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(t("Delete this post?"))) return;
+    setIsDeleting(true);
+    try {
+      const pathParts = post.media_url.split('/public/posts/');
+      if (pathParts.length > 1) {
+        const mediaPath = pathParts[1];
+        await supabase.storage.from('posts').remove([mediaPath]);
+      }
+      await supabase.from('posts').delete().eq('id', post.id);
+      window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
+      onClose();
+    } catch (err: any) { 
+      alert("Delete failed: " + err.message); 
+      setIsDeleting(false); 
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-2xl flex items-center justify-center animate-vix-in">
       <button 
@@ -370,9 +409,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
                 )}
               </div>
             </div>
-            <button className="p-2 text-zinc-500 hover:text-white transition-colors">
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-3">
+              {post.user_id === currentUserId && (
+                <button onClick={handleDelete} className="p-2 text-zinc-500 hover:text-red-500 transition-colors">
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : <Trash2 className="w-5 h-5" />}
+                </button>
+              )}
+              <button className="p-2 text-zinc-500 hover:text-white transition-colors">
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Comments List */}

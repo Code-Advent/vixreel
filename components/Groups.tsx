@@ -49,6 +49,8 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
   const [comments, setComments] = useState<Record<string, GroupPostComment[]>>({});
   const [newComment, setNewComment] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
+  const [showChannelInfo, setShowChannelInfo] = useState(false);
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
 
   useEffect(() => {
     fetchGroups();
@@ -239,8 +241,8 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
         .maybeSingle();
       
       setIsMember(!!memberData);
-      const isGroupAdmin = memberData?.role === 'ADMIN';
-
+      setIsGroupAdmin(memberData?.role === 'ADMIN');
+      
       // Fetch posts
       const { data: posts, error } = await supabase
         .from('group_posts')
@@ -639,11 +641,11 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 <button onClick={() => setView('LIST')} className="p-1 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
                   <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
                 </button>
-                <div className="flex items-center gap-3 cursor-pointer">
-                  <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)]" alt={selectedGroup.name} />
+                <div onClick={() => setShowChannelInfo(true)} className="flex items-center gap-3 cursor-pointer group/header">
+                  <img src={selectedGroup.cover_url} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] group-hover/header:scale-105 transition-transform" alt={selectedGroup.name} />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1">
-                      <h3 className="text-base font-bold text-[var(--vix-text)] leading-tight">
+                      <h3 className="text-base font-bold text-[var(--vix-text)] leading-tight group-hover/header:text-pink-500 transition-colors">
                         {selectedGroup.name}
                       </h3>
                       {selectedGroup.is_verified && (
@@ -713,6 +715,88 @@ const Groups: React.FC<GroupsProps> = ({ currentUser, onBack, initialGroup }) =>
                 </div>
               </div>
             </div>
+
+            {/* Channel Info Modal */}
+            {showChannelInfo && (
+              <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+                <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl animate-vix-in max-h-[90vh] overflow-y-auto no-scrollbar">
+                   <div className="flex justify-between items-center">
+                      <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{t('Channel Info')}</h3>
+                      <button onClick={() => setShowChannelInfo(false)} className="p-2 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                   </div>
+                   
+                   <div className="flex flex-col items-center text-center gap-6">
+                      <img src={selectedGroup.cover_url} className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-[var(--vix-border)] shadow-2xl" alt={selectedGroup.name} />
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <h4 className="text-2xl font-black text-[var(--vix-text)] uppercase tracking-tight">{selectedGroup.name}</h4>
+                          {selectedGroup.is_verified && <CheckCircle2 className="w-6 h-6 fill-[#ec4899] text-white" />}
+                        </div>
+                        <p className="text-sm text-[var(--vix-muted)] font-bold uppercase tracking-widest">
+                          {formatNumber((selectedGroup.member_count || 0) + (selectedGroup.boosted_members || 0))} {t('followers')}
+                        </p>
+                      </div>
+                   </div>
+
+                   <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
+                        <div className="bg-[var(--vix-secondary)] rounded-2xl p-6 border border-[var(--vix-border)]">
+                          <p className="text-sm text-[var(--vix-text)] leading-relaxed font-medium">
+                            {selectedGroup.description || t('No description provided.')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Channel Settings')}</label>
+                        <div className="bg-[var(--vix-secondary)] rounded-2xl p-6 border border-[var(--vix-border)] space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Globe className="w-4 h-4 text-zinc-500" />
+                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Public Channel')}</span>
+                            </div>
+                            <span className="text-[10px] font-black text-green-500 uppercase">{t('Active')}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Shield className="w-4 h-4 text-zinc-500" />
+                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Admin Only Posting')}</span>
+                            </div>
+                            <span className={`text-[10px] font-black uppercase ${selectedGroup.only_admin_can_post ? 'text-pink-500' : 'text-zinc-500'}`}>
+                              {selectedGroup.only_admin_can_post ? t('Enabled') : t('Disabled')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="flex flex-col gap-3">
+                      {isMember ? (
+                        <button 
+                          onClick={() => { leaveGroup(); setShowChannelInfo(false); }}
+                          className="w-full py-5 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
+                        >
+                          {t('Unfollow Channel')}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => { joinGroup(); setShowChannelInfo(false); }}
+                          className="w-full py-5 vix-gradient text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-pink-500/20"
+                        >
+                          {t('Follow Channel')}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setShowChannelInfo(false)}
+                        className="w-full py-5 bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all"
+                      >
+                        {t('Close')}
+                      </button>
+                   </div>
+                </div>
+              </div>
+            )}
 
             {/* Channel Feed */}
             <div id="channel-feed" className="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] relative scroll-smooth">

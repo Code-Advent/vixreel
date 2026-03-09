@@ -61,6 +61,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [infoModal, setInfoModal] = useState<{title: string, content: string} | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const toggleSetting = async (key: keyof UserProfile, value: any) => {
     setSaving(key);
@@ -133,6 +138,36 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      setPasswordError(t('Password must be at least 6 characters.'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError(t('Passwords do not match.'));
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordError(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      
+      setInfoModal({
+        title: t('Success'),
+        content: t('Your password has been updated successfully.')
+      });
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setPasswordError(err.message);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const sections = [
     {
       title: t('Account Settings'),
@@ -182,6 +217,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           active: theme === 'dark', 
           onToggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
           desc: `${t('Currently using')} ${t(theme)} ${t('mode protocol.')}`
+        },
+        { 
+          icon: Lock, 
+          label: t('Change Password'), 
+          action: () => setShowPasswordModal(true), 
+          desc: t('Update your narrative access key.') 
         },
       ]
     },
@@ -434,6 +475,59 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
              </div>
              <p className="text-zinc-400 text-sm leading-loose whitespace-pre-wrap">{infoModal.content}</p>
              <button onClick={() => setInfoModal(null)} className="w-full py-4 bg-[var(--vix-secondary)] rounded-2xl text-[10px] font-black uppercase text-[var(--vix-text)] hover:bg-zinc-800 transition-all">{t('Understood')}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[10001] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl animate-vix-in">
+             <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{t('Change Password')}</h3>
+                <button onClick={() => setShowPasswordModal(false)} className="p-2 text-zinc-500 hover:text-white"><X className="w-6 h-6" /></button>
+             </div>
+             
+             <div className="space-y-4">
+                <div className="space-y-2">
+                   <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('New Password')}</label>
+                   <input 
+                     type="password" 
+                     value={newPassword}
+                     onChange={(e) => setNewPassword(e.target.value)}
+                     className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all"
+                     placeholder="••••••••"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-4">{t('Confirm Password')}</label>
+                   <input 
+                     type="password" 
+                     value={confirmPassword}
+                     onChange={(e) => setConfirmPassword(e.target.value)}
+                     className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all"
+                     placeholder="••••••••"
+                   />
+                </div>
+                {passwordError && <p className="text-red-500 text-[10px] font-bold text-center">{passwordError}</p>}
+             </div>
+
+             <div className="flex flex-col gap-3">
+                <button 
+                  disabled={isChangingPassword}
+                  onClick={handleChangePassword}
+                  className="w-full py-5 vix-gradient text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-pink-500/20 flex items-center justify-center gap-2"
+                >
+                  {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin vix-loader" /> : t('Update Password')}
+                </button>
+                <button 
+                  disabled={isChangingPassword}
+                  onClick={() => setShowPasswordModal(false)}
+                  className="w-full py-5 bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all"
+                >
+                  {t('Cancel')}
+                </button>
+             </div>
           </div>
         </div>
       )}
