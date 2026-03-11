@@ -5,7 +5,7 @@ import {
   ShieldCheck, Globe, Lock, EyeOff, Eye, Users, ChevronRight, Trash2,
   MessageSquare, UserCheck, Image as ImageIcon, MapPin, Plus, Play, Pause
 } from 'lucide-react';
-import { UserProfile, Post as PostType, Group, Story } from '../types';
+import { UserProfile, Post as PostType, Channel, Story } from '../types';
 import { supabase } from '../lib/supabase';
 import { sanitizeFilename, formatNumber } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -22,7 +22,7 @@ interface ProfileProps {
   onOpenSettings?: () => void;
   onLogout?: () => void;
   onNavigateToChannels?: () => void;
-  onSelectChannel?: (group: Group) => void;
+  onSelectChannel?: (channel: Channel) => void;
   onExpand?: (post: PostType) => void;
   autoEdit?: boolean;
 }
@@ -31,9 +31,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
   const { t } = useTranslation();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
-  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [userChannels, setUserChannels] = useState<Channel[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
-  const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES' | 'GROUPS'>('POSTS');
+  const [activeTab, setActiveTab] = useState<'POSTS' | 'LIKES' | 'CHANNELS'>('POSTS');
   const [counts, setCounts] = useState({ followers: 0, following: 0, likes: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -142,9 +142,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         setLikedPosts(lData.map((l: any) => l.post).filter(p => p !== null) as any);
       }
 
-      // Fetch groups created by the user
+      // Fetch channels created by the user
       const { data: gData } = await supabase
-        .from('groups')
+        .from('channels')
         .select(`
           *,
           creator:profiles(*)
@@ -153,14 +153,14 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         .order('created_at', { ascending: false });
       
       if (gData) {
-        const groupsWithCounts = await Promise.all(gData.map(async (g) => {
+        const channelsWithCounts = await Promise.all(gData.map(async (g) => {
           const { count } = await supabase
-            .from('group_members')
+            .from('channel_members')
             .select('*', { count: 'exact', head: true })
-            .eq('group_id', g.id);
+            .eq('channel_id', g.id);
           return { ...g, member_count: count || 0 };
         }));
-        setUserGroups(groupsWithCounts);
+        setUserChannels(channelsWithCounts);
       }
 
       // Fetch active stories
@@ -681,28 +681,28 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
         {activeTab === 'CHANNELS' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-            {userGroups.length === 0 ? (
+            {userChannels.length === 0 ? (
               <div className="col-span-full py-20 text-center space-y-4 opacity-20">
                 <Users className="w-16 h-16 mx-auto" />
                 <p className="font-black uppercase tracking-widest text-xs">{t('No channels created yet')}</p>
               </div>
             ) : (
-              userGroups.map(group => (
+              userChannels.map(channel => (
                 <div 
-                  key={group.id} 
-                  onClick={() => onSelectChannel?.(group)}
+                  key={channel.id} 
+                  onClick={() => onSelectChannel?.(channel)}
                   className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] overflow-hidden shadow-xl hover:border-pink-500/30 transition-all cursor-pointer group"
                 >
                   <div className="h-24 relative">
-                    <img src={group.cover_url} className="w-full h-full object-cover" alt={group.name} />
+                    <img src={channel.cover_url} className="w-full h-full object-cover" alt={channel.name} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   </div>
                   <div className="p-4 space-y-1">
-                    <h3 className="text-sm font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{group.name}</h3>
+                    <h3 className="text-sm font-black text-[var(--vix-text)] group-hover:text-pink-500 transition-colors">{channel.name}</h3>
                     <div className="flex items-center gap-2">
                       <Users className="w-3 h-3 text-zinc-700" />
                       <span className="text-[9px] text-zinc-700 font-black uppercase tracking-widest">
-                        {formatNumber((group.member_count || 0) + (group.boosted_members || 0))} {t('Members')}
+                        {formatNumber((channel.member_count || 0) + (channel.boosted_members || 0))} {t('Members')}
                       </span>
                     </div>
                   </div>

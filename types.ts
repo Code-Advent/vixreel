@@ -71,7 +71,7 @@ export interface Story {
   user: UserProfile;
 }
 
-export interface Group {
+export interface Channel {
   id: string;
   name: string;
   description: string;
@@ -87,18 +87,18 @@ export interface Group {
   member_count?: number;
 }
 
-export interface GroupMember {
+export interface ChannelMember {
   id: string;
-  group_id: string;
+  channel_id: string;
   user_id: string;
   role: 'ADMIN' | 'MEMBER';
   joined_at: string;
   user?: UserProfile;
 }
 
-export interface GroupPost {
+export interface ChannelPost {
   id: string;
-  group_id: string;
+  channel_id: string;
   user_id: string;
   content: string;
   media_url?: string;
@@ -108,17 +108,17 @@ export interface GroupPost {
   likes_count?: number;
   comments_count?: number;
   is_liked?: boolean;
-  reactions?: GroupPostReaction[];
+  reactions?: ChannelPostReaction[];
 }
 
-export interface GroupPostLike {
+export interface ChannelPostLike {
   id: string;
   post_id: string;
   user_id: string;
   created_at: string;
 }
 
-export interface GroupPostComment {
+export interface ChannelPostComment {
   id: string;
   post_id: string;
   user_id: string;
@@ -127,7 +127,7 @@ export interface GroupPostComment {
   user?: UserProfile;
 }
 
-export interface GroupPostReaction {
+export interface ChannelPostReaction {
   id: string;
   post_id: string;
   user_id: string;
@@ -195,4 +195,4 @@ export interface EngagingVideo {
   created_at: string;
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'GROUPS' | 'GROUP_DETAILS' | 'ENGAGING_VIDEOS';
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'CHANNELS' | 'CHANNEL_DETAILS' | 'ENGAGING_VIDEOS';

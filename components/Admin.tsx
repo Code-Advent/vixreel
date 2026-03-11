@@ -21,7 +21,7 @@ import {
   Plus
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { UserProfile, Post, Group } from '../types';
+import { UserProfile, Post, Channel } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { formatNumber } from '../lib/utils';
 import { useTranslation } from '../lib/translation';
@@ -30,14 +30,14 @@ const Admin: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'USERS' | 'CHANNELS' | 'CONTENT'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [channels, setChannels] = useState<Group[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserPosts, setSelectedUserPosts] = useState<Post[]>([]);
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
-  const [viewingChannel, setViewingChannel] = useState<Group | null>(null);
+  const [viewingChannel, setViewingChannel] = useState<Channel | null>(null);
   const [boostAmount, setBoostAmount] = useState<string>('500');
   const [followerBoostAmount, setFollowerBoostAmount] = useState<string>('1000');
-  const [groupBoostAmount, setGroupBoostAmount] = useState<string>('1000');
+  const [channelBoostAmount, setChannelBoostAmount] = useState<string>('1000');
   const [loading, setLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,12 +72,12 @@ const Admin: React.FC = () => {
     setLoading(true);
     try {
       const { data, error: fetchError } = await supabase
-        .from('groups')
+        .from('channels')
         .select('*, creator:profiles(*)')
         .order('created_at', { ascending: false });
       
       if (fetchError) throw fetchError;
-      setChannels((data as Group[]) || []);
+      setChannels((data as Channel[]) || []);
     } catch (err: any) {
       console.error("Admin Channel Fetch Failure:", err);
     } finally {
@@ -212,17 +212,17 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleVerifyChannel = async (groupId: string, status: boolean) => {
+  const handleVerifyChannel = async (channelId: string, status: boolean) => {
     try {
       const { error: updateError } = await supabase
-        .from('groups')
+        .from('channels')
         .update({ is_verified: status })
-        .eq('id', groupId);
+        .eq('id', channelId);
       
       if (updateError) throw updateError;
 
-      setChannels(prev => prev.map(g => g.id === groupId ? { ...g, is_verified: status } : g));
-      if (viewingChannel?.id === groupId) {
+      setChannels(prev => prev.map(g => g.id === channelId ? { ...g, is_verified: status } : g));
+      if (viewingChannel?.id === channelId) {
         setViewingChannel(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
@@ -234,26 +234,26 @@ const Admin: React.FC = () => {
 
   const handleChannelBoost = async () => {
     if (!viewingChannel) return;
-    const amount = parseInt(groupBoostAmount);
+    const amount = parseInt(channelBoostAmount);
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid amount.");
       return;
     }
 
     try {
-      const { data: group, error: getErr } = await supabase
-        .from('groups')
+      const { data: channel, error: getErr } = await supabase
+        .from('channels')
         .select('boosted_members')
         .eq('id', viewingChannel.id)
         .maybeSingle();
 
       if (getErr) throw getErr;
       
-      const currentBoost = group?.boosted_members || 0;
+      const currentBoost = channel?.boosted_members || 0;
       const newBoost = currentBoost + amount;
       
       const { error: updateErr } = await supabase
-        .from('groups')
+        .from('channels')
         .update({ boosted_members: newBoost })
         .eq('id', viewingChannel.id);
       
@@ -600,8 +600,8 @@ const Admin: React.FC = () => {
                         <div className="relative">
                           <input 
                             type="number" 
-                            value={groupBoostAmount} 
-                            onChange={e => setGroupBoostAmount(e.target.value)}
+                            value={channelBoostAmount} 
+                            onChange={e => setChannelBoostAmount(e.target.value)}
                             className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-2xl px-8 py-5 text-lg font-black text-[var(--vix-text)] outline-none"
                             placeholder="00"
                           />

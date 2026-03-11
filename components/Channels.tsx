@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
-import { UserProfile, Group, GroupMember, GroupPost, GroupPostComment, GroupPostReaction } from '../types';
+import { UserProfile, Channel, ChannelMember, ChannelPost, ChannelPostComment, ChannelPostReaction } from '../types';
 import { sanitizeFilename, formatNumber, formatFileSize } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
@@ -17,18 +17,19 @@ import { useTranslation } from '../lib/translation';
 interface ChannelsProps {
   currentUser: UserProfile;
   onBack: () => void;
-  initialChannel?: Group | null;
+  initialChannel?: Channel | null;
 }
 
 const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel }) => {
   const { t } = useTranslation();
-  const [channels, setChannels] = useState<Group[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialChannel ? 'DETAILS' : 'LIST');
-  const [selectedChannel, setSelectedChannel] = useState<Group | null>(initialChannel || null);
-  const [channelPosts, setChannelPosts] = useState<GroupPost[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(initialChannel || null);
+  const [channelPosts, setChannelPosts] = useState<ChannelPost[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Create Channel State
   const [newName, setNewName] = useState('');
@@ -48,12 +49,12 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
   // Comment State
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, GroupPostComment[]>>({});
+  const [comments, setComments] = useState<Record<string, ChannelPostComment[]>>({});
   const [newComment, setNewComment] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
   const [showChannelInfo, setShowChannelInfo] = useState(false);
   const [isChannelAdmin, setIsChannelAdmin] = useState(false);
-  const [channelMembers, setChannelMembers] = useState<GroupMember[]>([]);
+  const [channelMembers, setChannelMembers] = useState<ChannelMember[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
 
@@ -62,9 +63,9 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     
     // Real-time Channels Subscription
     const channelsSubscription = supabase
-      .channel('groups_realtime')
-      .on('postgres_changes' as any, { event: '*', table: 'groups' }, () => fetchChannels())
-      .on('postgres_changes' as any, { event: '*', table: 'group_members' }, () => fetchChannels())
+      .channel('channels_realtime')
+      .on('postgres_changes' as any, { event: '*', table: 'channels' }, () => fetchChannels())
+      .on('postgres_changes' as any, { event: '*', table: 'channel_members' }, () => fetchChannels())
       .subscribe();
 
     if (initialChannel) {
@@ -77,31 +78,31 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   }, [initialChannel]);
 
   useEffect(() => {
-    if (view === 'DETAILS' && selectedChannel) {
+    if (selectedChannel) {
       // Real-time Channel Data Subscription
       const channelDataSubscription = supabase
-        .channel(`group_data_${selectedChannel.id}`)
+        .channel(`channel_data_${selectedChannel.id}`)
         .on('postgres_changes' as any, { 
           event: '*', 
-          table: 'group_posts', 
-          filter: `group_id=eq.${selectedChannel.id}` 
+          table: 'channel_posts', 
+          filter: `channel_id=eq.${selectedChannel.id}` 
         }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
-          table: 'group_post_likes'
+          table: 'channel_post_likes'
         }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
-          table: 'group_post_comments'
+          table: 'channel_post_comments'
         }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
-          table: 'group_post_reactions'
+          table: 'channel_post_reactions'
         }, () => fetchChannelData(selectedChannel.id))
         .on('postgres_changes' as any, { 
           event: '*', 
-          table: 'group_members',
-          filter: `group_id=eq.${selectedChannel.id}`
+          table: 'channel_members',
+          filter: `channel_id=eq.${selectedChannel.id}`
         }, () => fetchChannelData(selectedChannel.id))
         .subscribe();
 
@@ -109,10 +110,10 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         supabase.removeChannel(channelDataSubscription);
       };
     }
-  }, [view, selectedChannel]);
+  }, [selectedChannel]);
 
-  const copyChannelLink = (groupId: string) => {
-    const url = `${window.location.origin}/groups/${groupId}`;
+  const copyChannelLink = (channelId: string) => {
+    const url = `${window.location.origin}/channels/${channelId}`;
     navigator.clipboard.writeText(url);
     alert(t('Channel link copied to clipboard!'));
   };
@@ -142,7 +143,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('groups')
+        .from('channels')
         .select(`
           *,
           creator:profiles(*)
@@ -154,9 +155,9 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
       // Get member counts (simplified for demo)
       const channelsWithCounts = await Promise.all((data || []).map(async (g) => {
         const { count } = await supabase
-          .from('group_members')
+          .from('channel_members')
           .select('*', { count: 'exact', head: true })
-          .eq('group_id', g.id);
+          .eq('channel_id', g.id);
         return { ...g, member_count: count || 0 };
       }));
 
@@ -174,11 +175,11 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     setIsCreating(true);
 
     try {
-      let coverUrl = 'https://picsum.photos/seed/group/800/400';
+      let coverUrl = 'https://picsum.photos/seed/channel/800/400';
 
       if (newCoverFile) {
         const safeName = sanitizeFilename(newCoverFile.name);
-        const path = `groups/${Date.now()}-${safeName}`;
+        const path = `channels/${Date.now()}-${safeName}`;
         const { error: uploadErr } = await supabase.storage
           .from('posts')
           .upload(path, newCoverFile);
@@ -189,8 +190,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         }
       }
 
-      const { data: group, error: groupErr } = await supabase
-        .from('groups')
+      const { data: channel, error: channelErr } = await supabase
+        .from('channels')
         .insert({
           name: newName.trim(),
           description: newDescription.trim(),
@@ -202,11 +203,11 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         .select()
         .single();
 
-      if (groupErr) throw groupErr;
+      if (channelErr) throw channelErr;
 
       // Add creator as admin member
-      await supabase.from('group_members').insert({
-        group_id: group.id,
+      await supabase.from('channel_members').insert({
+        channel_id: channel.id,
         user_id: currentUser.id,
         role: 'ADMIN'
       });
@@ -225,36 +226,36 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     }
   };
 
-  const selectChannel = async (group: Group) => {
-    setSelectedChannel(group);
+  const selectChannel = async (channel: Channel) => {
+    setSelectedChannel(channel);
     setView('DETAILS');
-    fetchChannelData(group.id);
+    fetchChannelData(channel.id);
   };
 
-  const fetchChannelData = async (groupId: string) => {
+  const fetchChannelData = async (channelId: string) => {
     try {
       // Fetch channel details to get only_admin_can_post, boosted_members, is_verified
-      const { data: groupDetails } = await supabase
-        .from('groups')
+      const { data: channelDetails } = await supabase
+        .from('channels')
         .select('*')
-        .eq('id', groupId)
+        .eq('id', channelId)
         .single();
       
-      if (groupDetails) {
+      if (channelDetails) {
         // Fetch member count
         const { count } = await supabase
-          .from('group_members')
+          .from('channel_members')
           .select('*', { count: 'exact', head: true })
-          .eq('group_id', groupId);
+          .eq('channel_id', channelId);
         
-        setSelectedChannel({ ...groupDetails, member_count: count || 0 });
+        setSelectedChannel({ ...channelDetails, member_count: count || 0 });
       }
 
       // Check membership
       const { data: memberData } = await supabase
-        .from('group_members')
+        .from('channel_members')
         .select('*')
-        .eq('group_id', groupId)
+        .eq('channel_id', channelId)
         .eq('user_id', currentUser.id)
         .maybeSingle();
       
@@ -264,21 +265,21 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
       // Fetch members if admin
       if (memberData?.role === 'ADMIN') {
         const { data: members } = await supabase
-          .from('group_members')
+          .from('channel_members')
           .select('*, user:profiles(*)')
-          .eq('group_id', groupId);
+          .eq('channel_id', channelId);
         setChannelMembers(members || []);
       }
 
       // Fetch posts
       const { data: posts, error } = await supabase
-        .from('group_posts')
+        .from('channel_posts')
         .select(`
           *,
           user:profiles(*),
-          reactions:group_post_reactions(*, user:profiles(*))
+          reactions:channel_post_reactions(*, user:profiles(*))
         `)
-        .eq('group_id', groupId)
+        .eq('channel_id', channelId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -286,9 +287,9 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
       // Fetch likes and comments counts for each post
       const postsWithEngagement = await Promise.all((posts || []).map(async (p) => {
-        const { count: lCount } = await supabase.from('group_post_likes').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
-        const { count: cCount } = await supabase.from('group_post_comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
-        const { data: myLike } = await supabase.from('group_post_likes').select('*').eq('post_id', p.id).eq('user_id', currentUser.id).maybeSingle();
+        const { count: lCount } = await supabase.from('channel_post_likes').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+        const { count: cCount } = await supabase.from('channel_post_comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
+        const { data: myLike } = await supabase.from('channel_post_likes').select('*').eq('post_id', p.id).eq('user_id', currentUser.id).maybeSingle();
         return { ...p, likes_count: lCount || 0, comments_count: cCount || 0, is_liked: !!myLike };
       }));
       setChannelPosts(postsWithEngagement);
@@ -300,8 +301,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   const joinChannel = async () => {
     if (!selectedChannel) return;
     try {
-      const { error } = await supabase.from('group_members').insert({
-        group_id: selectedChannel.id,
+      const { error } = await supabase.from('channel_members').insert({
+        channel_id: selectedChannel.id,
         user_id: currentUser.id
       });
       if (error) throw error;
@@ -318,9 +319,9 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     setIsLeaving(true);
     try {
       const { error } = await supabase
-        .from('group_members')
+        .from('channel_members')
         .delete()
-        .eq('group_id', selectedChannel.id)
+        .eq('channel_id', selectedChannel.id)
         .eq('user_id', currentUser.id);
       
       if (error) throw error;
@@ -339,10 +340,10 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
     try {
       if (post.is_liked) {
-        await supabase.from('group_post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+        await supabase.from('channel_post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
         setChannelPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: false, likes_count: (p.likes_count || 1) - 1 } : p));
       } else {
-        await supabase.from('group_post_likes').insert({ post_id: postId, user_id: currentUser.id });
+        await supabase.from('channel_post_likes').insert({ post_id: postId, user_id: currentUser.id });
         setChannelPosts(prev => prev.map(p => p.id === postId ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 } : p));
       }
     } catch (err) {
@@ -353,7 +354,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   const fetchComments = async (postId: string) => {
     try {
       const { data, error } = await supabase
-        .from('group_post_comments')
+        .from('channel_post_comments')
         .select('*, user:profiles(*)')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
@@ -370,7 +371,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     setIsCommenting(true);
     try {
       const { data, error } = await supabase
-        .from('group_post_comments')
+        .from('channel_post_comments')
         .insert({
           post_id: postId,
           user_id: currentUser.id,
@@ -393,7 +394,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   const handleDeletePost = async (postId: string) => {
     if (!confirm(t('Are you sure you want to delete this update?'))) return;
     try {
-      const { error } = await supabase.from('group_posts').delete().eq('id', postId);
+      const { error } = await supabase.from('channel_posts').delete().eq('id', postId);
       if (error) throw error;
       setChannelPosts(prev => prev.filter(p => p.id !== postId));
     } catch (err) {
@@ -404,7 +405,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   const toggleReaction = async (postId: string, reaction: string) => {
     try {
       const { data: existing } = await supabase
-        .from('group_post_reactions')
+        .from('channel_post_reactions')
         .select('*')
         .eq('post_id', postId)
         .eq('user_id', currentUser.id)
@@ -413,12 +414,12 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
       if (existing) {
         await supabase
-          .from('group_post_reactions')
+          .from('channel_post_reactions')
           .delete()
           .eq('id', existing.id);
       } else {
         await supabase
-          .from('group_post_reactions')
+          .from('channel_post_reactions')
           .insert({
             post_id: postId,
             user_id: currentUser.id,
@@ -437,9 +438,9 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     setIsTransferring(true);
     try {
       const { error } = await supabase
-        .from('group_members')
+        .from('channel_members')
         .update({ role: 'ADMIN' })
-        .eq('group_id', selectedChannel!.id)
+        .eq('channel_id', selectedChannel!.id)
         .eq('user_id', targetUserId);
       
       if (error) throw error;
@@ -456,7 +457,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     if (!selectedChannel) return;
     try {
       const { error } = await supabase
-        .from('groups')
+        .from('channels')
         .update({ boosted_members: (selectedChannel.boosted_members || 0) + 100 })
         .eq('id', selectedChannel.id);
       if (error) throw error;
@@ -471,7 +472,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     if (!selectedChannel) return;
     try {
       const { error } = await supabase
-        .from('groups')
+        .from('channels')
         .update({ is_verified: true })
         .eq('id', selectedChannel.id);
       if (error) throw error;
@@ -493,7 +494,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
       if (postFile) {
         const safeName = sanitizeFilename(postFile.name);
-        const path = `group_posts/${Date.now()}-${safeName}`;
+        const path = `channel_posts/${Date.now()}-${safeName}`;
         const { error: uploadErr } = await supabase.storage
           .from('posts')
           .upload(path, postFile);
@@ -505,8 +506,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         }
       }
 
-      const { error } = await supabase.from('group_posts').insert({
-        group_id: selectedChannel.id,
+      const { error } = await supabase.from('channel_posts').insert({
+        channel_id: selectedChannel.id,
         user_id: currentUser.id,
         content: postContent.trim(),
         media_url: mediaUrl,
@@ -525,165 +526,181 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
     }
   };
 
+  const filteredChannels = channels.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className={`flex flex-col h-full bg-[var(--vix-bg)] animate-vix-in ${view === 'DETAILS' ? 'fixed inset-0 z-[100] sm:ml-0 lg:ml-0' : ''}`}>
-      {/* Main Header - Hide in DETAILS view as it has its own header */}
-      {view !== 'DETAILS' && (
-        <div className="flex items-center justify-between p-4 border-b border-[var(--vix-border)] sticky top-0 bg-[var(--vix-bg)]/80 backdrop-blur-xl z-50">
-          <div className="flex items-center gap-4">
-            <button onClick={view === 'LIST' ? onBack : () => setView('LIST')} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+    <div className="flex h-full bg-[var(--vix-bg)] overflow-hidden">
+      {/* Sidebar - Channel List */}
+      <div className={`${selectedChannel && 'hidden sm:flex'} flex flex-col w-full sm:w-80 lg:w-96 border-r border-[var(--vix-border)] bg-[var(--vix-bg)] z-10`}>
+        <div className="p-4 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-bg)]/80 backdrop-blur-xl sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
               <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
             </button>
             <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
-              {view === 'LIST' ? t('Channels') : t('Create Channel')}
+              {t('Channels')}
             </h2>
           </div>
-          {view === 'LIST' && (
-            <button onClick={() => setView('CREATE')} className="vix-gradient p-2.5 rounded-full text-white shadow-lg hover:scale-105 transition-all">
-              <Plus className="w-5 h-5" />
-            </button>
+          <button 
+            onClick={() => setView('CREATE')} 
+            className="vix-gradient p-2 rounded-full text-white shadow-lg hover:scale-105 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-pink-500 transition-colors" />
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={t('Search channels...')}
+              className="w-full bg-[var(--vix-secondary)] border border-[var(--vix-border)] rounded-2xl py-3 pl-12 pr-4 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-medium"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin vix-loader" />
+            </div>
+          ) : filteredChannels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+              <Globe className="w-10 h-10 text-[var(--vix-muted)] mb-4 opacity-20" />
+              <p className="text-[var(--vix-muted)] text-sm font-medium">{t('No channels found')}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {filteredChannels.map(channel => (
+                <div 
+                  key={channel.id}
+                  onClick={() => selectChannel(channel)}
+                  className={`flex items-center gap-3 p-4 cursor-pointer transition-all border-l-4 ${selectedChannel?.id === channel.id ? 'bg-[var(--vix-secondary)] border-pink-500' : 'border-transparent hover:bg-[var(--vix-secondary)]/50'}`}
+                >
+                  <div className="relative flex-shrink-0">
+                    <img src={channel.cover_url} className="w-12 h-12 rounded-2xl object-cover border border-[var(--vix-border)]" alt={channel.name} />
+                    {channel.is_verified && (
+                      <div className="absolute -bottom-1 -right-1 bg-[var(--vix-bg)] rounded-full p-0.5 shadow-sm">
+                        <CheckCircle2 className="w-3 h-3 fill-[#ec4899] text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <h3 className="text-sm font-bold text-[var(--vix-text)] truncate">
+                        {channel.name}
+                      </h3>
+                      <span className="text-[10px] text-[var(--vix-muted)] font-medium">
+                        {channel.created_at ? new Date(channel.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--vix-muted)] truncate font-medium">
+                      {formatNumber((channel.member_count || 0) + (channel.boosted_members || 0))} {t('followers')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {view === 'LIST' && (
-          <div className="flex flex-col">
-            <div className="p-6">
-              <div className="relative group">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-700 group-focus-within:text-pink-500 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder={t('Find channels...')}
-                  className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2rem] py-4 pl-16 pr-8 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] placeholder:text-zinc-500 font-bold shadow-xl"
-                />
-              </div>
+      {/* Main Content - Channel Details / Chat */}
+      <div className={`${!selectedChannel && view !== 'CREATE' && 'hidden sm:flex'} flex-1 flex flex-col bg-[var(--vix-bg)] relative overflow-hidden`}>
+        {view === 'CREATE' ? (
+          <div className="flex flex-col h-full">
+            <div className="p-4 border-b border-[var(--vix-border)] flex items-center gap-4 bg-[var(--vix-bg)]/80 backdrop-blur-xl z-20">
+              <button onClick={() => setView('LIST')} className="p-2 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+                <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
+              </button>
+              <h2 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight">
+                {t('Create Channel')}
+              </h2>
             </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin vix-loader" />
-              </div>
-            ) : channels.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-32 text-center px-6">
-                <div className="w-24 h-24 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-8 shadow-inner">
-                  <Globe className="w-12 h-12 text-[var(--vix-muted)]" />
-                </div>
-                <h3 className="text-2xl font-black text-[var(--vix-text)] mb-3 uppercase tracking-tight">{t('No channels found')}</h3>
-                <p className="text-[var(--vix-muted)] max-w-xs font-medium leading-relaxed">{t('Be the first to create a community and share your updates with the world.')}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-8">
-                {channels.map(channel => (
+            
+            <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
+              <form onSubmit={handleCreateChannel} className="space-y-8 max-w-lg mx-auto">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Cover Image')}</label>
                   <div 
-                    key={channel.id}
-                    onClick={() => selectChannel(channel)}
-                    className="group bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 cursor-pointer hover:border-pink-500/50 transition-all hover:shadow-2xl hover:-translate-y-2"
+                    onClick={() => document.getElementById('cover-input')?.click()}
+                    className="h-48 rounded-[2.5rem] border-2 border-dashed border-[var(--vix-border)] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-pink-500/30 transition-all overflow-hidden relative"
                   >
-                    <div className="flex flex-col items-center text-center gap-4">
-                      <div className="relative">
-                        <img src={channel.cover_url} className="w-24 h-24 rounded-[2rem] object-cover border-2 border-[var(--vix-border)] shadow-xl group-hover:scale-105 transition-transform" alt={channel.name} />
-                        {channel.is_verified && (
-                          <div className="absolute -bottom-2 -right-2 bg-[var(--vix-bg)] rounded-full p-1 shadow-xl">
-                            <CheckCircle2 className="w-5 h-5 fill-[#ec4899] text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 w-full">
-                        <h3 className="text-lg font-black text-[var(--vix-text)] truncate uppercase tracking-tight mb-1">
-                          {channel.name}
-                        </h3>
-                        <p className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
-                          {formatNumber((channel.member_count || 0) + (channel.boosted_members || 0))} {t('followers')}
-                        </p>
-                        <div className="mt-6 flex items-center justify-center gap-2">
-                          <button className="bg-gradient-to-r from-pink-500 to-blue-500 text-white px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all">
-                            {t('View Channel')}
-                          </button>
-                        </div>
-                      </div>
+                    {newCoverPreview ? (
+                      <img src={newCoverPreview} className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <Camera className="w-8 h-8 text-zinc-800" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700">{t('Upload Cover')}</span>
+                      </>
+                    )}
+                    <input 
+                      id="cover-input"
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setNewCoverFile(f);
+                          setNewCoverPreview(URL.createObjectURL(f));
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Channel Name')}</label>
+                    <input 
+                      type="text" 
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder={t('e.g. VixReel Creators')}
+                      className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
+                    <textarea 
+                      value={newDescription}
+                      onChange={e => setNewDescription(e.target.value)}
+                      placeholder={t('What is this channel about?')}
+                      className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all min-h-[120px] resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Privacy')}</label>
+                    <div className="flex gap-4">
+                      <button 
+                        type="button"
+                        onClick={() => setNewPrivacy('PUBLIC')}
+                        className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PUBLIC' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{t('Public')}</span>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setNewPrivacy('PRIVATE')}
+                        className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PRIVATE' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{t('Private')}</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {view === 'CREATE' && (
-          <form onSubmit={handleCreateChannel} className="p-6 space-y-8 max-w-lg mx-auto">
-            <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Cover Image')}</label>
-              <div 
-                onClick={() => document.getElementById('cover-input')?.click()}
-                className="h-48 rounded-[2.5rem] border-2 border-dashed border-[var(--vix-border)] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-pink-500/30 transition-all overflow-hidden relative"
-              >
-                {newCoverPreview ? (
-                  <img src={newCoverPreview} className="w-full h-full object-cover" />
-                ) : (
-                  <>
-                    <Camera className="w-8 h-8 text-zinc-800" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700">{t('Upload Cover')}</span>
-                  </>
-                )}
-                <input 
-                  id="cover-input"
-                  type="file" 
-                  className="hidden" 
-                  accept="image/*"
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      setNewCoverFile(f);
-                      setNewCoverPreview(URL.createObjectURL(f));
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Group Name')}</label>
-                <input 
-                  type="text" 
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  placeholder={t('e.g. VixReel Creators')}
-                  className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
-                <textarea 
-                  value={newDescription}
-                  onChange={e => setNewDescription(e.target.value)}
-                  placeholder={t('What is this channel about?')}
-                  className="w-full bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl py-4 px-6 text-sm text-[var(--vix-text)] outline-none focus:border-pink-500/50 transition-all min-h-[120px] resize-none"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Privacy')}</label>
-                <div className="flex gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setNewPrivacy('PUBLIC')}
-                    className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PUBLIC' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
-                  >
-                    <Globe className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{t('Public')}</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setNewPrivacy('PRIVATE')}
-                    className={`flex-1 py-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${newPrivacy === 'PRIVATE' ? 'bg-pink-500 text-white border-pink-500 shadow-lg' : 'bg-[var(--vix-card)] border-[var(--vix-border)] text-zinc-600'}`}
-                  >
-                    <Lock className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{t('Private')}</span>
-                  </button>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Posting Permissions')}</label>
                     <button 
@@ -698,25 +715,23 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                     </button>
                   </div>
                 </div>
-              </div>
+
+                <button 
+                  type="submit" 
+                  disabled={isCreating}
+                  className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 flex items-center justify-center gap-3"
+                >
+                  {isCreating ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : t('Establish Channel')}
+                </button>
+              </form>
             </div>
-
-            <button 
-              type="submit" 
-              disabled={isCreating}
-              className="w-full vix-gradient py-5 rounded-[2rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 flex items-center justify-center gap-3"
-            >
-              {isCreating ? <Loader2 className="w-5 h-5 animate-spin vix-loader" /> : t('Establish Channel')}
-            </button>
-          </form>
-        )}
-
-        {view === 'DETAILS' && selectedChannel && (
-          <div className="flex flex-col h-full animate-vix-in bg-[var(--vix-bg)]">
-            {/* WhatsApp Style Header */}
+          </div>
+        ) : selectedChannel ? (
+          <div className="flex flex-col h-full bg-[var(--vix-bg)] relative">
+            {/* Channel Header */}
             <div className="flex items-center justify-between p-3 bg-[var(--vix-card)] border-b border-[var(--vix-border)] sticky top-0 z-50">
               <div className="flex items-center gap-3">
-                <button onClick={() => setView('LIST')} className="p-1 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
+                <button onClick={() => setSelectedChannel(null)} className="sm:hidden p-1 hover:bg-[var(--vix-secondary)] rounded-full transition-all">
                   <ArrowLeft className="w-6 h-6 text-[var(--vix-text)]" />
                 </button>
                 <div onClick={() => setShowChannelInfo(true)} className="flex items-center gap-3 cursor-pointer group/header">
@@ -745,214 +760,65 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                     {t('Follow')}
                   </button>
                 ) : (
-                  <button 
-                    onClick={leaveChannel}
-                    className="bg-[var(--vix-secondary)] text-[var(--vix-text)] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-[var(--vix-border)] hover:bg-[var(--vix-border)] transition-all"
-                  >
-                    {t('Following')}
-                  </button>
-                )}
-                <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
-                  <Bell className="w-5 h-5" />
-                </button>
-                <div className="relative group">
-                  <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
-                    {selectedChannel.creator_id === currentUser.id && (
-                      <button 
-                        onClick={async () => {
-                          const newVal = !selectedChannel.only_admin_can_post;
-                          const { error } = await supabase.from('groups').update({ only_admin_can_post: newVal }).eq('id', selectedChannel.id);
-                          if (!error) setSelectedChannel({ ...selectedChannel, only_admin_can_post: newVal });
-                        }}
-                        className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
-                      >
-                        <Shield className="w-4 h-4" />
-                        {selectedChannel.only_admin_can_post ? t('Allow everyone to post') : t('Only admins can post')}
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => copyChannelLink(selectedChannel.id)}
-                      className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
-                    >
-                      <LinkIcon className="w-4 h-4" />
-                      {t('Copy Link')}
+                  <div className="flex items-center gap-2">
+                    <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
+                      <Bell className="w-5 h-5" />
                     </button>
-                    {isMember && (
-                      <button 
-                        onClick={leaveChannel}
-                        className="w-full px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-500/5 transition-all flex items-center gap-2"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        {t('Unfollow')}
+                    <div className="relative group">
+                      <button className="p-2 text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all">
+                        <MoreHorizontal className="w-5 h-5" />
                       </button>
-                    )}
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] overflow-hidden">
+                        {selectedChannel.creator_id === currentUser.id && (
+                          <button 
+                            onClick={async () => {
+                              const newVal = !selectedChannel.only_admin_can_post;
+                              const { error } = await supabase.from('channels').update({ only_admin_can_post: newVal }).eq('id', selectedChannel.id);
+                              if (!error) setSelectedChannel({ ...selectedChannel, only_admin_can_post: newVal });
+                            }}
+                            className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
+                          >
+                            <Shield className="w-4 h-4" />
+                            {selectedChannel.only_admin_can_post ? t('Allow everyone to post') : t('Only admins can post')}
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => copyChannelLink(selectedChannel.id)}
+                          className="w-full px-4 py-3 text-left text-xs font-bold hover:bg-[var(--vix-secondary)] transition-all flex items-center gap-2"
+                        >
+                          <LinkIcon className="w-4 h-4" />
+                          {t('Copy Link')}
+                        </button>
+                        <button 
+                          onClick={leaveChannel}
+                          className="w-full px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-500/5 transition-all flex items-center gap-2"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          {t('Unfollow')}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Channel Info Modal */}
-            {showChannelInfo && (
-              <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
-                <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl animate-vix-in max-h-[90vh] overflow-y-auto no-scrollbar">
-                   <div className="flex justify-between items-center">
-                      <h3 className="text-xl font-black uppercase text-[var(--vix-text)] tracking-widest">{t('Channel Info')}</h3>
-                      <button onClick={() => setShowChannelInfo(false)} className="p-2 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
-                   </div>
-                   
-                   <div className="flex flex-col items-center text-center gap-6">
-                      <img src={selectedChannel.cover_url} className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-[var(--vix-border)] shadow-2xl" alt={selectedChannel.name} />
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-center gap-2">
-                          <h4 className="text-2xl font-black text-[var(--vix-text)] uppercase tracking-tight">{selectedChannel.name}</h4>
-                          {selectedChannel.is_verified && <CheckCircle2 className="w-6 h-6 fill-[#ec4899] text-white" />}
-                        </div>
-                        <p className="text-sm text-[var(--vix-muted)] font-bold uppercase tracking-widest">
-                          {formatNumber((selectedChannel.member_count || 0) + (selectedChannel.boosted_members || 0))} {t('followers')}
-                        </p>
-                      </div>
-                   </div>
-
-                   <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Description')}</label>
-                        <div className="bg-[var(--vix-secondary)] rounded-2xl p-6 border border-[var(--vix-border)]">
-                          <p className="text-sm text-[var(--vix-text)] leading-relaxed font-medium">
-                            {selectedChannel.description || t('No description provided.')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Channel Settings')}</label>
-                        <div className="bg-[var(--vix-secondary)] rounded-2xl p-6 border border-[var(--vix-border)] space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Globe className="w-4 h-4 text-zinc-500" />
-                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Public Channel')}</span>
-                            </div>
-                            <span className="text-[10px] font-black text-green-500 uppercase">{t('Active')}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Shield className="w-4 h-4 text-zinc-500" />
-                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Admin Only Posting')}</span>
-                            </div>
-                            <span className={`text-[10px] font-black uppercase ${selectedChannel.only_admin_can_post ? 'text-pink-500' : 'text-zinc-500'}`}>
-                              {selectedChannel.only_admin_can_post ? t('Enabled') : t('Disabled')}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <LinkIcon className="w-4 h-4 text-zinc-500" />
-                              <span className="text-xs font-bold text-[var(--vix-text)] uppercase">{t('Channel Link')}</span>
-                            </div>
-                            <button 
-                              onClick={() => copyChannelLink(selectedChannel.id)}
-                              className="text-[10px] font-black text-blue-500 uppercase hover:underline"
-                            >
-                              {t('Copy')}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {isChannelAdmin && (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Admin Actions')}</label>
-                            <div className="grid grid-cols-2 gap-3">
-                              <button 
-                                onClick={boostChannel}
-                                className="flex items-center justify-center gap-2 p-4 bg-pink-500/10 text-pink-500 rounded-2xl border border-pink-500/20 hover:bg-pink-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
-                              >
-                                <Plus className="w-4 h-4" />
-                                {t('Boost')}
-                              </button>
-                              {!selectedChannel.is_verified && (
-                                <button 
-                                  onClick={verifyChannel}
-                                  className="flex items-center justify-center gap-2 p-4 bg-blue-500/10 text-blue-500 rounded-2xl border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
-                                >
-                                  <ShieldCheck className="w-4 h-4" />
-                                  {t('Verify')}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">{t('Members')}</label>
-                            <div className="bg-[var(--vix-secondary)] rounded-2xl p-4 border border-[var(--vix-border)] space-y-3 max-h-60 overflow-y-auto no-scrollbar">
-                            {channelMembers.map(member => (
-                              <div key={member.id} className="flex items-center justify-between group/member">
-                                <div className="flex items-center gap-3">
-                                  <img src={member.user?.avatar_url || `https://ui-avatars.com/api/?name=${member.user?.username}`} className="w-8 h-8 rounded-full object-cover" />
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-[var(--vix-text)]">@{member.user?.username}</span>
-                                    <span className="text-[8px] font-black text-zinc-500 uppercase">{member.role}</span>
-                                  </div>
-                                </div>
-                                {selectedChannel.creator_id === currentUser.id && member.user_id !== currentUser.id && member.role !== 'ADMIN' && (
-                                  <button 
-                                    onClick={() => transferAdmin(member.user_id)}
-                                    disabled={isTransferring}
-                                    className="p-2 text-zinc-500 hover:text-pink-500 transition-all opacity-0 group-hover/member:opacity-100"
-                                    title={t('Promote to Admin')}
-                                  >
-                                    <ShieldCheck className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                   <div className="flex flex-col gap-3">
-                      {isMember ? (
-                        <button 
-                          onClick={() => { leaveChannel(); setShowChannelInfo(false); }}
-                          className="w-full py-5 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
-                        >
-                          {t('Unfollow Channel')}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => { joinChannel(); setShowChannelInfo(false); }}
-                          className="w-full py-5 vix-gradient text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-pink-500/20"
-                        >
-                          {t('Follow Channel')}
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setShowChannelInfo(false)}
-                        className="w-full py-5 bg-[var(--vix-secondary)] text-[var(--vix-text)] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all"
-                      >
-                        {t('Close')}
-                      </button>
-                   </div>
+            {/* Feed Area */}
+            <div id="channel-feed" className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar relative">
+              {/* Background Pattern */}
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(var(--vix-text) 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+              
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-8 h-8 animate-spin vix-loader" />
                 </div>
-              </div>
-            </div>
-          )}
-
-            {/* Channel Feed */}
-            <div id="channel-feed" className="flex-1 p-4 space-y-6 overflow-y-auto no-scrollbar bg-[var(--vix-bg)] relative scroll-smooth">
-              {/* Background Pattern Overlay (Optional) */}
-              <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:invert"></div>
-
-              {channelPosts.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                  <MessageSquare className="w-12 h-12 text-[var(--vix-text)]" />
-                  <p className="text-[var(--vix-muted)] font-bold uppercase tracking-widest text-[10px]">{t('No updates yet')}</p>
+              ) : channelPosts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-32 text-center">
+                  <MessageSquare className="w-12 h-12 text-[var(--vix-muted)] mb-4 opacity-20" />
+                  <p className="text-[var(--vix-muted)] font-medium">{t('No updates yet')}</p>
                 </div>
               ) : (
-                <div className="space-y-8 relative z-10">
+                <div className="space-y-6 relative z-10">
                   {channelPosts.map((post, index) => {
                     const postDate = new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                     const prevPostDate = index > 0 ? new Date(channelPosts[index - 1].created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null;
@@ -962,113 +828,41 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                       <React.Fragment key={post.id}>
                         {showDateSeparator && (
                           <div className="flex justify-center my-6">
-                            <div className="bg-[var(--vix-secondary)] text-[var(--vix-muted)] text-[11px] px-3 py-1 rounded-lg shadow-sm font-medium border border-[var(--vix-border)]">
+                            <div className="bg-[var(--vix-secondary)] text-[var(--vix-muted)] text-[10px] px-3 py-1 rounded-full shadow-sm font-bold border border-[var(--vix-border)] uppercase tracking-wider">
                               {postDate}
                             </div>
                           </div>
                         )}
                         
-                        <div className="max-w-[92%] sm:max-w-[85%] mx-auto space-y-3">
-                          <div className="bg-[var(--vix-card)] rounded-[2rem] shadow-lg relative group overflow-hidden border border-[var(--vix-border)]">
+                        <div className="max-w-[90%] mx-auto">
+                          <div className="bg-[var(--vix-card)] rounded-3xl shadow-lg relative group overflow-hidden border border-[var(--vix-border)]">
                             {post.media_url && (
                               <div className="relative">
                                 {post.media_type === 'video' ? (
-                                  <video src={post.media_url} controls className="w-full max-h-[600px] object-cover" />
+                                  <video src={post.media_url} controls className="w-full max-h-[500px] object-cover" />
                                 ) : (
-                                  <div className="relative group/media">
-                                    <img src={post.media_url} className="w-full max-h-[600px] object-cover" alt="Post media" />
-                                    
-                                    {/* Download Overlay */}
-                                    <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-                                      <button 
-                                        onClick={() => handleDownload(post.id, post.media_url!, `vix-${post.id}.jpg`)}
-                                        disabled={downloadingPostId === post.id}
-                                        className="bg-black/40 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 text-white border border-white/10 hover:bg-black/60 transition-all group/btn shadow-2xl"
-                                      >
-                                        {downloadingPostId === post.id ? (
-                                          <div className="relative w-6 h-6">
-                                            <div className="absolute inset-0 border-2 border-pink-500 border-t-blue-500 rounded-full animate-spin"></div>
-                                          </div>
-                                        ) : (
-                                          <Download className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                                        )}
-                                        <div className="flex flex-col items-start">
-                                          <span className="text-[10px] font-black uppercase tracking-widest">{t('Download')}</span>
-                                          <span className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">
-                                            {/* Mocking file size as we don't store it, but using a realistic random-ish size for the UI feel */}
-                                            {formatFileSize(Math.floor(Math.random() * 2000000) + 500000)}
-                                          </span>
-                                        </div>
-                                      </button>
-                                    </div>
-                                  </div>
+                                  <img src={post.media_url} className="w-full max-h-[500px] object-cover" alt="Post media" />
                                 )}
                               </div>
                             )}
                             
-                            <div className="p-6 space-y-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-black text-[var(--vix-text)] uppercase tracking-widest">
-                                    {selectedChannel.name}
-                                  </span>
-                                  {selectedChannel.is_verified && (
-                                    <CheckCircle2 className="w-3.5 h-3.5 fill-[#ec4899] text-white" />
-                                  )}
-                                </div>
-                                {(selectedChannel.creator_id === currentUser.id || isChannelAdmin) && (
-                                  <button 
-                                    onClick={() => handleDeletePost(post.id)}
-                                    className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all opacity-0 group-hover:opacity-100"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-
+                            <div className="p-5 space-y-3">
                               {post.content && (
-                                <div className="space-y-2">
-                                  {/* Detect if content has a title-like first line */}
-                                  {post.content.includes('\n') ? (
-                                    <>
-                                      <h4 className="text-lg font-black text-[var(--vix-text)] leading-tight uppercase tracking-tight">
-                                        {post.content.split('\n')[0]}
-                                      </h4>
-                                      <p className="text-[15px] text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap font-medium opacity-80">
-                                        {post.content.split('\n').slice(1).join('\n')}
-                                      </p>
-                                    </>
-                                  ) : (
-                                    <p className="text-[16px] text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap font-medium">
-                                      {post.content}
-                                    </p>
-                                  )}
-                                  
-                                  {post.content.toLowerCase().includes('http') && (
-                                    <div className="pt-4">
-                                      <p className="text-[14px] text-blue-500 font-bold hover:underline cursor-pointer flex items-center gap-2">
-                                        <LinkIcon className="w-4 h-4" />
-                                        {t('Learn more')}: {post.content.match(/https?:\/\/[^\s]+/)?.[0]}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
+                                <p className="text-[15px] text-[var(--vix-text)] leading-relaxed whitespace-pre-wrap font-medium">
+                                  {post.content}
+                                </p>
                               )}
                               
-                              <div className="flex items-center justify-between pt-2 border-t border-[var(--vix-border)]/10">
-                                <div className="flex items-center gap-2">
+                              <div className="flex items-center justify-between pt-2">
+                                <div className="flex items-center gap-3">
                                   {post.reactions && post.reactions.length > 0 && (
-                                    <div className="flex -space-x-1">
+                                    <div className="flex items-center gap-1 bg-[var(--vix-secondary)] px-2 py-1 rounded-full border border-[var(--vix-border)]">
                                       {Array.from(new Set(post.reactions.map(r => r.reaction))).slice(0, 3).map(emoji => (
-                                        <div key={emoji} className="w-5 h-5 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center text-[10px] border border-[var(--vix-border)] shadow-sm">
-                                          {emoji}
-                                        </div>
+                                        <span key={emoji} className="text-xs">{emoji}</span>
                                       ))}
-                                      {post.reactions.length > 0 && (
-                                        <span className="text-[9px] text-[var(--vix-muted)] font-black ml-2 self-center">
-                                          {post.reactions.length}
-                                        </span>
-                                      )}
+                                      <span className="text-[10px] text-[var(--vix-muted)] font-bold ml-1">
+                                        {post.reactions.length}
+                                      </span>
                                     </div>
                                   )}
                                   <div className="relative">
@@ -1096,20 +890,20 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                                     )}
                                   </div>
                                 </div>
-                                <span className="text-[10px] text-[var(--vix-muted)] font-black uppercase tracking-widest">
-                                  {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {(selectedChannel.creator_id === currentUser.id || isChannelAdmin) && (
+                                    <button 
+                                      onClick={() => handleDeletePost(post.id)}
+                                      className="p-1.5 text-red-500/50 hover:text-red-500 transition-all"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <span className="text-[10px] text-[var(--vix-muted)] font-bold opacity-60">
+                                    {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-
-                            {/* Share Bar */}
-                            <div className="flex items-center justify-end px-6 pb-6">
-                              <button 
-                                onClick={() => copyChannelLink(selectedChannel.id)}
-                                className="p-3 bg-[var(--vix-secondary)] rounded-full text-[var(--vix-muted)] hover:text-[var(--vix-text)] transition-all border border-[var(--vix-border)] shadow-md"
-                              >
-                                <Share2 className="w-5 h-5" />
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -1120,31 +914,23 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
               )}
             </div>
 
-            {/* Floating Scroll to Bottom Button */}
-            <button 
-              onClick={() => document.getElementById('channel-feed')?.scrollTo({ top: document.getElementById('channel-feed')?.scrollHeight, behavior: 'smooth' })}
-              className="absolute bottom-24 right-6 p-2 bg-[var(--vix-card)] text-[var(--vix-muted)] rounded-full shadow-lg border border-[var(--vix-border)] hover:text-[var(--vix-text)] transition-all z-20"
-            >
-              <ChevronLeft className="w-5 h-5 -rotate-90" />
-            </button>
-
             {/* Broadcast Input (Admin Only) */}
-            {isMember && (!selectedChannel.only_admin_can_post || selectedChannel.creator_id === currentUser.id) ? (
-              <div className="p-6 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
-                <div className="flex items-end gap-4 max-w-4xl mx-auto">
-                  <div className="flex-1 bg-[var(--vix-secondary)] rounded-[2rem] flex flex-col p-2 border border-[var(--vix-border)] shadow-inner">
+            {isMember && (!selectedChannel.only_admin_can_post || isChannelAdmin) ? (
+              <div className="p-4 bg-[var(--vix-card)] border-t border-[var(--vix-border)]">
+                <div className="flex items-end gap-3 max-w-4xl mx-auto">
+                  <div className="flex-1 bg-[var(--vix-secondary)] rounded-3xl flex flex-col p-2 border border-[var(--vix-border)]">
                     {postPreview && (
-                      <div className="relative w-32 h-32 m-3 rounded-2xl overflow-hidden border border-[var(--vix-border)] shadow-lg">
-                        <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full z-10 hover:bg-black transition-colors"><X className="w-4 h-4" /></button>
+                      <div className="relative w-24 h-24 m-2 rounded-xl overflow-hidden border border-[var(--vix-border)]">
+                        <button onClick={() => { setPostFile(null); setPostPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full z-10"><X className="w-3 h-3" /></button>
                         {postFile?.type.startsWith('video') ? <video src={postPreview} className="w-full h-full object-cover" /> : <img src={postPreview} className="w-full h-full object-cover" />}
                       </div>
                     )}
                     <div className="flex items-center">
                       <button 
                         onClick={() => document.getElementById('channel-post-media')?.click()}
-                        className="p-4 text-[var(--vix-muted)] hover:text-pink-500 transition-all"
+                        className="p-3 text-[var(--vix-muted)] hover:text-pink-500 transition-all"
                       >
-                        <Plus className="w-7 h-7" />
+                        <Plus className="w-6 h-6" />
                       </button>
                       <input 
                         id="channel-post-media"
@@ -1163,7 +949,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                         value={postContent}
                         onChange={e => setPostContent(e.target.value)}
                         placeholder={t('Broadcast an update...')}
-                        className="flex-1 bg-transparent border-none py-4 px-2 text-[16px] text-[var(--vix-text)] outline-none placeholder:text-[var(--vix-muted)] resize-none max-h-48 font-medium"
+                        className="flex-1 bg-transparent border-none py-3 px-2 text-sm text-[var(--vix-text)] outline-none placeholder:text-[var(--vix-muted)] resize-none max-h-32 font-medium"
                         rows={1}
                       />
                     </div>
@@ -1172,31 +958,104 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                   <button 
                     onClick={handleCreatePost}
                     disabled={!postContent.trim() || isPosting}
-                    className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full text-white shadow-2xl disabled:opacity-30 transition-all flex-shrink-0 hover:scale-110 active:scale-95"
+                    className="bg-pink-500 p-4 rounded-full text-white shadow-lg disabled:opacity-30 transition-all flex-shrink-0"
                   >
-                    {isPosting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-7 h-7" />}
+                    {isPosting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
                   </button>
                 </div>
               </div>
             ) : isMember && selectedChannel.only_admin_can_post ? (
-              <div className="p-8 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
-                <p className="text-[11px] text-[var(--vix-muted)] font-black uppercase tracking-widest opacity-60">
+              <div className="p-4 bg-[var(--vix-card)] text-center border-t border-[var(--vix-border)]">
+                <p className="text-xs text-[var(--vix-muted)] font-medium opacity-60">
                   {t('Only administrators can send messages to this channel')}
                 </p>
               </div>
             ) : !isMember && (
-              <div className="p-8 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
+              <div className="p-6 bg-[var(--vix-card)] border-t border-[var(--vix-border)] text-center">
                 <button 
                   onClick={joinChannel}
-                  className="bg-gradient-to-r from-pink-500 to-blue-500 px-16 py-4 rounded-full text-white text-xs font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
+                  className="bg-pink-500 px-12 py-3 rounded-full text-white text-xs font-black uppercase tracking-widest shadow-xl hover:bg-pink-600 transition-all"
                 >
-                  {t('Follow to see updates')}
+                  {t('Join Channel')}
                 </button>
               </div>
             )}
           </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+            <div className="w-24 h-24 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-6 opacity-20">
+              <Globe className="w-12 h-12 text-[var(--vix-text)]" />
+            </div>
+            <h3 className="text-xl font-black text-[var(--vix-text)] uppercase tracking-tight mb-2">{t('Select a channel')}</h3>
+            <p className="text-[var(--vix-muted)] text-sm font-medium max-w-xs">{t('Choose a channel from the list to see the latest updates.')}</p>
+          </div>
         )}
       </div>
+
+      {/* Channel Info Modal */}
+      {showChannelInfo && selectedChannel && (
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[3rem] p-10 space-y-8 shadow-2xl animate-vix-in max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex flex-col items-center text-center gap-6">
+              <div className="relative">
+                <img src={selectedChannel.cover_url} className="w-32 h-32 rounded-[3rem] object-cover border-4 border-[var(--vix-border)] shadow-2xl" alt={selectedChannel.name} />
+                {selectedChannel.is_verified && (
+                  <div className="absolute -bottom-2 -right-2 bg-[var(--vix-bg)] rounded-full p-1.5 shadow-xl">
+                    <CheckCircle2 className="w-6 h-6 fill-[#ec4899] text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black text-[var(--vix-text)] uppercase tracking-tight">{selectedChannel.name}</h2>
+                <p className="text-sm text-[var(--vix-muted)] font-bold uppercase tracking-widest">
+                  {formatNumber((selectedChannel.member_count || 0) + (selectedChannel.boosted_members || 0))} {t('followers')}
+                </p>
+              </div>
+              <p className="text-[var(--vix-text)] leading-relaxed font-medium opacity-80">{selectedChannel.description}</p>
+              
+              <div className="w-full pt-6 border-t border-[var(--vix-border)] space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--vix-muted)] font-bold uppercase tracking-widest text-[10px]">{t('Created by')}</span>
+                  <span className="text-[var(--vix-text)] font-black">@{selectedChannel.creator?.username}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--vix-muted)] font-bold uppercase tracking-widest text-[10px]">{t('Privacy')}</span>
+                  <span className="text-[var(--vix-text)] font-black uppercase tracking-widest text-[10px]">{selectedChannel.privacy}</span>
+                </div>
+              </div>
+
+              {isChannelAdmin && (
+                <div className="w-full space-y-4 pt-6">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-pink-500 text-left">{t('Admin Controls')}</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={boostChannel}
+                      className="flex flex-col items-center gap-2 p-4 bg-[var(--vix-secondary)] rounded-3xl border border-[var(--vix-border)] hover:border-pink-500/30 transition-all"
+                    >
+                      <UserPlus className="w-5 h-5 text-pink-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">{t('Boost')}</span>
+                    </button>
+                    <button 
+                      onClick={verifyChannel}
+                      className="flex flex-col items-center gap-2 p-4 bg-[var(--vix-secondary)] rounded-3xl border border-[var(--vix-border)] hover:border-blue-500/30 transition-all"
+                    >
+                      <ShieldCheck className="w-5 h-5 text-blue-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">{t('Verify')}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                onClick={() => setShowChannelInfo(false)}
+                className="w-full bg-[var(--vix-secondary)] py-4 rounded-2xl text-[var(--vix-text)] font-black uppercase tracking-widest text-[10px] border border-[var(--vix-border)]"
+              >
+                {t('Close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

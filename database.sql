@@ -182,8 +182,8 @@ CREATE TABLE IF NOT EXISTS public.stories (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- 14. COMMUNITIES (GROUPS) TABLE
-CREATE TABLE IF NOT EXISTS public.groups (
+-- 14. COMMUNITIES (CHANNELS) TABLE
+CREATE TABLE IF NOT EXISTS public.channels (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
@@ -197,25 +197,25 @@ CREATE TABLE IF NOT EXISTS public.groups (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migration for existing groups
-ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS only_admin_can_post BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS boosted_members INTEGER DEFAULT 0;
+-- Migration for existing channels
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS only_admin_can_post BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS boosted_members INTEGER DEFAULT 0;
 
--- 15. GROUP MEMBERS TABLE
-CREATE TABLE IF NOT EXISTS public.group_members (
+-- 15. CHANNEL MEMBERS TABLE
+CREATE TABLE IF NOT EXISTS public.channel_members (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE NOT NULL,
+    channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     role TEXT DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(group_id, user_id)
+    UNIQUE(channel_id, user_id)
 );
 
--- 16. GROUP POSTS TABLE
-CREATE TABLE IF NOT EXISTS public.group_posts (
+-- 16. CHANNEL POSTS TABLE
+CREATE TABLE IF NOT EXISTS public.channel_posts (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE NOT NULL,
+    channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     media_url TEXT,
@@ -223,28 +223,28 @@ CREATE TABLE IF NOT EXISTS public.group_posts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 16a. GROUP POST LIKES TABLE
-CREATE TABLE IF NOT EXISTS public.group_post_likes (
+-- 16a. CHANNEL POST LIKES TABLE
+CREATE TABLE IF NOT EXISTS public.channel_post_likes (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(post_id, user_id)
 );
 
--- 16b. GROUP POST COMMENTS TABLE
-CREATE TABLE IF NOT EXISTS public.group_post_comments (
+-- 16b. CHANNEL POST COMMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.channel_post_comments (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 16c. GROUP POST REACTIONS TABLE
-CREATE TABLE IF NOT EXISTS public.group_post_reactions (
+-- 16c. CHANNEL POST REACTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.channel_post_reactions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    post_id UUID REFERENCES public.group_posts(id) ON DELETE CASCADE NOT NULL,
+    post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     reaction TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -335,12 +335,12 @@ ALTER TABLE public.saves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_post_likes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_post_comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_post_reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_post_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_post_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_post_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stickers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
@@ -431,39 +431,39 @@ CREATE POLICY "Users can delete own message reactions" ON public.message_reactio
 CREATE POLICY "Stories are viewable by everyone" ON public.stories FOR SELECT USING (true);
 CREATE POLICY "Users can insert own stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Groups
-CREATE POLICY "Groups are viewable by everyone" ON public.groups FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can create groups" ON public.groups FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Creators can update their groups" ON public.groups FOR UPDATE USING (auth.uid() = creator_id);
+-- Channels
+CREATE POLICY "Channels are viewable by everyone" ON public.channels FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can create channels" ON public.channels FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Creators can update their channels" ON public.channels FOR UPDATE USING (auth.uid() = creator_id);
 
--- Group Members
-CREATE POLICY "Group members are viewable by everyone" ON public.group_members FOR SELECT USING (true);
-CREATE POLICY "Users can join groups" ON public.group_members FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Users can leave groups" ON public.group_members FOR DELETE USING (auth.uid() = user_id);
+-- Channel Members
+CREATE POLICY "Channel members are viewable by everyone" ON public.channel_members FOR SELECT USING (true);
+CREATE POLICY "Users can join channels" ON public.channel_members FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Users can leave channels" ON public.channel_members FOR DELETE USING (auth.uid() = user_id);
 
--- Group Posts
-CREATE POLICY "Group posts are viewable by everyone" ON public.group_posts FOR SELECT USING (true);
-CREATE POLICY "Members can post in groups" ON public.group_posts FOR INSERT WITH CHECK (
+-- Channel Posts
+CREATE POLICY "Channel posts are viewable by everyone" ON public.channel_posts FOR SELECT USING (true);
+CREATE POLICY "Members can post in channels" ON public.channel_posts FOR INSERT WITH CHECK (
     EXISTS (
-        SELECT 1 FROM public.group_members 
-        WHERE group_id = group_posts.group_id AND user_id = auth.uid()
+        SELECT 1 FROM public.channel_members 
+        WHERE channel_id = channel_posts.channel_id AND user_id = auth.uid()
     )
 );
-CREATE POLICY "Users can delete own group posts" ON public.group_posts FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own channel posts" ON public.channel_posts FOR DELETE USING (auth.uid() = user_id);
 
--- Group Post Likes
-CREATE POLICY "Group post likes are viewable by everyone" ON public.group_post_likes FOR SELECT USING (true);
-CREATE POLICY "Users can insert own group post likes" ON public.group_post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own group post likes" ON public.group_post_likes FOR DELETE USING (auth.uid() = user_id);
+-- Channel Post Likes
+CREATE POLICY "Channel post likes are viewable by everyone" ON public.channel_post_likes FOR SELECT USING (true);
+CREATE POLICY "Users can insert own channel post likes" ON public.channel_post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own channel post likes" ON public.channel_post_likes FOR DELETE USING (auth.uid() = user_id);
 
--- Group Post Comments
-CREATE POLICY "Group post comments are viewable by everyone" ON public.group_post_comments FOR SELECT USING (true);
-CREATE POLICY "Users can insert own group post comments" ON public.group_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Channel Post Comments
+CREATE POLICY "Channel post comments are viewable by everyone" ON public.channel_post_comments FOR SELECT USING (true);
+CREATE POLICY "Users can insert own channel post comments" ON public.channel_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Group Post Reactions
-CREATE POLICY "Group post reactions are viewable by everyone" ON public.group_post_reactions FOR SELECT USING (true);
-CREATE POLICY "Users can insert own group post reactions" ON public.group_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own group post reactions" ON public.group_post_reactions FOR DELETE USING (auth.uid() = user_id);
+-- Channel Post Reactions
+CREATE POLICY "Channel post reactions are viewable by everyone" ON public.channel_post_reactions FOR SELECT USING (true);
+CREATE POLICY "Users can insert own channel post reactions" ON public.channel_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own channel post reactions" ON public.channel_post_reactions FOR DELETE USING (auth.uid() = user_id);
 
 -- Notifications
 CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);

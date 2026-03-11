@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Users, LogOut, Trash2, X, UserPlus, CheckCircle, Plus } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { UserProfile, Post as PostType, ViewType, AccountSession, Group } from './types';
+import { UserProfile, Post as PostType, ViewType, AccountSession, Channel } from './types';
 import Sidebar from './components/Sidebar';
 import Post from './components/Post';
 import Profile from './components/Profile';
@@ -33,7 +33,7 @@ const AppContent: React.FC = () => {
   const [profileAutoEdit, setProfileAutoEdit] = useState(false);
   const [duetSource, setDuetSource] = useState<PostType | null>(null);
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState<Group | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
   const [homeSubView, setHomeSubView] = useState<'REELS' | 'ENGAGING'>('REELS');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -381,7 +381,7 @@ const AppContent: React.FC = () => {
               />
             )}
             
-            {(currentView === 'CHANNELS' || currentView === 'CHANNEL_DETAILS') && <Channels currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialGroup={selectedChannel} />}
+            {(currentView === 'CHANNELS' || currentView === 'CHANNEL_DETAILS') && <Channels currentUser={currentUser} onBack={() => setCurrentView('PROFILE')} initialChannel={selectedChannel} />}
             
             {currentView === 'CREATE' && (
               <CreatePost 
