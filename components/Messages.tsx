@@ -582,30 +582,30 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               )}
               
               <div className="flex items-end gap-2 max-w-5xl mx-auto">
-                <div className="flex items-center gap-0.5 mb-1">
-                  <button title={t('More actions')} className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                  <button 
-                    title={t('Attach photo or video')}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                  </button>
-                  <button 
-                    title={t('Choose a sticker')}
-                    onClick={() => setShowStickerPicker(!showStickerPicker)}
-                    className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                  >
-                    <StickerIcon className="w-5 h-5" />
-                  </button>
-                  <button title={t('Start a video call')} className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                    <VideoIcon className="w-5 h-5" />
-                  </button>
-                </div>
+                <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-800 rounded-2xl px-2 py-1 border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-600 transition-all">
+                  <div className="flex items-center gap-0.5">
+                    <button title={t('More actions')} className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95">
+                      <Plus className="w-5 h-5" />
+                    </button>
+                    <button 
+                      title={t('Attach photo or video')}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                    </button>
+                    <button 
+                      title={t('Choose a sticker')}
+                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95"
+                    >
+                      <StickerIcon className="w-5 h-5" />
+                    </button>
+                    <button title={t('Start a video call')} className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95">
+                      <VideoIcon className="w-5 h-5" />
+                    </button>
+                  </div>
 
-                <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-1.5 border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-600 transition-all">
                   <textarea 
                     ref={messageInputRef}
                     value={text} 
@@ -618,14 +618,17 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     }}
                     placeholder={t('Aa')}
                     rows={1}
-                    className="flex-1 bg-transparent border-none py-1 text-[15px] outline-none text-black dark:text-white resize-none max-h-32 no-scrollbar" 
+                    className="flex-1 bg-transparent border-none py-2 px-2 text-[15px] outline-none text-black dark:text-white resize-none max-h-32 no-scrollbar" 
                   />
-                  <button 
-                    title={t('Choose an emoji')}
-                    className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
-                  >
-                    <Smile className="w-5 h-5" />
-                  </button>
+
+                  <div className="flex items-center gap-0.5">
+                    <button 
+                      title={t('Choose an emoji')}
+                      className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center mb-1">
@@ -637,7 +640,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     text.trim() || selectedFile ? (
                       <button 
                         onClick={sendMessage}
-                        className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-sm active:scale-95"
+                        className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-sm active:scale-95 flex items-center justify-center"
                       >
                         <Send className="w-5 h-5 fill-current" />
                       </button>
