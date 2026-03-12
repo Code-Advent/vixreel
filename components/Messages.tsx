@@ -316,14 +316,14 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
           </div>
           
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="text" 
               value={chatSearchQuery}
               onChange={(e) => setChatSearchQuery(e.target.value)}
               placeholder={t('Search Messenger')}
-              className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-0 text-black dark:text-white placeholder-gray-500"
+              className="w-full bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-gray-700 rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500/10 transition-all text-black dark:text-white placeholder-gray-500 outline-none"
             />
           </div>
 
@@ -568,42 +568,44 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             {/* Input Area */}
             <div className="p-3 bg-white dark:bg-[#18191a] border-t border-gray-200 dark:border-gray-800">
               {mediaPreview && (
-                <div className="relative inline-block mb-3 ml-12">
-                  <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="relative inline-block mb-3 ml-12 animate-vix-in">
+                  <div className="w-24 h-24 rounded-xl overflow-hidden border-2 border-blue-500 shadow-lg">
                     {selectedFile?.type.startsWith('video') ? <video src={mediaPreview} className="w-full h-full object-cover" /> : <img src={mediaPreview} className="w-full h-full object-cover" />}
                   </div>
                   <button 
                     onClick={() => { setSelectedFile(null); setMediaPreview(null); }} 
-                    className="absolute -top-2 -right-2 p-1 bg-gray-800 text-white rounded-full shadow-md"
+                    className="absolute -top-2 -right-2 p-1.5 bg-gray-900 text-white rounded-full shadow-md hover:bg-black transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               )}
               
-              <div className="flex items-end gap-2">
-                <div className="flex items-center gap-1 mb-1">
-                  <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+              <div className="flex items-end gap-2 max-w-5xl mx-auto">
+                <div className="flex items-center gap-0.5 mb-1">
+                  <button title={t('More actions')} className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                     <Plus className="w-5 h-5" />
                   </button>
                   <button 
+                    title={t('Attach photo or video')}
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                   >
                     <ImageIcon className="w-5 h-5" />
                   </button>
                   <button 
+                    title={t('Choose a sticker')}
                     onClick={() => setShowStickerPicker(!showStickerPicker)}
                     className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                   >
                     <StickerIcon className="w-5 h-5" />
                   </button>
-                  <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                  <button title={t('Start a video call')} className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                     <VideoIcon className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-800 rounded-3xl px-3 py-1.5">
+                <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-1.5 border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-600 transition-all">
                   <textarea 
                     ref={messageInputRef}
                     value={text} 
@@ -618,32 +620,39 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     rows={1}
                     className="flex-1 bg-transparent border-none py-1 text-[15px] outline-none text-black dark:text-white resize-none max-h-32 no-scrollbar" 
                   />
-                  <button className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                  <button 
+                    title={t('Choose an emoji')}
+                    className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                  >
                     <Smile className="w-5 h-5" />
                   </button>
                 </div>
 
-                <button 
-                  onClick={sendMessage}
-                  disabled={isUploading}
-                  className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-30"
-                >
+                <div className="flex items-center mb-1">
                   {isUploading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <div className="p-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    </div>
                   ) : (
                     text.trim() || selectedFile ? (
-                      <Send className="w-6 h-6 fill-current" />
+                      <button 
+                        onClick={sendMessage}
+                        className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-sm active:scale-95"
+                      >
+                        <Send className="w-5 h-5 fill-current" />
+                      </button>
                     ) : (
-                      <div onClick={(e) => { e.preventDefault(); setText('👍'); sendMessage(); }} className="cursor-pointer">
-                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-blue-600">
-                          <path d="M12 21.638h-.014C9.403 21.59 1.026 12.288 1.026 7.054 1.026 4.267 3.293 2 6.08 2c1.606 0 3.044.753 3.97 1.917C10.977 2.753 12.414 2 14.02 2c2.787 0 5.054 2.267 5.054 5.054 0 5.234-8.377 14.536-10.96 14.584H8.014z" className="hidden" />
-                          <path d="M2.322 13.154c.502.502 1.185.779 1.923.779h1.754v-9.154c0-1.104.896-2 2-2h7c1.104 0 2 .896 2 2v1c0 1.104-.896 2-2 2h-1v7h3.5c1.104 0 2 .896 2 2v1c0 1.104-.896 2-2 2h-13.5c-.738 0-1.421-.277-1.923-.779-.502-.502-.779-1.185-.779-1.923v-1c0-.738.277-1.421.779-1.923z" className="hidden" />
+                      <button 
+                        onClick={(e) => { e.preventDefault(); setText('👍'); sendMessage(); }}
+                        className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors active:scale-90"
+                      >
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-current">
                           <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3z" />
                         </svg>
-                      </div>
+                      </button>
                     )
                   )}
-                </button>
+                </div>
               </div>
               <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
             </div>
