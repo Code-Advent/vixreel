@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Send, User, ChevronLeft, MessageCircle, Loader2, Search, Plus, X, 
   Image as ImageIcon, Smile, MoreVertical, Trash2, Sticker as StickerIcon,
-  Check, CheckCheck, Clock, Paperclip, Phone, Video as VideoIcon, Info
+  Check, CheckCheck, Clock, Paperclip, Phone, Video as VideoIcon, Info,
+  CheckCircle, Heart
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
@@ -290,221 +291,319 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   };
 
   return (
-    <div className="max-w-[1100px] mx-auto h-[90vh] flex flex-col md:flex-row bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] overflow-hidden shadow-2xl mt-4 animate-vix-in">
+    <div className="flex h-[calc(100vh-80px)] bg-white dark:bg-[#18191a] overflow-hidden animate-vix-in">
       
-      {/* Sidebar */}
-      <div className={`w-full md:w-80 border-r border-[var(--vix-border)] flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-8 border-b border-[var(--vix-border)] flex flex-col gap-6 bg-[var(--vix-secondary)]/10">
+      {/* Sidebar - Chat List */}
+      <div className={`w-full md:w-[360px] flex flex-col border-r border-gray-200 dark:border-gray-800 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+        {/* Sidebar Header */}
+        <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black uppercase tracking-tighter text-[var(--vix-text)]">{t('Messages')}</h2>
-            <button onClick={() => setShowNewChatModal(true)} className="p-3 bg-[var(--vix-secondary)] rounded-2xl text-pink-500 hover:scale-110 transition-all shadow-lg active:scale-95">
-              <Plus className="w-5 h-5" />
-            </button>
+            <h1 className="text-2xl font-bold text-black dark:text-white">{t('Chats')}</h1>
+            <div className="flex gap-2">
+              <button className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <MoreVertical className="w-5 h-5 text-black dark:text-white" />
+              </button>
+              <button className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <VideoIcon className="w-5 h-5 text-black dark:text-white" />
+              </button>
+              <button 
+                onClick={() => setShowNewChatModal(true)}
+                className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Plus className="w-5 h-5 text-black dark:text-white" />
+              </button>
+            </div>
           </div>
           
-          {/* Search Bar Structure */}
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="w-4 h-4 text-zinc-500 group-focus-within:text-pink-500 transition-colors" />
-            </div>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input 
               type="text" 
               value={chatSearchQuery}
               onChange={(e) => setChatSearchQuery(e.target.value)}
-              placeholder={t('Search conversations...')}
-              className="w-full bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-2xl py-3.5 pl-11 pr-4 text-xs outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] font-bold shadow-inner placeholder:text-zinc-600"
+              placeholder={t('Search Messenger')}
+              className="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-0 text-black dark:text-white placeholder-gray-500"
             />
           </div>
+
+          {/* Active Users Row */}
+          <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
+            <div className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer">
+              <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                <Plus className="w-6 h-6 text-gray-500" />
+              </div>
+              <span className="text-[11px] text-gray-500 font-medium">{t('Your story')}</span>
+            </div>
+            {chats.slice(0, 8).map(u => (
+              <div key={u.id} className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer" onClick={() => setActiveChat(u)}>
+                <div className="relative">
+                  <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-14 h-14 rounded-full object-cover border-2 border-transparent p-0.5" />
+                  <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
+                </div>
+                <span className="text-[11px] text-gray-500 font-medium truncate w-14 text-center">{u.username}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--vix-border)]/10">
+
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto no-scrollbar">
           {filteredChats.length > 0 ? filteredChats.map(u => (
             <div 
               key={u.id} 
               onClick={() => setActiveChat(u)}
-              className={`flex items-center gap-5 p-8 cursor-pointer transition-all relative group ${activeChat?.id === u.id ? 'bg-[var(--vix-secondary)]/40' : 'hover:bg-[var(--vix-secondary)]/20'}`}
+              className={`flex items-center gap-3 p-3 mx-2 rounded-xl cursor-pointer transition-colors relative group ${activeChat?.id === u.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
-              {activeChat?.id === u.id && <div className="absolute left-0 top-0 bottom-0 w-1.5 vix-gradient"></div>}
-              <div className="relative">
-                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-14 h-14 rounded-full border border-[var(--vix-border)] object-cover shadow-lg" />
-                <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-[var(--vix-bg)] rounded-full"></div>
+              <div className="relative flex-shrink-0">
+                <img 
+                  src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
+                  className="w-14 h-14 rounded-full object-cover" 
+                />
+                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-black text-sm truncate text-[var(--vix-text)] uppercase tracking-tight">@{u.username}</span>
-                  <div className="flex items-center gap-2">
-                    {u.last_message_at && <span className="text-[10px] text-zinc-500 font-black">{new Date(u.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); deleteConversation(u.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-500 transition-all"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-[12px] text-zinc-500 truncate font-medium opacity-70 flex-1">{u.last_message || t('New conversation')}</p>
-                  {u.unread_count && u.unread_count > 0 && (
-                    <span className="ml-2 bg-pink-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-pulse">
-                      {u.unread_count}
+                <div className="flex justify-between items-baseline">
+                  <span className={`text-[15px] truncate ${u.unread_count ? 'font-bold text-black dark:text-white' : 'font-medium text-gray-900 dark:text-gray-100'}`}>
+                    {u.full_name || u.username}
+                  </span>
+                  {u.last_message_at && (
+                    <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
+                      {new Date(u.last_message_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}
                     </span>
                   )}
                 </div>
+                <div className="flex justify-between items-center">
+                  <p className={`text-sm truncate ${u.unread_count ? 'font-bold text-black dark:text-white' : 'text-gray-500'}`}>
+                    {u.last_message || t('New conversation')}
+                  </p>
+                  {u.unread_count && u.unread_count > 0 && (
+                    <div className="w-3 h-3 bg-blue-600 rounded-full ml-2 flex-shrink-0"></div>
+                  )}
+                </div>
               </div>
+              
+              {/* Delete conversation button on hover */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteConversation(u.id); }}
+                className="absolute right-4 opacity-0 group-hover:opacity-100 p-2 bg-white dark:bg-gray-700 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-all z-10"
+              >
+                <Trash2 className="w-4 h-4 text-gray-500" />
+              </button>
             </div>
           )) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-30">
-              <MessageCircle className="w-12 h-12 mb-4" />
-              <p className="text-xs font-bold uppercase tracking-widest">{t('No messages yet')}</p>
+            <div className="flex flex-col items-center justify-center p-8 text-center text-gray-500">
+              <MessageCircle className="w-12 h-12 mb-2 opacity-20" />
+              <p className="text-sm">{t('No chats found')}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className={`flex-1 flex flex-col relative ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
+      {/* Main Chat Area */}
+      <div className={`flex-1 flex flex-col bg-white dark:bg-[#18191a] ${!activeChat ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
         {activeChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-6 border-b border-[var(--vix-border)] flex items-center justify-between bg-[var(--vix-bg)]/80 backdrop-blur-xl z-20">
-              <div className="flex items-center gap-4">
-                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 text-zinc-500"><ChevronLeft className="w-6 h-6" /></button>
-                <img src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} className="w-10 h-10 rounded-full border border-[var(--vix-border)] object-cover" />
-                <div>
-                  <h3 className="font-black text-sm flex items-center gap-1.5">
-                    {activeChat.username} {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
-                  </h3>
-                  <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest">{t('Online')}</span>
+            <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 shadow-sm z-10">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setActiveChat(null)} className="md:hidden p-2 -ml-2 text-blue-600">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <div className="relative">
+                  <img 
+                    src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} 
+                    className="w-10 h-10 rounded-full object-cover" 
+                  />
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
                 </div>
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-[15px] text-black dark:text-white leading-tight flex items-center gap-1">
+                    {activeChat.full_name || activeChat.username}
+                    {activeChat.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
+                  </h3>
+                  <span className="text-xs text-gray-500">{t('Active now')}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                  <Phone className="w-5 h-5 fill-current" />
+                </button>
+                <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                  <VideoIcon className="w-6 h-6 fill-current" />
+                </button>
+                <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                  <Info className="w-6 h-6 fill-current" />
+                </button>
               </div>
             </div>
 
             {/* Messages List */}
-            <div className="flex-1 p-4 md:p-8 overflow-y-auto space-y-4 no-scrollbar bg-[#0e1621] relative" dir="ltr">
-              {/* Telegram-style background pattern (optional) */}
-              <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] invert"></div>
-              
+            <div className="flex-1 overflow-y-auto p-4 space-y-1 no-scrollbar flex flex-col">
               {loading && messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin vix-loader" /></div>
+                <div className="flex-1 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                </div>
               ) : (
                 messages.map((m, i) => {
                   const isOwn = m.sender_id === currentUser.id;
-                  const postDate = new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-                  const prevPostDate = i > 0 ? new Date(messages[i - 1].created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : null;
-                  const showDateSeparator = postDate !== prevPostDate;
+                  const prevMsg = i > 0 ? messages[i - 1] : null;
+                  const nextMsg = i < messages.length - 1 ? messages[i + 1] : null;
+                  
+                  const isStartOfGroup = !prevMsg || prevMsg.sender_id !== m.sender_id;
+                  const isEndOfGroup = !nextMsg || nextMsg.sender_id !== m.sender_id;
+                  
+                  // Date separator logic
+                  const msgDate = new Date(m.created_at);
+                  const showDate = !prevMsg || (msgDate.getTime() - new Date(prevMsg.created_at).getTime() > 1000 * 60 * 30);
 
                   return (
                     <React.Fragment key={m.id}>
-                      {showDateSeparator && (
-                        <div className="flex justify-center my-6 sticky top-2 z-10">
-                          <div className="bg-black/30 backdrop-blur-md text-white/70 text-[11px] px-4 py-1 rounded-full font-bold uppercase tracking-widest">
-                            {postDate}
-                          </div>
+                      {showDate && (
+                        <div className="flex justify-center my-4">
+                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            {msgDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </span>
                         </div>
                       )}
-                      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} animate-vix-in relative z-10`}>
-                        <div 
-                          dir="auto"
-                          className={`group relative max-w-[85%] md:max-w-[70%] p-3 px-4 rounded-2xl text-[14px] font-medium shadow-lg transition-all whitespace-pre-wrap break-words ${
-                          isOwn ? 'bg-[#2b5278] text-white rounded-tr-none' : 'bg-[#182533] text-white rounded-tl-none'
-                        }`}>
-                          {m.media_url && (
-                            <div className="mb-2 rounded-xl overflow-hidden border border-white/5 shadow-md">
-                              {m.media_type === 'video' ? <video src={m.media_url} controls className="max-h-80 w-full object-cover" /> : <img src={m.media_url} className="max-h-80 w-full object-cover" />}
-                            </div>
-                          )}
-                          {m.sticker_url && (
-                            <div className="mb-2 w-32 h-32">
-                              <img src={m.sticker_url} className="w-full h-full object-contain" alt="Sticker" />
-                            </div>
-                          )}
-                          <div className="pr-12">
+                      
+                      <div className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'} ${isEndOfGroup ? 'mb-2' : 'mb-0.5'}`}>
+                        {!isOwn && (
+                          <div className="w-7 h-7 flex-shrink-0">
+                            {isEndOfGroup ? (
+                              <img 
+                                src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} 
+                                className="w-7 h-7 rounded-full object-cover" 
+                              />
+                            ) : <div className="w-7" />}
+                          </div>
+                        )}
+                        
+                        <div className={`group relative max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                          <div 
+                            className={`px-3 py-2 text-[15px] leading-snug break-words whitespace-pre-wrap shadow-sm ${
+                              isOwn 
+                                ? 'bg-gradient-to-b from-[#0084FF] to-[#00C6FF] text-white' 
+                                : 'bg-gray-200 dark:bg-gray-800 text-black dark:text-white'
+                            } ${
+                              isOwn 
+                                ? `rounded-[1.25rem] ${isStartOfGroup ? 'rounded-tr-[1.25rem]' : 'rounded-tr-[0.25rem]'} ${isEndOfGroup ? 'rounded-br-[1.25rem]' : 'rounded-br-[0.25rem]'}`
+                                : `rounded-[1.25rem] ${isStartOfGroup ? 'rounded-tl-[1.25rem]' : 'rounded-tl-[0.25rem]'} ${isEndOfGroup ? 'rounded-bl-[1.25rem]' : 'rounded-bl-[0.25rem]'}`
+                            }`}
+                          >
+                            {m.media_url && (
+                              <div className="mb-1 -mx-1 -mt-1 rounded-lg overflow-hidden">
+                                {m.media_type === 'video' ? (
+                                  <video src={m.media_url} controls className="max-w-full max-h-60" />
+                                ) : (
+                                  <img src={m.media_url} className="max-w-full max-h-60 object-cover" />
+                                )}
+                              </div>
+                            )}
+                            {m.sticker_url && (
+                              <div className="w-32 h-32">
+                                <img src={m.sticker_url} className="w-full h-full object-contain" />
+                              </div>
+                            )}
                             {m.content}
                           </div>
-                          
-                          <div className="absolute bottom-1.5 right-2 flex items-center gap-1 opacity-60">
-                            <span className="text-[9px] font-bold">
-                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                            </span>
-                            {isOwn && (
-                              m.is_read ? <CheckCheck className="w-3 h-3 text-[#40a7e3]" /> : <Check className="w-3 h-3" />
-                            )}
-                          </div>
 
-                          {/* Reaction Trigger */}
-                          <div className={`absolute ${isOwn ? '-left-16' : '-right-16'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1`}>
-                            <button 
-                              onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
-                              className="text-zinc-500 hover:text-pink-500 p-2"
-                            >
-                              <Smile className="w-4 h-4" />
-                            </button>
-                            {isOwn && (
-                              <button 
-                                onClick={() => deleteMessage(m.id)}
-                                className="text-zinc-500 hover:text-red-500 p-2"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Reactions Display */}
+                          {/* Reactions */}
                           {m.reactions && m.reactions.length > 0 && (
-                            <div className={`absolute -bottom-3 ${isOwn ? 'right-2' : 'left-2'} flex gap-1 z-20`}>
+                            <div className={`flex gap-0.5 mt-[-8px] z-10 ${isOwn ? 'mr-2' : 'ml-2'}`}>
                               {Array.from(new Set(m.reactions.map(r => r.reaction))).map(emoji => (
-                                <div key={emoji} className="bg-[#1c2938] border border-white/5 rounded-full px-1.5 py-0.5 text-[10px] shadow-lg flex items-center gap-1">
-                                  <span>{emoji}</span>
-                                  <span className="text-[8px] opacity-50">{m.reactions?.filter(r => r.reaction === emoji).length}</span>
+                                <div key={emoji} className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full px-1 py-0.5 text-[10px] shadow-sm flex items-center">
+                                  {emoji}
                                 </div>
                               ))}
                             </div>
                           )}
 
+                          {/* Action Buttons on Hover */}
+                          <div className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'right-full mr-2' : 'left-full ml-2'}`}>
+                            <button 
+                              onClick={() => setShowReactionPicker(showReactionPicker === m.id ? null : m.id)}
+                              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <Smile className="w-4 h-4" />
+                            </button>
+                            <button className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          </div>
+
                           {/* Reaction Picker */}
                           {showReactionPicker === m.id && (
-                            <div className={`absolute ${isOwn ? '-left-48' : '-right-48'} top-1/2 -translate-y-1/2 bg-[#1c2938] border border-white/5 rounded-full p-1.5 flex gap-1 shadow-2xl z-50 animate-vix-in`}>
+                            <div className={`absolute bottom-full mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-1 flex gap-1 shadow-xl z-50 animate-vix-in ${isOwn ? 'right-0' : 'left-0'}`}>
                               {REACTION_OPTIONS.map(emoji => (
-                                <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-full transition-all text-base">{emoji}</button>
+                                <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all text-lg">{emoji}</button>
                               ))}
                             </div>
                           )}
                         </div>
                       </div>
+                      
+                      {isOwn && isEndOfGroup && i === messages.length - 1 && (
+                        <div className="flex justify-end mb-2">
+                          <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium">
+                            {m.is_read ? (
+                              <img 
+                                src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} 
+                                className="w-3 h-3 rounded-full" 
+                              />
+                            ) : (
+                              <CheckCircle className="w-3 h-3" />
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </React.Fragment>
                   );
                 })
               )}
-              <div ref={messagesEndRef} className="h-4" />
+              <div ref={messagesEndRef} className="h-2" />
             </div>
 
             {/* Input Area */}
-            <form onSubmit={sendMessage} className="p-6 bg-[var(--vix-secondary)]/10 border-t border-[var(--vix-border)] flex flex-col gap-4 relative">
-              {showStickerPicker && (
-                <StickerPicker 
-                  currentUser={currentUser}
-                  onSelect={sendSticker}
-                  onClose={() => setShowStickerPicker(false)}
-                />
-              )}
+            <div className="p-3 bg-white dark:bg-[#18191a] border-t border-gray-200 dark:border-gray-800">
               {mediaPreview && (
-                <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--vix-border)] shadow-lg animate-vix-in">
-                  <button type="button" onClick={() => { setSelectedFile(null); setMediaPreview(null); }} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full"><X className="w-3 h-3" /></button>
-                  {selectedFile?.type.startsWith('video') ? <video src={mediaPreview} className="w-full h-full object-cover" /> : <img src={mediaPreview} className="w-full h-full object-cover" />}
+                <div className="relative inline-block mb-3 ml-12">
+                  <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
+                    {selectedFile?.type.startsWith('video') ? <video src={mediaPreview} className="w-full h-full object-cover" /> : <img src={mediaPreview} className="w-full h-full object-cover" />}
+                  </div>
+                  <button 
+                    onClick={() => { setSelectedFile(null); setMediaPreview(null); }} 
+                    className="absolute -top-2 -right-2 p-1 bg-gray-800 text-white rounded-full shadow-md"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               )}
               
-              <div className="flex gap-4 items-end max-w-5xl mx-auto w-full">
-                <div className="flex-1 relative flex items-center bg-[var(--vix-bg)] border border-[var(--vix-border)] rounded-[2.5rem] shadow-inner group focus-within:border-pink-500/30 transition-all">
-                  {/* Attachment Button (Left) */}
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()} 
-                    className="p-4 text-zinc-500 hover:text-pink-500 transition-all"
-                  >
-                    <Plus className="w-6 h-6" />
+              <div className="flex items-end gap-2">
+                <div className="flex items-center gap-1 mb-1">
+                  <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                    <Plus className="w-5 h-5" />
                   </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setShowStickerPicker(!showStickerPicker)}
+                    className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <StickerIcon className="w-5 h-5" />
+                  </button>
+                  <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                    <VideoIcon className="w-5 h-5" />
+                  </button>
+                </div>
 
+                <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-800 rounded-3xl px-3 py-1.5">
                   <textarea 
                     ref={messageInputRef}
                     value={text} 
@@ -515,84 +614,113 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                         sendMessage();
                       }
                     }}
-                    placeholder={t('Message')}
-                    dir="auto"
+                    placeholder={t('Aa')}
                     rows={1}
-                    className="flex-1 bg-transparent border-none px-2 py-5 text-[15px] outline-none text-[var(--vix-text)] resize-none max-h-40 no-scrollbar font-medium" 
+                    className="flex-1 bg-transparent border-none py-1 text-[15px] outline-none text-black dark:text-white resize-none max-h-32 no-scrollbar" 
                   />
-
-                  {/* Sticker Button (Right) */}
-                  <div className="flex items-center pr-2">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowStickerPicker(!showStickerPicker)} 
-                      className={`p-3 transition-all ${showStickerPicker ? 'text-pink-500' : 'text-zinc-500 hover:text-pink-500'}`}
-                    >
-                      <StickerIcon className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                    <Smile className="w-5 h-5" />
+                  </button>
                 </div>
 
-                <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
-                
                 <button 
-                  type="submit" 
-                  disabled={(!text.trim() && !selectedFile) || isUploading} 
-                  className="bg-gradient-to-r from-pink-500 to-blue-500 p-5 rounded-full shadow-2xl active:scale-90 transition-all disabled:opacity-20 flex items-center justify-center flex-shrink-0"
+                  onClick={sendMessage}
+                  disabled={isUploading}
+                  className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-30"
                 >
-                  {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-white" /> : <Send className="w-6 h-6 text-white" />}
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    text.trim() || selectedFile ? (
+                      <Send className="w-6 h-6 fill-current" />
+                    ) : (
+                      <div onClick={(e) => { e.preventDefault(); setText('👍'); sendMessage(); }} className="cursor-pointer">
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-blue-600">
+                          <path d="M12 21.638h-.014C9.403 21.59 1.026 12.288 1.026 7.054 1.026 4.267 3.293 2 6.08 2c1.606 0 3.044.753 3.97 1.917C10.977 2.753 12.414 2 14.02 2c2.787 0 5.054 2.267 5.054 5.054 0 5.234-8.377 14.536-10.96 14.584H8.014z" className="hidden" />
+                          <path d="M2.322 13.154c.502.502 1.185.779 1.923.779h1.754v-9.154c0-1.104.896-2 2-2h7c1.104 0 2 .896 2 2v1c0 1.104-.896 2-2 2h-1v7h3.5c1.104 0 2 .896 2 2v1c0 1.104-.896 2-2 2h-13.5c-.738 0-1.421-.277-1.923-.779-.502-.502-.779-1.185-.779-1.923v-1c0-.738.277-1.421.779-1.923z" className="hidden" />
+                          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3z" />
+                        </svg>
+                      </div>
+                    )
+                  )}
                 </button>
               </div>
-            </form>
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
+            </div>
+
+            {showStickerPicker && (
+              <div className="absolute bottom-20 left-4 z-50">
+                <StickerPicker 
+                  currentUser={currentUser}
+                  onSelect={sendSticker}
+                  onClose={() => setShowStickerPicker(false)}
+                />
+              </div>
+            )}
           </>
         ) : (
-          <div className="text-center space-y-6 max-w-xs animate-vix-in">
-            <div className="w-24 h-24 rounded-[2.5rem] bg-[var(--vix-secondary)]/30 flex items-center justify-center mx-auto border border-[var(--vix-border)] border-dashed">
-              <MessageCircle className="w-10 h-10 text-zinc-500" />
+          <div className="flex flex-col items-center justify-center p-10 text-center">
+            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+              <MessageCircle className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-xl font-black uppercase tracking-widest">{t('Select a narrative')}</h3>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed">{t('Initiate a secure signal exchange with another creator.')}</p>
-            <button onClick={() => setShowNewChatModal(true)} className="vix-gradient px-10 py-3 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl">{t('Start Chat')}</button>
+            <h2 className="text-xl font-bold text-black dark:text-white mb-2">{t('Select a chat')}</h2>
+            <p className="text-gray-500 text-sm max-w-xs">{t('Choose from your existing conversations or start a new one.')}</p>
+            <button 
+              onClick={() => setShowNewChatModal(true)}
+              className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-full font-bold hover:bg-blue-700 transition-colors"
+            >
+              {t('New Message')}
+            </button>
           </div>
         )}
       </div>
 
       {/* New Chat Modal */}
       {showNewChatModal && (
-        <div className="fixed inset-0 z-[100] bg-[var(--vix-bg)]/95 flex flex-col items-center justify-start pt-24 p-6 backdrop-blur-xl animate-vix-in">
-          <button onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }} className="absolute top-10 right-10 p-3 bg-[var(--vix-secondary)] rounded-full border border-[var(--vix-border)]"><X className="w-6 h-6" /></button>
-          <div className="w-full max-w-md space-y-8">
-            <div className="text-center">
-               <h3 className="text-2xl font-black uppercase tracking-widest">{t('Creator Search')}</h3>
-               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-2">{t('Establish new signal connection')}</p>
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-vix-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#242526] rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-black dark:text-white">{t('New Message')}</h3>
+              <button 
+                onClick={() => { setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
             </div>
-            <div className="relative">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-              <input 
-                type="text" 
-                placeholder={t('Search @username...')} 
-                value={searchQuery}
-                onChange={e => handleSearchUsers(e.target.value)}
-                autoFocus
-                className="w-full bg-[var(--vix-secondary)]/50 border border-[var(--vix-border)] rounded-full py-5 pl-14 pr-6 text-sm outline-none focus:border-pink-500/30 transition-all text-[var(--vix-text)] font-bold"
-              />
-            </div>
-            <div className="space-y-2 max-h-[50vh] overflow-y-auto no-scrollbar">
-              {isSearching ? (
-                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin vix-loader" /></div>
-              ) : searchResults.map(u => (
-                <div 
-                  key={u.id}
-                  onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
-                  className="flex items-center gap-4 p-4 rounded-3xl bg-[var(--vix-card)] border border-[var(--vix-border)] hover:border-pink-500/30 cursor-pointer transition-all group"
-                >
-                  <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)]" />
-                  <div className="flex-1">
-                    <p className="font-black text-sm text-[var(--vix-text)]">@{u.username}</p>
-                    <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{u.full_name || t('Creator')}</p>
+            
+            <div className="p-4">
+              <div className="relative mb-4">
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{t('To:')}</span>
+                <input 
+                  type="text" 
+                  placeholder={t('Type a name or @username')} 
+                  value={searchQuery}
+                  onChange={e => handleSearchUsers(e.target.value)}
+                  autoFocus
+                  className="w-full bg-transparent border-none pl-8 py-2 text-sm outline-none focus:ring-0 text-black dark:text-white"
+                />
+              </div>
+
+              <div className="max-h-[300px] overflow-y-auto no-scrollbar space-y-1">
+                {isSearching ? (
+                  <div className="flex justify-center py-4"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
+                ) : searchResults.length > 0 ? searchResults.map(u => (
+                  <div 
+                    key={u.id}
+                    onClick={() => { setActiveChat(u); setShowNewChatModal(false); setSearchQuery(''); setSearchResults([]); }}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                  >
+                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-10 h-10 rounded-full object-cover" />
+                    <div className="flex-1">
+                      <p className="font-bold text-sm text-black dark:text-white">{u.full_name || u.username}</p>
+                      <p className="text-xs text-gray-500">@{u.username}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )) : searchQuery.length >= 2 ? (
+                  <p className="text-center py-4 text-sm text-gray-500">{t('No users found')}</p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
