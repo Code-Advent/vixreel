@@ -4,7 +4,7 @@ import {
   X, Wand2, Loader2, Video, 
   UploadCloud, ChevronRight, Columns2, Scissors,
   MapPin, Lock, MessageSquare, Smile, Sparkles,
-  Megaphone, Link as LinkIcon
+  Megaphone, Link as LinkIcon, Radio
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateAIText, generateAIImage } from '../services/geminiService';
@@ -12,6 +12,7 @@ import { sanitizeFilename, formatExternalLink } from '../lib/utils';
 import { Post, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
+import LiveStream from './LiveStream';
 
 interface CreatePostProps {
   user: UserProfile;
@@ -38,6 +39,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+  const [showLiveStream, setShowLiveStream] = useState(false);
+  const [liveRoomID, setLiveRoomID] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +168,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
       console.error("Post Upload Error:", err);
       alert(err.message || "Failed to share post.");
     } finally { setIsPosting(false); }
+  };
+
+  const handleStartLive = () => {
+    const roomID = `live_${user.id}_${Date.now()}`;
+    setLiveRoomID(roomID);
+    setShowLiveStream(true);
   };
 
   return (
@@ -385,6 +394,19 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
               </div>
             </div>
 
+            <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl group cursor-pointer hover:border-pink-500/30 transition-all mb-4" onClick={handleStartLive}>
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-red-500/10 rounded-2xl group-hover:bg-red-500/20 transition-colors">
+                    <Radio className="w-4 h-4 text-red-500 animate-pulse" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-[var(--vix-text)] uppercase tracking-widest">{t('Go Live')}</span>
+                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">{t('Start a live stream now')}</span>
+                  </div>
+               </div>
+               <ChevronRight className="w-4 h-4 text-zinc-800" />
+            </div>
+
             <div className="bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-8 flex items-center justify-between shadow-xl group cursor-pointer hover:border-pink-500/30 transition-all" onClick={handleGenerateAIImage}>
                <div className="flex items-center gap-4">
                   <div className="p-3 bg-[var(--vix-secondary)] rounded-2xl group-hover:bg-pink-500/10 transition-colors">
@@ -399,6 +421,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
             </div>
           </div>
         </div>
+        {showLiveStream && (
+          <LiveStream 
+            currentUser={user}
+            roomID={liveRoomID}
+            isHost={true}
+            onClose={() => setShowLiveStream(false)}
+          />
+        )}
       </div>
     );
 };

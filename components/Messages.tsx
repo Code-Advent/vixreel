@@ -13,6 +13,7 @@ import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
 import { sanitizeFilename } from '../lib/utils';
 import StickerPicker from './StickerPicker';
+import LiveStream from './LiveStream';
 
 interface MessagesProps {
   currentUser: UserProfile;
@@ -47,6 +48,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
   const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [showLiveStream, setShowLiveStream] = useState(false);
+  const [liveRoomID, setLiveRoomID] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -290,6 +293,15 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
     } finally { setIsUploading(false); }
   };
 
+  const handleStartLive = () => {
+    if (!activeChat) return;
+    // Generate a room ID based on both users to ensure they join the same one
+    const sortedIds = [currentUser.id, activeChat.id].sort();
+    const roomID = `chat_${sortedIds[0]}_${sortedIds[1]}`;
+    setLiveRoomID(roomID);
+    setShowLiveStream(true);
+  };
+
   return (
     <div className="flex h-[calc(100vh-80px)] bg-white dark:bg-[#18191a] overflow-hidden animate-vix-in">
       
@@ -430,7 +442,10 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                 <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                   <Phone className="w-5 h-5 fill-current" />
                 </button>
-                <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                <button 
+                  onClick={handleStartLive}
+                  className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
                   <VideoIcon className="w-6 h-6 fill-current" />
                 </button>
                 <button className="p-2 text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
@@ -601,7 +616,11 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                     >
                       <StickerIcon className="w-5 h-5" />
                     </button>
-                    <button title={t('Start a video call')} className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95">
+                    <button 
+                      title={t('Start a video call')} 
+                      onClick={handleStartLive}
+                      className="p-1.5 text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all hover:scale-110 active:scale-95"
+                    >
                       <VideoIcon className="w-5 h-5" />
                     </button>
                   </div>
@@ -736,6 +755,15 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             </div>
           </div>
         </div>
+      )}
+
+      {showLiveStream && (
+        <LiveStream 
+          currentUser={currentUser}
+          roomID={liveRoomID}
+          isHost={true}
+          onClose={() => setShowLiveStream(false)}
+        />
       )}
     </div>
   );
