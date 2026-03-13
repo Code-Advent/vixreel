@@ -171,7 +171,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
   };
 
   const handleStartLive = () => {
-    const roomID = `live_${user.id}_${Date.now()}`;
+    const roomID = `live_${user.id}`;
     setLiveRoomID(roomID);
     setShowLiveStream(true);
   };

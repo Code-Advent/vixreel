@@ -102,6 +102,21 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       if (e.detail?.id === user.id) fetchUserContent();
     };
 
+    // Real-time subscription for this specific profile
+    const profileChannel = supabase
+      .channel(`profile-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`
+      }, (payload) => {
+        if (payload.new) {
+          onUpdateProfile(payload.new as UserProfile);
+        }
+      })
+      .subscribe();
+
     window.addEventListener('vixreel-post-deleted', handleGlobalDelete);
     window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     window.addEventListener('vixreel-engagement-updated', handleEngagementUpdate);
@@ -112,6 +127,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
       window.removeEventListener('vixreel-engagement-updated', handleEngagementUpdate);
       window.removeEventListener('vixreel-post-updated', handleEngagementUpdate);
+      supabase.removeChannel(profileChannel);
     };
   }, [user.id]);
 
@@ -196,11 +212,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         .maybeSingle();
 
       if (freshProfile) {
-        // If it's the own profile, we might want to update the parent state too
-        // but for now let's just ensure local display is correct
-        if (freshProfile.is_verified !== user.is_verified) {
-          onUpdateProfile({ is_verified: freshProfile.is_verified });
-        }
+        // Update the parent state with fresh profile data
+        onUpdateProfile(freshProfile);
       }
 
       const boostedFollowers = freshProfile?.boosted_followers || 0;

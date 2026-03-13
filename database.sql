@@ -495,21 +495,21 @@ CREATE POLICY "Live likes are viewable by everyone" ON public.live_likes FOR SEL
 CREATE POLICY "Users can insert own live likes" ON public.live_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 20. FUNCTIONS
-CREATE OR REPLACE FUNCTION increment_live_viewers(stream_id UUID)
+CREATE OR REPLACE FUNCTION increment_live_viewers(stream_channel TEXT)
 RETURNS VOID AS $$
 BEGIN
     UPDATE public.live_streams
     SET viewer_count = viewer_count + 1
-    WHERE id = stream_id;
+    WHERE channel_name = stream_channel AND is_live = true;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION decrement_live_viewers(stream_id UUID)
+CREATE OR REPLACE FUNCTION decrement_live_viewers(stream_channel TEXT)
 RETURNS VOID AS $$
 BEGIN
     UPDATE public.live_streams
     SET viewer_count = GREATEST(0, viewer_count - 1)
-    WHERE id = stream_id;
+    WHERE channel_name = stream_channel AND is_live = true;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

@@ -111,17 +111,17 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
       },
       showPreJoinView: false,
       onJoinRoom: () => {
-        if (isHost) startLive();
+        startLive();
       },
       onLeaveRoom: () => {
-        if (isHost) endLive();
+        endLive();
         onClose();
       },
     });
 
     return () => {
       if (zp) {
-        if (isHost) endLive();
+        endLive();
         zp.destroy();
       }
     };
