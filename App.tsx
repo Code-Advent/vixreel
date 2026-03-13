@@ -17,6 +17,8 @@ import SettingsPage from './components/SettingsPage';
 import Channels from './components/Channels';
 import PostDetail from './components/PostDetail';
 import EngagingVideos from './components/EngagingVideos';
+import LivePage from './components/LivePage';
+import LiveStream from './components/LiveStream';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { Zap } from 'lucide-react';
 
@@ -35,6 +37,7 @@ const AppContent: React.FC = () => {
   const [stitchSource, setStitchSource] = useState<PostType | null>(null);
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
+  const [activeLiveStream, setActiveLiveStream] = useState<UserProfile | null>(null);
   const [homeSubView, setHomeSubView] = useState<'REELS' | 'ENGAGING'>('REELS');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
@@ -292,6 +295,7 @@ const AppContent: React.FC = () => {
         onLogout={() => setIsAccountMenuOpen(true)} 
         currentUser={currentUser} 
         isAdminUnlocked={currentUser.is_admin} 
+        onJoinLive={(user) => setActiveLiveStream(user)}
       />
 
       <main className="flex-1 sm:ml-20 lg:ml-64 pb-20 sm:pb-0 overflow-y-auto h-screen no-scrollbar">
@@ -336,6 +340,7 @@ const AppContent: React.FC = () => {
                           onDuet={(post) => { setDuetSource(post); setCurrentView('CREATE'); }}
                           onStitch={(post) => { setStitchSource(post); setCurrentView('CREATE'); }}
                           onExpand={(post) => setSelectedPost(post)}
+                          onJoinLive={(user) => setActiveLiveStream(user)}
                         />
                       ))
                     ) : (
@@ -355,6 +360,7 @@ const AppContent: React.FC = () => {
                 currentUserId={currentUser.id} 
                 onSelectUser={(u) => setView('PROFILE', u)} 
                 onExpand={(post) => setSelectedPost(post)} 
+                onJoinLive={(user) => setActiveLiveStream(user)}
               />
             )}
             {currentView === 'PROFILE' && viewedUser && (
@@ -378,6 +384,7 @@ const AppContent: React.FC = () => {
                 onSelectChannel={(channel) => { setSelectedChannel(channel); setCurrentView('CHANNEL_DETAILS'); }}
                 onExpand={(post) => setSelectedPost(post)}
                 autoEdit={profileAutoEdit}
+                onJoinLive={(user) => setActiveLiveStream(user)}
               />
             )}
             
@@ -400,12 +407,15 @@ const AppContent: React.FC = () => {
                 stitchSource={stitchSource}
               />
             )}
+            {currentView === 'LIVE' && (
+              <LivePage onJoinStream={(user) => setActiveLiveStream(user)} />
+            )}
             {currentView === 'SEARCH' && (
               <Search 
                 onSelectUser={(u) => setView('PROFILE', u)} 
               />
             )}
-            {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} />}
+            {currentView === 'MESSAGES' && <Messages currentUser={currentUser} initialChatUser={initialChatUser} onJoinLive={(user) => setActiveLiveStream(user)} />}
             {currentView === 'ADMIN' && currentUser.is_admin && <Admin />}
             {currentView === 'NOTIFICATIONS' && (
               <Notifications 
@@ -421,6 +431,7 @@ const AppContent: React.FC = () => {
                     });
                   }
                 }}
+                onJoinLive={(user) => setActiveLiveStream(user)}
               />
             )}
             {currentView === 'SETTINGS' && (
@@ -499,6 +510,15 @@ const AppContent: React.FC = () => {
               setSelectedPost(null);
               setView('PROFILE', u);
             }}
+          />
+        )}
+
+        {activeLiveStream && (
+          <LiveStream 
+            currentUser={currentUser}
+            roomID={activeLiveStream.live_channel_name || `live_${activeLiveStream.id}`}
+            isHost={false}
+            onClose={() => setActiveLiveStream(null)}
           />
         )}
       </div>

@@ -14,10 +14,12 @@ import { useTranslation } from '../lib/translation';
 import { sanitizeFilename } from '../lib/utils';
 import StickerPicker from './StickerPicker';
 import LiveStream from './LiveStream';
+import LiveIndicator from './LiveIndicator';
 
 interface MessagesProps {
   currentUser: UserProfile;
   initialChatUser?: UserProfile | null;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
 interface ChatPreview extends UserProfile {
@@ -26,7 +28,7 @@ interface ChatPreview extends UserProfile {
   unread_count?: number;
 }
 
-const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => {
+const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoinLive }) => {
   const { t } = useTranslation();
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [activeChat, setActiveChat] = useState<UserProfile | null>(initialChatUser || null);
@@ -350,7 +352,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
             {chats.slice(0, 8).map(u => (
               <div key={u.id} className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer" onClick={() => setActiveChat(u)}>
                 <div className="relative">
-                  <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-14 h-14 rounded-full object-cover border-2 border-transparent p-0.5" />
+                  <LiveIndicator user={u} size="md" onClick={() => onJoinLive?.(u)}>
+                    <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} className="w-14 h-14 rounded-full object-cover border-2 border-transparent p-0.5" />
+                  </LiveIndicator>
                   <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
                 </div>
                 <span className="text-[11px] text-gray-500 font-medium truncate w-14 text-center">{u.username}</span>
@@ -368,10 +372,12 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
               className={`flex items-center gap-3 p-3 mx-2 rounded-xl cursor-pointer transition-colors relative group ${activeChat?.id === u.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
             >
               <div className="relative flex-shrink-0">
-                <img 
-                  src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
-                  className="w-14 h-14 rounded-full object-cover" 
-                />
+                <LiveIndicator user={u} size="md" onClick={() => onJoinLive?.(u)}>
+                  <img 
+                    src={u.avatar_url || `https://ui-avatars.com/api/?name=${u.username}`} 
+                    className="w-14 h-14 rounded-full object-cover" 
+                  />
+                </LiveIndicator>
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
               </div>
               <div className="flex-1 min-w-0">
@@ -423,10 +429,12 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser }) => 
                   <ChevronLeft className="w-6 h-6" />
                 </button>
                 <div className="relative">
-                  <img 
-                    src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} 
-                    className="w-10 h-10 rounded-full object-cover" 
-                  />
+                  <LiveIndicator user={activeChat} size="sm" onClick={() => onJoinLive?.(activeChat)}>
+                    <img 
+                      src={activeChat.avatar_url || `https://ui-avatars.com/api/?name=${activeChat.username}`} 
+                      className="w-10 h-10 rounded-full object-cover" 
+                    />
+                  </LiveIndicator>
                   <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#18191a] rounded-full"></div>
                 </div>
                 <div className="flex flex-col">

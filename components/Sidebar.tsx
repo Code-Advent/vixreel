@@ -5,6 +5,7 @@ import VerificationBadge from './VerificationBadge';
 import { ShieldAlert, LogOut, Settings as SettingsIcon, Bell } from 'lucide-react';
 import { useTranslation } from '../lib/translation';
 import { supabase } from '../lib/supabase';
+import LiveIndicator from './LiveIndicator';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -12,9 +13,10 @@ interface SidebarProps {
   onLogout: () => void;
   currentUser?: UserProfile | null;
   isAdminUnlocked?: boolean;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, currentUser, isAdminUnlocked, onJoinLive }) => {
   const { t } = useTranslation();
   const [unreadCount, setUnreadCount] = useState(0);
   const isActuallyAdmin = isAdminUnlocked || currentUser?.email === 'davidhen498@gmail.com';
@@ -52,6 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
   
   const navItems = [
     { id: 'FEED' as ViewType, label: t('Home'), icon: 'fa-solid fa-house' },
+    { id: 'LIVE' as ViewType, label: t('Live'), icon: 'fa-solid fa-video', color: 'text-red-500' },
     { id: 'SEARCH' as ViewType, label: t('Search'), icon: 'fa-solid fa-magnifying-glass' },
     { id: 'EXPLORE' as ViewType, label: t('Explore'), icon: 'fa-solid fa-compass' },
     { id: 'NOTIFICATIONS' as ViewType, label: t('Notifications'), icon: 'fa-solid fa-bell', badge: unreadCount },
@@ -131,10 +134,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout, curre
 
           {currentUser && (
             <div className="flex items-center gap-3 p-3 lg:p-4 rounded-2xl cursor-pointer hover:bg-[var(--vix-secondary)]/40 transition-all group" onClick={() => setView('PROFILE')}>
-               <div className="relative shrink-0">
-                 <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover border border-[var(--vix-border)] group-hover:border-pink-500 transition-all" />
-                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[var(--vix-bg)]" />
-               </div>
+               <LiveIndicator user={currentUser} size="sm" showText={false} onClick={() => onJoinLive?.(currentUser)}>
+                 <div className="relative shrink-0">
+                   <img src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover border border-[var(--vix-border)] group-hover:border-pink-500 transition-all" />
+                   <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[var(--vix-bg)]" />
+                 </div>
+               </LiveIndicator>
                <div className="hidden lg:flex flex-col min-w-0">
                  <span className="font-bold text-xs truncate flex items-center gap-1 text-[var(--vix-text)]">
                    @{currentUser.username}

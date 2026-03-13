@@ -5,14 +5,16 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, Post } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import LiveIndicator from './LiveIndicator';
 
 interface ExploreProps {
   currentUserId: string;
   onSelectUser: (user: UserProfile) => void;
   onExpand?: (post: Post) => void;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand }) => {
+const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand, onJoinLive }) => {
   const { t } = useTranslation();
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [explorePosts, setExplorePosts] = useState<Post[]>([]);
@@ -81,11 +83,13 @@ const Explore: React.FC<ExploreProps> = ({ currentUserId, onSelectUser, onExpand
               onClick={() => onSelectUser(user)}
               className="min-w-[180px] bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-[2.5rem] p-6 flex flex-col items-center text-center group cursor-pointer hover:border-pink-500/30 transition-all hover:scale-105"
             >
-              <div className={`w-20 h-20 rounded-full mb-4 p-1 ${user.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-[var(--vix-secondary)]'}`}>
-                <div className="w-full h-full rounded-full border-2 border-[var(--vix-bg)] overflow-hidden bg-[var(--vix-bg)]">
-                  <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full object-cover" />
+              <LiveIndicator user={user} size="md" onClick={() => onJoinLive?.(user)}>
+                <div className={`w-20 h-20 rounded-full mb-4 p-1 ${user.is_verified ? 'vix-gradient shadow-lg shadow-pink-500/10' : 'bg-[var(--vix-secondary)]'}`}>
+                  <div className="w-full h-full rounded-full border-2 border-[var(--vix-bg)] overflow-hidden bg-[var(--vix-bg)]">
+                    <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full object-cover" />
+                  </div>
                 </div>
-              </div>
+              </LiveIndicator>
               <h3 className="font-black text-xs mb-1 flex items-center gap-1 group-hover:text-pink-500 transition-colors text-[var(--vix-text)]">
                 @{user.username} {user.is_verified && <VerificationBadge size="w-3 h-3" />}
               </h3>

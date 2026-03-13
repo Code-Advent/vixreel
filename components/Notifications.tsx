@@ -5,14 +5,16 @@ import { UserProfile, Notification } from '../types';
 import { useTranslation } from '../lib/translation';
 import { supabase } from '../lib/supabase';
 import VerificationBadge from './VerificationBadge';
+import LiveIndicator from './LiveIndicator';
 
 interface NotificationsProps {
   currentUser: UserProfile;
   onSelectUser?: (user: UserProfile) => void;
   onSelectPost?: (postId: string) => void;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser, onSelectPost }) => {
+const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser, onSelectPost, onJoinLive }) => {
   const { t } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,10 +130,12 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
               }`}
             >
               <div className="relative" onClick={(e) => { e.stopPropagation(); if (n.actor) onSelectUser?.(n.actor); }}>
-                <img 
-                  src={n.actor?.avatar_url || `https://ui-avatars.com/api/?name=${n.actor?.username}`} 
-                  className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)]" 
-                />
+                <LiveIndicator user={n.actor} size="sm" onClick={() => onJoinLive?.(n.actor)}>
+                  <img 
+                    src={n.actor?.avatar_url || `https://ui-avatars.com/api/?name=${n.actor?.username}`} 
+                    className="w-12 h-12 rounded-full object-cover border border-[var(--vix-border)]" 
+                  />
+                </LiveIndicator>
                 <div className="absolute -bottom-1 -right-1 bg-[var(--vix-card)] p-1.5 rounded-full border border-[var(--vix-border)] shadow-sm">
                   {getIcon(n.type)}
                 </div>

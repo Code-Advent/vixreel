@@ -21,6 +21,8 @@ export interface UserProfile {
   website?: string;
   show_followers_to?: 'EVERYONE' | 'FOLLOWERS' | 'ONLY_ME';
   is_business_mode?: boolean;
+  is_live?: boolean;
+  live_channel_name?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -195,4 +197,4 @@ export interface EngagingVideo {
   created_at: string;
 }
 
-export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'CHANNELS' | 'CHANNEL_DETAILS' | 'ENGAGING_VIDEOS';
+export type ViewType = 'FEED' | 'EXPLORE' | 'SEARCH' | 'NOTIFICATIONS' | 'PROFILE' | 'CREATE' | 'REELS' | 'MESSAGES' | 'ADMIN' | 'SETTINGS' | 'CHANNELS' | 'CHANNEL_DETAILS' | 'ENGAGING_VIDEOS' | 'LIVE';

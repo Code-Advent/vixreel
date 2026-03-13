@@ -13,6 +13,7 @@ import Post from './Post';
 import { COUNTRIES_DATA } from '../constants';
 import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
+import LiveIndicator from './LiveIndicator';
 
 interface ProfileProps {
   user: UserProfile;
@@ -25,9 +26,10 @@ interface ProfileProps {
   onSelectChannel?: (channel: Channel) => void;
   onExpand?: (post: PostType) => void;
   autoEdit?: boolean;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToChannels, onSelectChannel, onExpand, autoEdit }) => {
+const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToChannels, onSelectChannel, onExpand, autoEdit, onJoinLive }) => {
   const { t } = useTranslation();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
@@ -547,21 +549,23 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         
         <div className="absolute -bottom-12 left-6 sm:left-12 flex items-end gap-6 sm:gap-8">
            <div className="relative">
-              <div 
-                onClick={() => {
-                  if (stories.length > 0) {
-                    setShowStoryViewer(true);
-                  }
-                }}
-                className={`w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden cursor-pointer relative group/avatar ${stories.length > 0 ? 'ring-pink-500 ring-offset-2 ring-offset-[var(--vix-bg)]' : ''}`}
-              >
-                <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-secondary)] group-hover/avatar:scale-110 transition-transform duration-500" />
-                {stories.length > 0 && (
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                    <Play className="w-8 h-8 text-white fill-white" />
-                  </div>
-                )}
-              </div>
+              <LiveIndicator user={user} size="xl" showText={true} onClick={() => onJoinLive?.(user)}>
+                <div 
+                  onClick={() => {
+                    if (stories.length > 0) {
+                      setShowStoryViewer(true);
+                    }
+                  }}
+                  className={`w-28 h-28 sm:w-40 sm:h-40 rounded-full p-1 bg-[var(--vix-bg)] ring-4 ring-[var(--vix-bg)] shadow-2xl overflow-hidden cursor-pointer relative group/avatar ${stories.length > 0 ? 'ring-pink-500 ring-offset-2 ring-offset-[var(--vix-bg)]' : ''}`}
+                >
+                  <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} className="w-full h-full rounded-full object-cover bg-[var(--vix-secondary)] group-hover/avatar:scale-110 transition-transform duration-500" />
+                  {stories.length > 0 && (
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                      <Play className="w-8 h-8 text-white fill-white" />
+                    </div>
+                  )}
+                </div>
+              </LiveIndicator>
               {isOwnProfile && (
                 <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2">
                   <button 

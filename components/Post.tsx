@@ -16,6 +16,7 @@ import { useTranslation } from '../lib/translation';
 import { createNotification } from '../lib/notifications';
 import StickerPicker from './StickerPicker';
 import EmojiPicker from './EmojiPicker';
+import LiveIndicator from './LiveIndicator';
 
 interface PostProps {
   post: PostType;
@@ -26,9 +27,10 @@ interface PostProps {
   onDuet?: (post: PostType) => void;
   onStitch?: (post: PostType) => void;
   onExpand?: (post: PostType) => void;
+  onJoinLive?: (user: UserProfile) => void;
 }
 
-const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand }) => {
+const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand, onJoinLive }) => {
   const { t, language } = useTranslation();
   const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
@@ -351,9 +353,9 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       )}
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectUser?.(post.user)}>
-          <div className="relative p-0.5 rounded-full">
+          <LiveIndicator user={post.user} size="md" onClick={() => onJoinLive?.(post.user)}>
             <img src={post.user.avatar_url || `https://ui-avatars.com/api/?name=${post.user.username}`} className="w-10 h-10 rounded-full object-cover border border-[var(--vix-border)] shadow-sm" />
-          </div>
+          </LiveIndicator>
           <div className="flex flex-col">
             <span className="text-sm font-bold flex items-center gap-1 text-[var(--vix-text)]">
               {post.user.username} {post.user.is_verified && <VerificationBadge size="w-3 h-3" />}
