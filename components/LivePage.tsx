@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
-import { Loader2, Video, Users, Play } from 'lucide-react';
+import { Loader2, Video, Users, Play, Heart, MessageCircle, Plus } from 'lucide-react';
 import VerificationBadge from './VerificationBadge';
 
 interface LivePageProps {
@@ -74,89 +74,99 @@ const LivePage: React.FC<LivePageProps> = ({ onJoinStream }) => {
   }
 
   return (
-    <div className="animate-vix-in pb-20">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-[var(--vix-text)] flex items-center gap-3">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-            {t('Live Now')}
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">{t('Watch real-time streams from the community')}</p>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full">
-          <Users className="w-4 h-4 text-red-500" />
-          <span className="text-red-500 font-black text-[10px] uppercase tracking-widest">{liveUsers.length} {t('Active')}</span>
-        </div>
-      </div>
-
+    <div className="h-screen w-full bg-black overflow-y-scroll snap-y snap-mandatory no-scrollbar">
       {liveUsers.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {liveUsers.map((user) => (
-            <div 
-              key={user.id} 
-              className="group relative aspect-[9/16] bg-[var(--vix-card)] rounded-[2rem] overflow-hidden border border-[var(--vix-border)] hover:border-red-500/50 transition-all cursor-pointer shadow-xl shadow-black/20"
-              onClick={() => onJoinStream(user)}
-            >
-              {/* Preview Background (using avatar as placeholder) */}
-              <div className="absolute inset-0">
-                <img 
-                  src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} 
-                  className="w-full h-full object-cover blur-md opacity-30 scale-110" 
-                  alt=""
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
-              </div>
-
-              {/* Live Badge */}
-              <div className="absolute top-4 left-4 flex items-center gap-2">
-                <div className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg shadow-red-500/20">
-                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                  LIVE
-                </div>
-                <div className="bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/10">
-                  <Users className="w-3 h-3" />
-                  {(user as any).viewer_count || 0}
-                </div>
-              </div>
-
-              {/* User Info */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-tr from-red-500 to-pink-500 shadow-lg">
-                    <img 
-                      src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} 
-                      className="w-full h-full rounded-full object-cover border-2 border-black" 
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-white font-black text-sm flex items-center gap-1">
-                      @{user.username}
-                      {user.is_verified && <VerificationBadge size="w-3.5 h-3.5" />}
-                    </span>
-                    <span className="text-white/60 text-[10px] font-bold uppercase tracking-widest">{t('Streaming Now')}</span>
-                  </div>
-                </div>
-                
-                <button className="w-full py-3 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 group-hover:bg-red-500 group-hover:text-white transition-all shadow-xl">
-                  <Play className="w-4 h-4 fill-current" />
-                  {t('Watch Stream')}
-                </button>
-              </div>
-
-              {/* Hover Effect Overlay */}
-              <div className="absolute inset-0 bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        liveUsers.map((user) => (
+          <div 
+            key={user.id} 
+            className="h-screen w-full snap-start relative flex flex-col justify-end pb-24 px-4"
+            onClick={() => onJoinStream(user)}
+          >
+            {/* Background Preview */}
+            <div className="absolute inset-0 z-0">
+              <img 
+                src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} 
+                className="w-full h-full object-cover opacity-50 blur-sm" 
+                alt=""
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-32 flex flex-col items-center justify-center bg-[var(--vix-secondary)]/20 rounded-[3rem] border border-dashed border-[var(--vix-border)]">
-          <div className="w-20 h-20 bg-[var(--vix-secondary)] rounded-full flex items-center justify-center mb-6">
-            <Video className="w-10 h-10 text-zinc-700" />
+
+            {/* Live Badge & Viewer Count */}
+            <div className="absolute top-12 left-4 z-10 flex items-center gap-2">
+              <div className="bg-red-600 text-white text-[11px] font-black px-3 py-1 rounded-sm flex items-center gap-1.5 shadow-lg">
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                LIVE
+              </div>
+              <div className="bg-black/40 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/10">
+                <Users className="w-3.5 h-3.5" />
+                {(user as any).viewer_count || 0}
+              </div>
+            </div>
+
+            {/* User Info & Interaction */}
+            <div className="relative z-10 flex flex-col gap-4 max-w-md animate-vix-in">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-red-500 to-pink-500 shadow-xl">
+                  <img 
+                    src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}`} 
+                    className="w-full h-full rounded-full object-cover border-2 border-black" 
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-white font-black text-lg flex items-center gap-1 drop-shadow-md">
+                    @{user.username}
+                    {user.is_verified && <VerificationBadge size="w-4 h-4" />}
+                  </span>
+                  <span className="text-white/80 text-xs font-medium drop-shadow-md">{t('Streaming Now')}</span>
+                </div>
+              </div>
+              
+              <p className="text-white/90 text-sm line-clamp-2 drop-shadow-md">
+                {t('Join the conversation and watch this live broadcast!')}
+              </p>
+
+              <button className="w-full py-4 bg-red-600 text-white rounded-lg font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-red-700 transition-all shadow-2xl active:scale-95">
+                <Play className="w-5 h-5 fill-current" />
+                {t('Watch Stream')}
+              </button>
+            </div>
+
+            {/* Side Actions (TikTok style) */}
+            <div className="absolute right-4 bottom-32 z-10 flex flex-col items-center gap-6">
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer">
+                  <Heart className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-bold">{(user as any).viewer_count * 12}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-bold">{(user as any).viewer_count * 3}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer">
+                  <Plus className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-bold">{t('Share')}</span>
+              </div>
+            </div>
           </div>
-          <h3 className="text-xl font-black text-[var(--vix-text)] mb-2">{t('No active streams')}</h3>
-          <p className="text-zinc-500 text-sm text-center max-w-xs px-6">
+        ))
+      ) : (
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-black px-6 text-center">
+          <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center mb-8 border border-zinc-800">
+            <Video className="w-12 h-12 text-zinc-700" />
+          </div>
+          <h3 className="text-2xl font-black text-white mb-3">{t('No active streams')}</h3>
+          <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">
             {t('Be the first to go live and start your own community broadcast!') }
           </p>
+          <button className="mt-8 px-8 py-3 bg-white text-black rounded-full font-black text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all">
+            {t('Go Live')}
+          </button>
         </div>
       )}
     </div>
