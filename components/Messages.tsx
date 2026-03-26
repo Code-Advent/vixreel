@@ -305,10 +305,10 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-white dark:bg-black overflow-hidden animate-vix-in">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-80px)] bg-white dark:bg-black overflow-hidden animate-vix-in">
       
       {/* Sidebar - Chat List */}
-      <div className={`w-full md:w-full flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'} h-full`}>
+      <div className={`w-full md:w-80 lg:w-96 md:border-r border-gray-100 dark:border-zinc-900 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'} h-full`}>
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-100 dark:border-zinc-900">
           <div className="flex items-center justify-between mb-4">
@@ -324,8 +324,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
           </div>
 
           {/* TikTok Activities Row */}
-          <div className="flex justify-between px-2 py-4">
-            <div className="flex flex-col items-center gap-2 cursor-pointer group">
+          <div className="flex justify-between px-2 py-4 overflow-x-auto no-scrollbar gap-4">
+            <div className="flex flex-col items-center gap-2 cursor-pointer group min-w-[60px]">
               <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
                 <Users className="w-6 h-6 text-white" />
               </div>
@@ -579,22 +579,13 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
             )}
             
             <div className="flex items-end gap-3 max-w-5xl mx-auto">
-              <div className="flex items-center gap-1 mb-1">
+              <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-zinc-900 rounded-2xl px-4 py-1.5">
                 <button 
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-900 rounded-full transition-all"
+                  className="p-1.5 text-black dark:text-white hover:text-pink-500 transition-colors"
                 >
                   <ImageIcon className="w-6 h-6" />
                 </button>
-                <button 
-                  onClick={() => setShowStickerPicker(!showStickerPicker)}
-                  className="p-2 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-900 rounded-full transition-all"
-                >
-                  <StickerIcon className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-zinc-900 rounded-2xl px-4 py-1.5">
                 <textarea 
                   ref={messageInputRef}
                   value={text} 
@@ -609,12 +600,54 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
                   rows={1}
                   className="flex-1 bg-transparent border-none py-2 text-[15px] outline-none text-black dark:text-white resize-none max-h-32 no-scrollbar" 
                 />
-                <button className="p-1.5 text-black dark:text-white hover:text-pink-500 transition-colors">
+                <button 
+                  onClick={() => setShowFullEmojiPicker(!showFullEmojiPicker)}
+                  className={`p-1.5 transition-colors ${showFullEmojiPicker ? 'text-pink-500' : 'text-black dark:text-white hover:text-pink-500'}`}
+                >
                   <Smile className="w-6 h-6" />
                 </button>
+
+                <button 
+                  onClick={() => setShowStickerPicker(!showStickerPicker)}
+                  className={`p-1.5 transition-colors ${showStickerPicker ? 'text-pink-500' : 'text-black dark:text-white hover:text-pink-500'}`}
+                >
+                  <StickerIcon className="w-6 h-6" />
+                </button>
+
+                {showFullEmojiPicker && (
+                  <div className="absolute bottom-full right-0 mb-4 z-[200]">
+                    <div className="fixed inset-0" onClick={() => setShowFullEmojiPicker(false)} />
+                    <div className="relative">
+                      <EmojiPicker 
+                        onEmojiClick={(emojiData: EmojiClickData) => {
+                          setText(prev => prev + emojiData.emoji);
+                          setShowFullEmojiPicker(false);
+                          messageInputRef.current?.focus();
+                        }}
+                        theme={EmojiTheme.AUTO}
+                        lazyLoadEmojis={true}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center mb-1">
+              <div className="flex items-center mb-1 relative">
+                {showStickerPicker && (
+                  <div className="absolute bottom-full right-0 mb-4 z-[200]">
+                    <div className="fixed inset-0" onClick={() => setShowStickerPicker(false)} />
+                    <div className="relative">
+                      <StickerPicker 
+                        currentUser={currentUser}
+                        onSelect={(url) => {
+                          sendSticker(url);
+                          setShowStickerPicker(false);
+                        }}
+                        onClose={() => setShowStickerPicker(false)}
+                      />
+                    </div>
+                  </div>
+                )}
                 {isUploading ? (
                   <div className="p-2">
                     <Loader2 className="w-6 h-6 animate-spin text-pink-500" />
@@ -632,6 +665,22 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
             </div>
             <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
           </div>
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-gray-50 dark:bg-black">
+          <div className="w-24 h-24 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center mb-6 shadow-xl border border-gray-100 dark:border-zinc-800">
+            <MessageCircle className="w-12 h-12 text-gray-300" />
+          </div>
+          <h3 className="text-xl font-bold text-black dark:text-white mb-2">{t('Your Messages')}</h3>
+          <p className="text-gray-500 text-sm max-w-xs text-center">
+            {t('Send private messages to your friends and followers.')}
+          </p>
+          <button 
+            onClick={() => setShowNewChatModal(true)}
+            className="mt-8 px-8 py-3 bg-pink-500 text-white rounded-full font-bold text-sm hover:bg-pink-600 transition-all shadow-lg active:scale-95"
+          >
+            {t('Send Message')}
+          </button>
         </div>
       )}
 

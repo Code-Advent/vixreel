@@ -73,8 +73,8 @@ const StickerPicker: React.FC<StickerPickerProps> = ({ currentUser, onSelect, on
   };
 
   return (
-    <div className="absolute bottom-20 left-0 w-80 bg-[var(--vix-card)] border border-[var(--vix-border)] rounded-3xl shadow-2xl z-50 overflow-hidden animate-vix-in">
-      <div className="p-4 border-b border-[var(--vix-border)] flex justify-between items-center bg-[var(--vix-secondary)]/20">
+    <div className="w-80 bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden animate-vix-in">
+      <div className="p-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-800/50">
         <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t('Stickers')}</h3>
         <button onClick={onClose} className="text-zinc-500 hover:text-[var(--vix-text)]"><X className="w-4 h-4" /></button>
       </div>

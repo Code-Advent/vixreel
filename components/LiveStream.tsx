@@ -1,9 +1,10 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { UserProfile } from '../types';
-import { X, Users as UsersIcon } from 'lucide-react';
+import { X, Users as UsersIcon, Heart, Share2, Gift, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface LiveStreamProps {
   currentUser: UserProfile;
@@ -12,9 +13,33 @@ interface LiveStreamProps {
   onClose: () => void;
 }
 
+interface FloatingHeart {
+  id: number;
+  x: number;
+  color: string;
+  size: number;
+}
+
 const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, onClose }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewerCount, setViewerCount] = useState(0);
+  const [hearts, setHearts] = useState<FloatingHeart[]>([]);
+  const [isLiked, setIsLiked] = useState(false);
+
+  const addHeart = useCallback(() => {
+    const id = Date.now();
+    const colors = ['#ff4b2b', '#ff416c', '#ff0080', '#ff00cc', '#ffcc00'];
+    const newHeart: FloatingHeart = {
+      id,
+      x: Math.random() * 40 - 20, // Random horizontal offset
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: Math.random() * 10 + 20,
+    };
+    setHearts(prev => [...prev, newHeart]);
+    setTimeout(() => {
+      setHearts(prev => prev.filter(h => h.id !== id));
+    }, 2000);
+  }, []);
 
   useEffect(() => {
     // Fetch initial viewer count
@@ -110,6 +135,11 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
         },
       },
       showPreJoinView: false,
+      turnOnCameraWhenJoining: true,
+      showMyCameraToggleButton: isHost,
+      showMyMicrophoneToggleButton: isHost,
+      showAudioVideoSettingsButton: isHost,
+      showScreenSharingButton: isHost,
       onJoinRoom: () => {
         startLive();
       },
@@ -128,7 +158,7 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
   }, [currentUser, roomID, isHost, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black flex flex-col animate-vix-in">
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col animate-vix-in overflow-hidden">
       {/* Top Overlay */}
       <div className="absolute top-6 left-6 right-6 z-[210] flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-3">
@@ -148,9 +178,11 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
                 <span className="text-white/60 text-[9px] font-bold">{viewerCount}</span>
               </div>
             </div>
-            <button className="ml-2 bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-full hover:bg-red-600 transition-all active:scale-90">
-              FOLLOW
-            </button>
+            {!isHost && (
+              <button className="ml-2 bg-pink-500 text-white text-[9px] font-black px-3 py-1 rounded-full hover:bg-pink-600 transition-all active:scale-90">
+                FOLLOW
+              </button>
+            )}
           </div>
 
           {/* Live Badge */}
@@ -184,11 +216,13 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
       {/* Bottom Overlay (TikTok Style) */}
       <div className="absolute bottom-10 left-6 right-6 z-[210] flex flex-col gap-4 pointer-events-none">
         {/* Mock Chat Messages */}
-        <div className="flex flex-col gap-2 max-w-[280px]">
+        <div className="flex flex-col gap-2 max-w-[280px] h-48 overflow-y-auto no-scrollbar mask-fade-top">
           {[
             { user: 'Alex', msg: 'This is amazing! 🔥' },
             { user: 'Sarah', msg: 'Love the content!' },
-            { user: 'Mike', msg: 'Joined the stream' }
+            { user: 'Mike', msg: 'Joined the stream' },
+            { user: 'David', msg: 'Hello from London! 🇬🇧' },
+            { user: 'Jessica', msg: 'Wow, so cool!' }
           ].map((chat, i) => (
             <div key={i} className="bg-black/20 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/5 animate-vix-in" style={{ animationDelay: `${i * 150}ms` }}>
               <span className="text-yellow-400 text-[11px] font-black mr-2">{chat.user}</span>
@@ -199,23 +233,54 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
 
         {/* Interaction Bar */}
         <div className="flex items-center justify-between pointer-events-auto">
-          <div className="flex-1 max-w-[200px] bg-black/40 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2.5">
+          <div className="flex-1 max-w-[200px] bg-black/40 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2.5 flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-white/40" />
             <span className="text-white/40 text-xs font-medium">Add comment...</span>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="w-11 h-11 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all active:scale-90">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <div className="flex items-center gap-3 relative">
+            {/* Animated Hearts Container */}
+            <div className="absolute bottom-full right-0 mb-4 pointer-events-none">
+              <AnimatePresence>
+                {hearts.map(heart => (
+                  <motion.div
+                    key={heart.id}
+                    initial={{ y: 0, opacity: 1, scale: 0.5, x: heart.x }}
+                    animate={{ y: -200, opacity: 0, scale: 1.5, x: heart.x + (Math.random() * 40 - 20) }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    className="absolute bottom-0 right-4"
+                  >
+                    <Heart 
+                      fill={heart.color} 
+                      color={heart.color} 
+                      size={heart.size} 
+                      className="drop-shadow-lg"
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            <button 
+              onClick={() => {
+                setIsLiked(!isLiked);
+                addHeart();
+              }}
+              className={`w-11 h-11 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center transition-all active:scale-90 ${isLiked ? 'bg-pink-500 text-white border-pink-500' : 'bg-black/40 text-white'}`}
+            >
+              <Heart className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
             </button>
             <button className="w-11 h-11 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all active:scale-90">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+              <Share2 className="w-6 h-6" />
             </button>
             <div className="w-11 h-11 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-orange-500/20 cursor-pointer hover:scale-110 transition-all active:scale-90">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.65-.5-.65C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36 2.38 3.24L17 10.83 14.92 8H20v6z"/></svg>
+              <Gift className="w-6 h-6" />
             </div>
           </div>
         </div>
       </div>
 
+      {/* ZEGOCLOUD Container */}
       <div ref={containerRef} className="w-full h-full" />
     </div>
   );
