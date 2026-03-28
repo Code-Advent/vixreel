@@ -46,7 +46,7 @@ const Admin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [passError, setPassError] = useState(false);
 
-  const ADMIN_CODE = "VIX-2025";
+  const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "VIX-2025";
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);

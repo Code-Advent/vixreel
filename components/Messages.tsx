@@ -184,7 +184,19 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setChats(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+      if (activeChat?.id === id) {
+        setActiveChat(prev => prev ? { ...prev, ...updates } : null);
+      }
+    };
+
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
+    return () => { 
+      supabase.removeChannel(channel); 
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
+    };
   }, [activeChat?.id, currentUser.id]);
 
   useEffect(() => {
@@ -411,7 +423,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
       </div>
 
       {/* Main Chat Area - Overlay for mobile, side for desktop */}
-      {activeChat && (
+      {activeChat ? (
         <div className="fixed inset-0 z-[150] md:relative md:flex-1 flex flex-col bg-white dark:bg-black animate-vix-in">
           {/* Chat Header */}
           <div className="h-16 px-4 flex items-center justify-between border-b border-gray-100 dark:border-zinc-900 shadow-sm">

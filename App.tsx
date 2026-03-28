@@ -76,6 +76,9 @@ const AppContent: React.FC = () => {
         });
       }
       if (viewedUser?.id === id) setViewedUser(prev => prev ? { ...prev, ...updates } : null);
+      if (selectedPost?.user_id === id) {
+        setSelectedPost(prev => prev ? { ...prev, user: { ...prev.user, ...updates } } : null);
+      }
       setPosts(prev => prev.map(p => p.user_id === id ? { ...p, user: { ...p.user, ...updates } } : p));
     };
 
@@ -88,7 +91,7 @@ const AppContent: React.FC = () => {
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
-  }, [currentUser?.id, viewedUser?.id]);
+  }, [currentUser, viewedUser, selectedPost]);
 
   useEffect(() => {
     // Apply theme to document element

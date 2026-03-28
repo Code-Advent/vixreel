@@ -168,20 +168,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
       }
     };
 
-    const handleIdentityUpdate = (e: any) => {
-      const { id, ...updates } = e.detail;
-      if (post.user_id === id) {
-        post.user = { ...post.user, ...updates };
-        // Force re-render by updating a dummy state if needed, but let's see if this works
-      }
-    };
-
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
-    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
       supabase.removeChannel(postSub);
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
-      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
   }, [post.id]);
 

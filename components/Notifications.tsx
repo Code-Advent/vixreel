@@ -34,8 +34,15 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
       })
       .subscribe();
 
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setNotifications(prev => prev.map(n => n.actor_id === id ? { ...n, actor: { ...n.actor, ...updates } } : n));
+    };
+
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
       supabase.removeChannel(subscription);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
   }, [currentUser.id]);
 
@@ -143,8 +150,8 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, onSelectUser
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[var(--vix-text)] leading-tight">
-                  <span className="font-bold mr-1" onClick={(e) => { e.stopPropagation(); if (n.actor) onSelectUser?.(n.actor); }}>
-                    @{n.actor?.username}
+                  <span className="font-bold mr-1 flex items-center gap-1" onClick={(e) => { e.stopPropagation(); if (n.actor) onSelectUser?.(n.actor); }}>
+                    @{n.actor?.username} {n.actor?.is_verified && <VerificationBadge size="w-3 h-3" />}
                   </span>
                   <span className="text-zinc-500">{getMessage(n)}</span>
                 </p>

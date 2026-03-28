@@ -133,12 +133,19 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       }
     };
 
+    const handleIdentityUpdate = (e: any) => {
+      const { id, ...updates } = e.detail;
+      setComments(prev => prev.map(c => c.user_id === id ? { ...c, user: { ...c.user, ...updates } } : c));
+    };
+
     window.addEventListener('vixreel-engagement-updated', handleEngagement);
     window.addEventListener('vixreel-post-updated', handlePostUpdate);
+    window.addEventListener('vixreel-user-updated', handleIdentityUpdate);
     return () => {
       supabase.removeChannel(postSub);
       window.removeEventListener('vixreel-engagement-updated', handleEngagement);
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
+      window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
   }, [post.id, showComments, post.boosted_likes]);
 
