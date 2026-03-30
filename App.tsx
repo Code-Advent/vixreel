@@ -124,7 +124,12 @@ const AppContent: React.FC = () => {
       if (session?.user) {
         const profile = await resolveIdentity(session.user);
         if (profile) {
-          if (session.user.email === 'davidhen498@gmail.com') profile.is_admin = true;
+          if (session.user.email === 'davidhen498@gmail.com') {
+            if (!profile.is_admin) {
+              supabase.from('profiles').update({ is_admin: true }).eq('id', profile.id).then();
+            }
+            profile.is_admin = true;
+          }
           
           setCurrentUser(profile);
           syncSavedAccount(profile, session);

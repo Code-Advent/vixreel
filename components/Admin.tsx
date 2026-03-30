@@ -47,6 +47,7 @@ const Admin: React.FC = () => {
   const [passError, setPassError] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'success' | 'error'>('success');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "VIX-2025";
 
@@ -318,12 +319,26 @@ const Admin: React.FC = () => {
         .insert(videos);
 
       if (seedErr) throw seedErr;
-      alert("Successfully seeded 100 engaging videos!");
+      showStatus("Successfully seeded 100 engaging videos!");
     } catch (err: any) {
       console.error("Seed Error:", err);
-      alert("Seed Failed: " + err.message);
+      showStatus("Seed Failed: " + err.message, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearEngagingVideos = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('engaging_videos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) throw error;
+      showStatus("Successfully cleared all engaging videos!");
+    } catch (err: any) {
+      showStatus("Clear Failed: " + err.message, 'error');
+    } finally {
+      setLoading(false);
+      setShowClearConfirm(false);
     }
   };
 
@@ -563,13 +578,17 @@ const Admin: React.FC = () => {
                           <span className="text-[9px] font-black text-white">{formatNumber(p.boosted_likes || 0)}</span>
                         </div>
 
-                        <button 
-                          onClick={() => handleBoost(p.id)}
-                          className="absolute inset-0 bg-purple-500/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all backdrop-blur-md"
-                        >
-                          <ArrowUpCircle className="w-10 h-10 text-white mb-2 animate-bounce" />
-                          <span className="text-[9px] font-black text-white uppercase">{t('Add')} {formatNumber(parseInt(boostAmount))} {t('Likes')}</span>
-                        </button>
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-purple-500/40 transition-all backdrop-blur-[1px] group-hover:backdrop-blur-md flex flex-col items-center justify-center">
+                          <button 
+                            onClick={() => handleBoost(p.id)}
+                            className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 border border-white/30 flex items-center justify-center transition-all active:scale-90 mb-2"
+                          >
+                            <ArrowUpCircle className="w-6 h-6 text-white" />
+                          </button>
+                          <span className="text-[8px] font-black text-white uppercase tracking-widest bg-black/40 px-2 py-1 rounded-full border border-white/10">
+                            {t('Add')} {formatNumber(parseInt(boostAmount))}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -669,35 +688,47 @@ const Admin: React.FC = () => {
               <p className="text-zinc-600 text-[11px] font-bold uppercase tracking-[0.4em] mb-12 max-w-md">{t('Seed the application with engaging videos from TikTok and Instagram.')}</p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <button 
-                  onClick={handleSeedEngagingVideos}
-                  disabled={loading}
-                  className="px-12 py-5 vix-gradient rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  {t('Seed 100 Engaging Videos')}
-                </button>
-                
-                <button 
-                  onClick={async () => {
-                    if (!confirm("Are you sure you want to clear all engaging videos?")) return;
-                    setLoading(true);
-                    try {
-                      const { error } = await supabase.from('engaging_videos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                      if (error) throw error;
-                      alert("Successfully cleared all engaging videos!");
-                    } catch (err: any) {
-                      alert("Clear Failed: " + err.message);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                  className="px-12 py-5 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] text-red-500 font-black uppercase tracking-widest text-[11px] hover:bg-red-500 hover:text-white transition-all flex items-center gap-3 disabled:opacity-50"
-                >
-                  <AlertTriangle className="w-5 h-5" />
-                  {t('Clear All')}
-                </button>
+                {!showClearConfirm ? (
+                  <>
+                    <button 
+                      onClick={handleSeedEngagingVideos}
+                      disabled={loading}
+                      className="px-12 py-5 vix-gradient rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                      {t('Seed 100 Engaging Videos')}
+                    </button>
+                    
+                    <button 
+                      onClick={() => setShowClearConfirm(true)}
+                      disabled={loading}
+                      className="px-12 py-5 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] text-red-500 font-black uppercase tracking-widest text-[11px] hover:bg-red-500 hover:text-white transition-all flex items-center gap-3 disabled:opacity-50"
+                    >
+                      <AlertTriangle className="w-5 h-5" />
+                      {t('Clear All')}
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 bg-red-500/5 p-8 rounded-[2.5rem] border border-red-500/20 animate-vix-in">
+                    <p className="text-red-500 font-black uppercase tracking-widest text-[10px]">{t('Are you absolutely sure?')}</p>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={handleClearEngagingVideos}
+                        disabled={loading}
+                        className="px-8 py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-50"
+                      >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Yes, Clear Everything')}
+                      </button>
+                      <button 
+                        onClick={() => setShowClearConfirm(false)}
+                        disabled={loading}
+                        className="px-8 py-4 bg-zinc-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all"
+                      >
+                        {t('Cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
