@@ -6,6 +6,7 @@ import { Story, UserProfile } from '../types';
 import { sanitizeFilename } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 
 interface StoriesProps {
   currentUser?: UserProfile | null;
@@ -13,6 +14,7 @@ interface StoriesProps {
 
 const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
   const { t } = useTranslation();
+  const { showStatus } = useStatus();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -55,7 +57,7 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
 
     // Validation
     if (file.size > 50 * 1024 * 1024) {
-      alert(t("Story file is too large (max 50MB)."));
+      showStatus(t("Story file is too large (max 50MB)."), 'error');
       return;
     }
 
@@ -88,7 +90,7 @@ const Stories: React.FC<StoriesProps> = ({ currentUser }) => {
       await fetchStories();
     } catch (err: any) {
       console.error("Story Error:", err);
-      alert(t("Story upload failed: ") + err.message);
+      showStatus(t("Story upload failed: ") + err.message, 'error');
     } finally {
       setIsUploading(false);
     }

@@ -12,6 +12,7 @@ import VerificationBadge from './VerificationBadge';
 import Post from './Post';
 import { COUNTRIES_DATA } from '../constants';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 import { createNotification } from '../lib/notifications';
 import LiveIndicator from './LiveIndicator';
 
@@ -31,6 +32,7 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, onMessageUser, onLogout, onOpenSettings, onNavigateToChannels, onSelectChannel, onExpand, autoEdit, onJoinLive }) => {
   const { t } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostType[]>([]);
   const [userChannels, setUserChannels] = useState<Channel[]>([]);
@@ -314,7 +316,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
   const saveProfileChanges = async () => {
     if (!editUsername.trim()) {
-      alert("Username cannot be empty.");
+      showStatus(t("Username cannot be empty"), 'error');
       return;
     }
 
@@ -403,6 +405,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       setIsEditModalOpen(false);
       setEditAvatarFile(null);
       setEditCoverFile(null);
+      showStatus(t('Profile updated successfully'));
       
       // Notify other components
       window.dispatchEvent(new CustomEvent('vixreel-user-updated', { 
@@ -417,7 +420,7 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
     } catch (err: any) {
       console.error("VixReel Identity Sync Error:", err);
-      alert(err.message || "Failed to synchronize profile changes.");
+      showStatus(err.message || t("Failed to synchronize profile changes"), 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -459,9 +462,9 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       if (dbErr) throw dbErr;
 
       fetchUserContent();
-      alert(t('Story uploaded successfully!'));
+      showStatus(t('Story uploaded successfully!'));
     } catch (err: any) {
-      alert(t('Failed to upload story: ') + err.message);
+      showStatus(t('Failed to upload story: ') + err.message, 'error');
     } finally {
       setIsUploadingStory(false);
     }
@@ -769,12 +772,13 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
                 {isOwnProfile && activeTab === 'POSTS' && (
                   <button 
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (window.confirm(t('Are you sure you want to delete this post?'))) {
-                        supabase.from('posts').delete().eq('id', post.id).then(() => {
-                          window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
-                        });
+                      const confirmed = await confirm(t('Delete Post'), t('Are you sure you want to delete this post?'));
+                      if (confirmed) {
+                        await supabase.from('posts').delete().eq('id', post.id);
+                        window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
+                        showStatus(t('Post deleted successfully'));
                       }
                     }}
                     className="absolute top-2 left-2 p-2 bg-black/50 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all z-20"

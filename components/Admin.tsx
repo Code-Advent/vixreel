@@ -25,9 +25,11 @@ import { UserProfile, Post, Channel } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { formatNumber } from '../lib/utils';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 
 const Admin: React.FC = () => {
   const { t } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const [activeTab, setActiveTab] = useState<'USERS' | 'CHANNELS' | 'CONTENT'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -45,17 +47,8 @@ const Admin: React.FC = () => {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [password, setPassword] = useState('');
   const [passError, setPassError] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [statusType, setStatusType] = useState<'success' | 'error'>('success');
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "VIX-2025";
-
-  const showStatus = (msg: string, type: 'success' | 'error' = 'success') => {
-    setStatusMessage(msg);
-    setStatusType(type);
-    setTimeout(() => setStatusMessage(null), 3000);
-  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -329,16 +322,22 @@ const Admin: React.FC = () => {
   };
 
   const handleClearEngagingVideos = async () => {
+    const confirmed = await confirm(
+      t("Clear All Engaging Videos"),
+      t("Are you absolutely sure? This will remove all seeded content.")
+    );
+    
+    if (!confirmed) return;
+
     setLoading(true);
     try {
       const { error } = await supabase.from('engaging_videos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
-      showStatus("Successfully cleared all engaging videos!");
+      showStatus(t("Successfully cleared all engaging videos!"));
     } catch (err: any) {
-      showStatus("Clear Failed: " + err.message, 'error');
+      showStatus(t("Clear Failed") + ": " + err.message, 'error');
     } finally {
       setLoading(false);
-      setShowClearConfirm(false);
     }
   };
 
@@ -395,12 +394,6 @@ const Admin: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-10 max-w-7xl mx-auto pb-32 sm:pb-10 animate-vix-in relative">
-      {statusMessage && (
-        <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 rounded-2xl shadow-2xl border animate-vix-in flex items-center gap-3 ${statusType === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
-          {statusType === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-          <span className="text-[10px] font-black uppercase tracking-widest">{statusMessage}</span>
-        </div>
-      )}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-8">
         <div className="flex items-center gap-6">
           <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-[2rem] shadow-2xl">
@@ -687,49 +680,25 @@ const Admin: React.FC = () => {
               <h3 className="text-3xl font-black uppercase tracking-[0.2em] text-[var(--vix-text)] mb-4">{t('Content Management')}</h3>
               <p className="text-zinc-600 text-[11px] font-bold uppercase tracking-[0.4em] mb-12 max-w-md">{t('Seed the application with engaging videos from TikTok and Instagram.')}</p>
               
-              <div className="flex flex-col sm:flex-row gap-4">
-                {!showClearConfirm ? (
-                  <>
-                    <button 
-                      onClick={handleSeedEngagingVideos}
-                      disabled={loading}
-                      className="px-12 py-5 vix-gradient rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                      {t('Seed 100 Engaging Videos')}
-                    </button>
-                    
-                    <button 
-                      onClick={() => setShowClearConfirm(true)}
-                      disabled={loading}
-                      className="px-12 py-5 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] text-red-500 font-black uppercase tracking-widest text-[11px] hover:bg-red-500 hover:text-white transition-all flex items-center gap-3 disabled:opacity-50"
-                    >
-                      <AlertTriangle className="w-5 h-5" />
-                      {t('Clear All')}
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-4 bg-red-500/5 p-8 rounded-[2.5rem] border border-red-500/20 animate-vix-in">
-                    <p className="text-red-500 font-black uppercase tracking-widest text-[10px]">{t('Are you absolutely sure?')}</p>
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={handleClearEngagingVideos}
-                        disabled={loading}
-                        className="px-8 py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-50"
-                      >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('Yes, Clear Everything')}
-                      </button>
-                      <button 
-                        onClick={() => setShowClearConfirm(false)}
-                        disabled={loading}
-                        className="px-8 py-4 bg-zinc-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all"
-                      >
-                        {t('Cancel')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <button 
+          onClick={handleSeedEngagingVideos}
+          disabled={loading}
+          className="px-12 py-5 vix-gradient rounded-[2.5rem] text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-pink-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+          {t('Seed 100 Engaging Videos')}
+        </button>
+        
+        <button 
+          onClick={handleClearEngagingVideos}
+          disabled={loading}
+          className="px-12 py-5 bg-red-500/10 border border-red-500/20 rounded-[2.5rem] text-red-500 font-black uppercase tracking-widest text-[11px] hover:bg-red-500 hover:text-white transition-all flex items-center gap-3 disabled:opacity-50"
+        >
+          <AlertTriangle className="w-5 h-5" />
+          {t('Clear All')}
+        </button>
+      </div>
             </div>
           )}
         </div>

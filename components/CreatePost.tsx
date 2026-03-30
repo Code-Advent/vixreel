@@ -11,6 +11,7 @@ import { generateAIText, generateAIImage } from '../services/geminiService';
 import { sanitizeFilename, formatExternalLink } from '../lib/utils';
 import { Post, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 import { createNotification } from '../lib/notifications';
 import LiveStream from './LiveStream';
 
@@ -24,6 +25,7 @@ interface CreatePostProps {
 
 const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, duetSource, stitchSource }) => {
   const { t } = useTranslation();
+  const { showStatus } = useStatus();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -47,7 +49,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.size > 50 * 1024 * 1024) {
-         alert("Max 50MB allowed.");
+         showStatus(t("Max 50MB allowed"), 'error');
          return;
       }
       setFile(selectedFile);
@@ -68,7 +70,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
 
   const handleGenerateAIImage = async () => {
     if (isGeneratingImage || !caption) {
-      alert("Please write a description in the caption first to guide the AI.");
+      showStatus(t("Please write a description in the caption first to guide the AI"), 'warning');
       return;
     }
     setIsGeneratingImage(true);
@@ -82,8 +84,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
         setFile(generatedFile);
         setPreview(imageUrl);
         setMediaType('image');
+        showStatus(t('AI Image generated!'));
       } else {
-        alert("Failed to generate image. Please try a different description.");
+        showStatus(t("Failed to generate image. Please try a different description"), 'error');
       }
     } finally { setIsGeneratingImage(false); }
   };
@@ -164,9 +167,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
 
       onPostSuccess();
       onClose();
+      showStatus(t('Post shared successfully!'));
     } catch (err: any) {
       console.error("Post Upload Error:", err);
-      alert(err.message || "Failed to share post.");
+      showStatus(err.message || t("Failed to share post"), 'error');
     } finally { setIsPosting(false); }
   };
 

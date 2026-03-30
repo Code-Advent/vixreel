@@ -26,6 +26,7 @@ import {
 import { UserProfile, ViewType } from '../types';
 import { supabase } from '../lib/supabase';
 import { useTranslation, SUPPORTED_LANGUAGES } from '../lib/translation';
+import { useStatus } from '../lib/status';
 
 interface SettingsPageProps {
   user: UserProfile;
@@ -49,6 +50,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onTriggerEditProfile
 }) => {
   const { t, language, setLanguage, isTranslating, translationProgress, syncLanguage, isSynced } = useTranslation();
+  const { showStatus } = useStatus();
   const [isPrivate, setIsPrivate] = useState(user.is_private || false);
   const [allowComments, setAllowComments] = useState(user.allow_comments !== false);
   const [isFollowingPublic, setIsFollowingPublic] = useState(user.is_following_public !== false);
@@ -131,7 +133,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       onLogout();
     } catch (err) {
       console.error("Identity Termination Failure:", err);
-      alert("Failed to terminate identity. Please contact core support.");
+      showStatus(t("Failed to terminate identity. Please contact core support."), 'error');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

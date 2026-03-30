@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, Message, MessageReaction } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 import { sanitizeFilename } from '../lib/utils';
 import StickerPicker from './StickerPicker';
 import LiveStream from './LiveStream';
@@ -30,6 +31,7 @@ interface ChatPreview extends UserProfile {
 
 const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoinLive }) => {
   const { t } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [activeChat, setActiveChat] = useState<UserProfile | null>(initialChatUser || null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -239,29 +241,38 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!confirm(t('Are you sure you want to delete this message?'))) return;
-    try {
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-      if (error) throw error;
-      setMessages(prev => prev.filter(m => m.id !== messageId));
-    } catch (err) {
-      console.error("Delete message error:", err);
+    const confirmed = await confirm(t('Delete Message'), t('Are you sure you want to delete this message?'));
+    if (confirmed) {
+      try {
+        const { error } = await supabase.from('messages').delete().eq('id', messageId);
+        if (error) throw error;
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        showStatus(t('Message deleted'));
+      } catch (err: any) {
+        showStatus(err.message || t('Delete failed'), 'error');
+      }
     }
   };
 
   const deleteConversation = async (otherUserId: string) => {
-    if (!confirm(t('Are you sure you want to remove this conversation? This will delete all messages for both participants.'))) return;
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUser.id})`);
-      
-      if (error) throw error;
-      setChats(prev => prev.filter(c => c.id !== otherUserId));
-      if (activeChat?.id === otherUserId) setActiveChat(null);
-    } catch (err) {
-      console.error("Delete conversation error:", err);
+    const confirmed = await confirm(
+      t('Remove Conversation'),
+      t('Are you sure you want to remove this conversation? This will delete all messages for both participants.')
+    );
+    if (confirmed) {
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUser.id})`);
+        
+        if (error) throw error;
+        setChats(prev => prev.filter(c => c.id !== otherUserId));
+        if (activeChat?.id === otherUserId) setActiveChat(null);
+        showStatus(t('Conversation removed'));
+      } catch (err: any) {
+        showStatus(err.message || t('Failed to remove conversation'), 'error');
+      }
     }
   };
 

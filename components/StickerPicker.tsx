@@ -4,6 +4,7 @@ import { X, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sticker, UserProfile } from '../types';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 
 interface StickerPickerProps {
   currentUser: UserProfile;
@@ -13,6 +14,7 @@ interface StickerPickerProps {
 
 const StickerPicker: React.FC<StickerPickerProps> = ({ currentUser, onSelect, onClose }) => {
   const { t } = useTranslation();
+  const { showStatus } = useStatus();
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -66,7 +68,7 @@ const StickerPicker: React.FC<StickerPickerProps> = ({ currentUser, onSelect, on
       if (newSticker) setStickers(prev => [newSticker, ...prev]);
     } catch (err) {
       console.error('Error uploading sticker:', err);
-      alert('Failed to create sticker');
+      showStatus(t('Failed to create sticker'), 'error');
     } finally {
       setIsUploading(false);
     }

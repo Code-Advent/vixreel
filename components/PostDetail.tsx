@@ -13,6 +13,7 @@ import { translateContent } from '../services/geminiService';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 import StickerPicker from './StickerPicker';
 import EmojiPicker from './EmojiPicker';
 import { createNotification } from '../lib/notifications';
@@ -100,6 +101,7 @@ const CommentItem: React.FC<{ comment: CommentType, language: string, t: any, on
 
 const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onSelectUser }) => {
   const { t, language } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -235,7 +237,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
       });
       setDownloadProgress(100);
       await new Promise(res => setTimeout(res, 800));
-    } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
+    } catch (err: any) { 
+      showStatus(t("Download failed") + ": " + err.message, 'error'); 
+    } finally { 
+      setIsDownloading(false); 
+    }
   };
 
   const handleLike = async () => {
@@ -299,7 +305,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(t("Delete this post?"))) return;
+    const confirmed = await confirm(t("Delete Post"), t("Delete this post?"));
+    if (!confirmed) return;
     setIsDeleting(true);
     try {
       const pathParts = post.media_url.split('/public/posts/');
@@ -310,8 +317,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
       await supabase.from('posts').delete().eq('id', post.id);
       window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
       onClose();
+      showStatus(t('Post deleted successfully'));
     } catch (err: any) { 
-      alert("Delete failed: " + err.message); 
+      showStatus(t("Delete failed") + ": " + err.message, 'error'); 
       setIsDeleting(false); 
     }
   };

@@ -13,6 +13,7 @@ import { UserProfile, Channel, ChannelMember, ChannelPost, ChannelPostComment, C
 import { sanitizeFilename, formatNumber, formatFileSize } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 
 interface ChannelsProps {
   currentUser: UserProfile;
@@ -22,6 +23,7 @@ interface ChannelsProps {
 
 const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel }) => {
   const { t } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAILS'>(initialChannel ? 'DETAILS' : 'LIST');
@@ -115,7 +117,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   const copyChannelLink = (channelId: string) => {
     const url = `${window.location.origin}/channels/${channelId}`;
     navigator.clipboard.writeText(url);
-    alert(t('Channel link copied to clipboard!'));
+    showStatus(t('Channel link copied to clipboard!'));
   };
 
   const handleDownload = async (postId: string, url: string, filename: string) => {
@@ -315,7 +317,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
 
   const leaveChannel = async () => {
     if (!selectedChannel || isLeaving) return;
-    if (!confirm('Are you sure you want to leave this channel?')) return;
+    const confirmed = await confirm(t('Leave Channel'), t('Are you sure you want to leave this channel?'));
+    if (!confirmed) return;
     setIsLeaving(true);
     try {
       const { error } = await supabase
@@ -392,7 +395,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!confirm(t('Are you sure you want to delete this update?'))) return;
+    const confirmed = await confirm(t('Delete Update'), t('Are you sure you want to delete this update?'));
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('channel_posts').delete().eq('id', postId);
       if (error) throw error;
@@ -434,7 +438,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
   };
 
   const transferAdmin = async (targetUserId: string) => {
-    if (!confirm(t('Are you sure you want to promote this user to admin?'))) return;
+    const confirmed = await confirm(t('Promote to Admin'), t('Are you sure you want to promote this user to admin?'));
+    if (!confirmed) return;
     setIsTransferring(true);
     try {
       const { error } = await supabase
@@ -462,7 +467,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         .eq('id', selectedChannel.id);
       if (error) throw error;
       fetchChannelData(selectedChannel.id);
-      alert(t('Channel boosted by 100 followers!'));
+      showStatus(t('Channel boosted by 100 followers!'));
     } catch (err) {
       console.error("Boost error:", err);
     }
@@ -477,7 +482,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
         .eq('id', selectedChannel.id);
       if (error) throw error;
       fetchChannelData(selectedChannel.id);
-      alert(t('Channel verified successfully!'));
+      showStatus(t('Channel verified successfully!'));
     } catch (err) {
       console.error("Verify error:", err);
     }

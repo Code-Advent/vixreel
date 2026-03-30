@@ -20,6 +20,7 @@ import EngagingVideos from './components/EngagingVideos';
 import LivePage from './components/LivePage';
 import LiveStream from './components/LiveStream';
 import { TranslationProvider, useTranslation } from './lib/translation';
+import { StatusProvider, useStatus } from './lib/status';
 import { Zap } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -563,7 +564,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <TranslationProvider>
-      <AppContent />
+      <StatusProvider>
+        <AppContent />
+      </StatusProvider>
     </TranslationProvider>
   );
 };

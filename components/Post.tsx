@@ -13,6 +13,7 @@ import { translateContent } from '../services/geminiService';
 import VerificationBadge from './VerificationBadge';
 import { downloadVideoWithWatermark } from '../lib/videoProcessing';
 import { useTranslation } from '../lib/translation';
+import { useStatus } from '../lib/status';
 import { createNotification } from '../lib/notifications';
 import StickerPicker from './StickerPicker';
 import EmojiPicker from './EmojiPicker';
@@ -32,6 +33,7 @@ interface PostProps {
 
 const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSelectUser, onDuet, onStitch, onExpand, onJoinLive }) => {
   const { t, language } = useTranslation();
+  const { showStatus, confirm } = useStatus();
   const currentUserId = currentUser.id;
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -229,7 +231,10 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       // Ensure it stays at 100% for a moment so it doesn't "skip" the final state
       setDownloadProgress(100);
       await new Promise(res => setTimeout(res, 800));
-    } catch (err: any) { alert("Download failed: " + err.message); } finally { setIsDownloading(false); }
+      showStatus(t('Video saved to gallery'));
+    } catch (err: any) { 
+      showStatus(t("Download failed: ") + err.message, 'error'); 
+    } finally { setIsDownloading(false); }
   };
 
   const handleVideoEnded = () => {
@@ -248,7 +253,9 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Delete this post?")) return;
+    const confirmed = await confirm(t("Delete Post"), t("Are you sure you want to delete this post?"));
+    if (!confirmed) return;
+
     setIsDeleting(true);
     try {
       const pathParts = post.media_url.split('/public/posts/');
@@ -259,8 +266,9 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       await supabase.from('posts').delete().eq('id', post.id);
       onDelete?.(post.id);
       window.dispatchEvent(new CustomEvent('vixreel-post-deleted', { detail: { id: post.id } }));
+      showStatus(t('Post deleted successfully'));
     } catch (err: any) { 
-      alert("Delete failed: " + err.message); 
+      showStatus(t("Delete failed: ") + err.message, 'error'); 
       setIsDeleting(false); 
     }
   };
@@ -291,8 +299,9 @@ const Post: React.FC<PostProps> = ({ post, currentUser, onDelete, onUpdate, onSe
       setRepostsCount(prev => prev + 1);
       onUpdate?.();
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
+      showStatus(t('Post reposted successfully'));
     } catch (err: any) {
-      alert("Repost failed: " + err.message);
+      showStatus(t("Repost failed: ") + err.message, 'error');
     } finally {
       setIsReposting(false);
     }
