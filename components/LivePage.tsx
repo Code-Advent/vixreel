@@ -7,10 +7,12 @@ import { Loader2, Video, Users, Play, Heart, MessageCircle, Plus } from 'lucide-
 import VerificationBadge from './VerificationBadge';
 
 interface LivePageProps {
+  currentUser: UserProfile;
   onJoinStream: (user: UserProfile) => void;
+  onStartStream: () => void;
 }
 
-const LivePage: React.FC<LivePageProps> = ({ onJoinStream }) => {
+const LivePage: React.FC<LivePageProps> = ({ currentUser, onJoinStream, onStartStream }) => {
   const { t } = useTranslation();
   const [liveUsers, setLiveUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +166,10 @@ const LivePage: React.FC<LivePageProps> = ({ onJoinStream }) => {
           <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">
             {t('Be the first to go live and start your own community broadcast!') }
           </p>
-          <button className="mt-8 px-8 py-3 bg-white text-black rounded-full font-black text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all">
+          <button 
+            onClick={onStartStream}
+            className="mt-8 px-8 py-3 bg-white text-black rounded-full font-black text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all"
+          >
             {t('Go Live')}
           </button>
         </div>

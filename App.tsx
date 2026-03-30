@@ -38,6 +38,7 @@ const AppContent: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostType | null>(null);
   const [activeLiveStream, setActiveLiveStream] = useState<UserProfile | null>(null);
+  const [isHostingLive, setIsHostingLive] = useState(false);
   const [homeSubView, setHomeSubView] = useState<'REELS' | 'ENGAGING'>('REELS');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vixreel_theme');
@@ -149,6 +150,7 @@ const AppContent: React.FC = () => {
         id: profile.id, 
         username: profile.username, 
         avatar_url: profile.avatar_url, 
+        is_verified: profile.is_verified,
         session_data: session 
       }, ...filtered];
       localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
@@ -163,7 +165,8 @@ const AppContent: React.FC = () => {
     const updated = list.map(acc => acc.id === profile.id ? {
       ...acc,
       username: profile.username,
-      avatar_url: profile.avatar_url
+      avatar_url: profile.avatar_url,
+      is_verified: profile.is_verified
     } : acc);
     localStorage.setItem('vixreel_saved_accounts', JSON.stringify(updated));
     setSavedAccounts(updated);
@@ -233,11 +236,21 @@ const AppContent: React.FC = () => {
   const fetchPosts = async () => {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     
-    const { data } = await supabase
+    let { data } = await supabase
       .from('posts')
       .select('*, user:profiles(*)')
       .gte('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: false });
+    
+    // If no posts in last 24 hours, fetch latest 50 posts
+    if (!data || data.length === 0) {
+      const { data: latestData } = await supabase
+        .from('posts')
+        .select('*, user:profiles(*)')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      data = latestData;
+    }
     
     if (data) {
       // Shuffle the posts to provide a fresh experience each time
@@ -411,7 +424,17 @@ const AppContent: React.FC = () => {
               />
             )}
             {currentView === 'LIVE' && (
-              <LivePage onJoinStream={(user) => setActiveLiveStream(user)} />
+              <LivePage 
+                currentUser={currentUser}
+                onJoinStream={(user) => {
+                  setActiveLiveStream(user);
+                  setIsHostingLive(false);
+                }} 
+                onStartStream={() => {
+                  setActiveLiveStream(currentUser);
+                  setIsHostingLive(true);
+                }}
+              />
             )}
             {currentView === 'SEARCH' && (
               <Search 
@@ -519,9 +542,13 @@ const AppContent: React.FC = () => {
         {activeLiveStream && (
           <LiveStream 
             currentUser={currentUser}
+            hostUser={activeLiveStream}
             roomID={activeLiveStream.live_channel_name || `live_${activeLiveStream.id}`}
-            isHost={false}
-            onClose={() => setActiveLiveStream(null)}
+            isHost={isHostingLive}
+            onClose={() => {
+              setActiveLiveStream(null);
+              setIsHostingLive(false);
+            }}
           />
         )}
       </div>

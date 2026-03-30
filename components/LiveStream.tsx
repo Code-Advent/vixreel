@@ -2,12 +2,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { UserProfile } from '../types';
+import VerificationBadge from './VerificationBadge';
 import { X, Users as UsersIcon, Heart, Share2, Gift, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LiveStreamProps {
   currentUser: UserProfile;
+  hostUser: UserProfile;
   roomID: string;
   isHost: boolean;
   onClose: () => void;
@@ -20,7 +22,7 @@ interface FloatingHeart {
   size: number;
 }
 
-const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, onClose }) => {
+const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, hostUser, roomID, isHost, onClose }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
@@ -166,13 +168,15 @@ const LiveStream: React.FC<LiveStreamProps> = ({ currentUser, roomID, isHost, on
           <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-full pl-1 pr-4 py-1 flex items-center gap-2 pointer-events-auto cursor-pointer hover:bg-black/60 transition-all">
             <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20">
               <img 
-                src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${currentUser.username}`} 
+                src={hostUser.avatar_url || `https://ui-avatars.com/api/?name=${hostUser.username}`} 
                 className="w-full h-full object-cover" 
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-white text-[11px] font-black leading-none">{currentUser.username}</span>
+              <span className="text-white text-[11px] font-black leading-none flex items-center gap-1">
+                {hostUser.username} {hostUser.is_verified && <VerificationBadge size="w-3 h-3" />}
+              </span>
               <div className="flex items-center gap-1 mt-0.5">
                 <UsersIcon className="w-2.5 h-2.5 text-white/60" />
                 <span className="text-white/60 text-[9px] font-bold">{viewerCount}</span>

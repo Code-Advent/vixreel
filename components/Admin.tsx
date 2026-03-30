@@ -45,8 +45,16 @@ const Admin: React.FC = () => {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [password, setPassword] = useState('');
   const [passError, setPassError] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<'success' | 'error'>('success');
 
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "VIX-2025";
+
+  const showStatus = (msg: string, type: 'success' | 'error' = 'success') => {
+    setStatusMessage(msg);
+    setStatusType(type);
+    setTimeout(() => setStatusMessage(null), 3000);
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -129,15 +137,16 @@ const Admin: React.FC = () => {
         detail: { id: userId, is_verified: status } 
       }));
       
+      showStatus(status ? "User Verified" : "Verification Removed");
     } catch (err: any) {
-      alert("Update Failed: " + (err.message || "Error saving verification"));
+      showStatus("Update Failed: " + (err.message || "Error saving verification"), 'error');
     }
   };
 
   const handleBoost = async (postId: string) => {
     const amount = parseInt(boostAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid amount.");
+      showStatus("Please enter a valid amount.", 'error');
       return;
     }
 
@@ -166,8 +175,9 @@ const Admin: React.FC = () => {
         detail: { id: postId, boosted_likes: newBoost } 
       }));
       window.dispatchEvent(new CustomEvent('vixreel-engagement-updated'));
+      showStatus(`Added ${amount} likes to post.`);
     } catch (err: any) {
-      alert("Boost Failed: " + (err.message || "Error adding likes"));
+      showStatus("Boost Failed: " + (err.message || "Error adding likes"), 'error');
     }
   };
 
@@ -175,7 +185,7 @@ const Admin: React.FC = () => {
     if (!viewingUser) return;
     const amount = parseInt(followerBoostAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid amount.");
+      showStatus("Please enter a valid amount.", 'error');
       return;
     }
 
@@ -206,9 +216,9 @@ const Admin: React.FC = () => {
         detail: { id: viewingUser.id, boosted_followers: newBoost } 
       }));
       
-      alert(`Added ${amount} followers to @${viewingUser.username}.`);
+      showStatus(`Added ${amount} followers to @${viewingUser.username}.`);
     } catch (err: any) {
-      alert("Follower Boost Failed: " + (err.message || "Error adding followers"));
+      showStatus("Follower Boost Failed: " + (err.message || "Error adding followers"), 'error');
     }
   };
 
@@ -226,9 +236,9 @@ const Admin: React.FC = () => {
         setViewingChannel(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
-      alert(status ? "Channel Verified" : "Verification Removed");
+      showStatus(status ? "Channel Verified" : "Verification Removed");
     } catch (err: any) {
-      alert("Update Failed: " + (err.message || "Error saving verification"));
+      showStatus("Update Failed: " + (err.message || "Error saving verification"), 'error');
     }
   };
 
@@ -236,7 +246,7 @@ const Admin: React.FC = () => {
     if (!viewingChannel) return;
     const amount = parseInt(channelBoostAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid amount.");
+      showStatus("Please enter a valid amount.", 'error');
       return;
     }
 
@@ -262,9 +272,9 @@ const Admin: React.FC = () => {
       setViewingChannel(prev => prev ? { ...prev, boosted_members: newBoost } : null);
       setChannels(prev => prev.map(g => g.id === viewingChannel.id ? { ...g, boosted_members: newBoost } : g));
       
-      alert(`Added ${amount} members to ${viewingChannel.name}.`);
+      showStatus(`Added ${amount} members to ${viewingChannel.name}.`);
     } catch (err: any) {
-      alert("Channel Boost Failed: " + (err.message || "Error adding members"));
+      showStatus("Channel Boost Failed: " + (err.message || "Error adding members"), 'error');
     }
   };
 
@@ -369,7 +379,13 @@ const Admin: React.FC = () => {
   );
 
   return (
-    <div className="p-4 sm:p-10 max-w-7xl mx-auto pb-32 sm:pb-10 animate-vix-in">
+    <div className="p-4 sm:p-10 max-w-7xl mx-auto pb-32 sm:pb-10 animate-vix-in relative">
+      {statusMessage && (
+        <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 rounded-2xl shadow-2xl border animate-vix-in flex items-center gap-3 ${statusType === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
+          {statusType === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+          <span className="text-[10px] font-black uppercase tracking-widest">{statusMessage}</span>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-8">
         <div className="flex items-center gap-6">
           <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-[2rem] shadow-2xl">

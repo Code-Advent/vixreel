@@ -384,7 +384,8 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
 
       if (updateErr) throw updateErr;
 
-      onUpdateProfile({ 
+      const updatedData = { 
+        id: activeUid,
         username: editUsername.toLowerCase().trim(), 
         bio: editBio.trim(), 
         avatar_url: finalAvatarUrl, 
@@ -392,7 +393,12 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
         date_of_birth: editDob || null,
         website: editWebsite.trim() || null,
         location: editCountry ? (editState ? `${editState}, ${editCountry}` : editCountry) : null
-      });
+      };
+
+      onUpdateProfile(updatedData);
+      
+      // Dispatch global event for real-time updates across the app
+      window.dispatchEvent(new CustomEvent('vixreel-user-updated', { detail: updatedData }));
       
       setIsEditModalOpen(false);
       setEditAvatarFile(null);
@@ -460,6 +466,23 @@ const Profile: React.FC<ProfileProps> = ({ user, isOwnProfile, onUpdateProfile, 
       setIsUploadingStory(false);
     }
   };
+
+  // Auto-advance for image stories
+  useEffect(() => {
+    if (showStoryViewer && stories.length > 0) {
+      const currentStory = stories[currentStoryIndex];
+      if (currentStory.media_type !== 'video') {
+        const timer = setTimeout(() => {
+          if (currentStoryIndex < stories.length - 1) {
+            setCurrentStoryIndex(prev => prev + 1);
+          } else {
+            setShowStoryViewer(false);
+          }
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showStoryViewer, currentStoryIndex, stories]);
 
   const renderStoryViewer = () => {
     if (!showStoryViewer || stories.length === 0) return null;
