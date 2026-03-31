@@ -19,6 +19,7 @@ import PostDetail from './components/PostDetail';
 import EngagingVideos from './components/EngagingVideos';
 import LivePage from './components/LivePage';
 import LiveStream from './components/LiveStream';
+import ErrorBoundary from './components/ErrorBoundary';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { StatusProvider, useStatus } from './lib/status';
 import { Zap } from 'lucide-react';
@@ -57,7 +58,9 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     init();
+  }, []);
 
+  useEffect(() => {
     const handleGlobalPostDelete = (e: any) => {
       const deletedId = e.detail?.id;
       if (deletedId) setPosts(prev => prev.filter(p => p.id !== deletedId));
@@ -93,7 +96,7 @@ const AppContent: React.FC = () => {
       window.removeEventListener('vixreel-post-updated', handlePostUpdate);
       window.removeEventListener('vixreel-user-updated', handleIdentityUpdate);
     };
-  }, [currentUser, viewedUser, selectedPost]);
+  }, [currentUser?.id, viewedUser?.id, selectedPost?.id]);
 
   useEffect(() => {
     // Apply theme to document element
@@ -295,10 +298,15 @@ const AppContent: React.FC = () => {
   if (!currentUser || isAddingAccount) {
     return (
       <Auth 
-        onAuthSuccess={(profile) => { 
+        onAuthSuccess={async (profile) => { 
           setCurrentUser(profile);
           setIsAddingAccount(false); 
           fetchPosts();
+          
+          // Sync account to registry
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) syncSavedAccount(profile, session);
+          
           // Force refresh of accounts list
           const saved = localStorage.getItem('vixreel_saved_accounts');
           if (saved) setSavedAccounts(JSON.parse(saved));
@@ -373,7 +381,7 @@ const AppContent: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  <EngagingVideos />
+                  <EngagingVideos currentUser={currentUser} />
                 )}
               </div>
             )}
@@ -563,11 +571,13 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <TranslationProvider>
-      <StatusProvider>
-        <AppContent />
-      </StatusProvider>
-    </TranslationProvider>
+    <ErrorBoundary>
+      <TranslationProvider>
+        <StatusProvider>
+          <AppContent />
+        </StatusProvider>
+      </TranslationProvider>
+    </ErrorBoundary>
   );
 };
 

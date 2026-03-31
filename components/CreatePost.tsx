@@ -428,6 +428,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
         {showLiveStream && (
           <LiveStream 
             currentUser={user}
+            hostUser={user}
             roomID={liveRoomID}
             isHost={true}
             onClose={() => setShowLiveStream(false)}

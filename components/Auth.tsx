@@ -462,7 +462,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onCancelAdd, isAddingAccount
 
           {mode === 'PICKER' ? renderPicker() : (
             <>
-              {mode !== 'FIND_ACCOUNT' && mode !== 'PICKER' && (
+              {mode !== 'FIND_ACCOUNT' && (
                 <div className="w-full mb-10 flex justify-center gap-10">
                   <button onClick={() => { setMode('LOGIN'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'LOGIN' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>{t('Login')}</button>
                   <button onClick={() => { setMode('SIGNUP'); setStep('DETAILS'); setError(null); }} className={`text-[11px] font-black uppercase tracking-widest pb-2 border-b-2 transition-all ${mode === 'SIGNUP' ? 'text-[var(--vix-text)] border-pink-500' : 'text-zinc-700 border-transparent hover:text-zinc-400'}`}>{t('Sign Up')}</button>

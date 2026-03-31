@@ -761,6 +761,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
       {showLiveStream && (
         <LiveStream 
           currentUser={currentUser}
+          hostUser={currentUser}
           roomID={liveRoomID}
           isHost={true}
           onClose={() => setShowLiveStream(false)}

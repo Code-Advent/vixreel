@@ -57,6 +57,7 @@ export interface Post {
 
 export interface Comment {
   id: string;
+  user_id: string;
   content: string;
   sticker_url?: string;
   created_at: string;

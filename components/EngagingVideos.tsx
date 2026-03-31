@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { EngagingVideo } from '../types';
-import { Loader2, Heart, MessageCircle, Share2, Music2, AlertCircle } from 'lucide-react';
+import { EngagingVideo, UserProfile } from '../types';
+import { Loader2, Heart, MessageCircle, Share2, Music2, AlertCircle, Plus } from 'lucide-react';
 import { useTranslation } from '../lib/translation';
 
-const EngagingVideos: React.FC = () => {
+interface EngagingVideosProps {
+  currentUser?: UserProfile | null;
+}
+
+const EngagingVideos: React.FC<EngagingVideosProps> = ({ currentUser }) => {
   const { t } = useTranslation();
   const [videos, setVideos] = useState<EngagingVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +29,37 @@ const EngagingVideos: React.FC = () => {
 
       if (error) throw error;
       setVideos(data || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAutoSeed = async () => {
+    if (!currentUser?.is_admin) return;
+    setLoading(true);
+    try {
+      const seedData = [
+        {
+          platform: 'tiktok',
+          video_url: 'https://www.tiktok.com/@khaby.lame/video/6951165123456789012',
+          fake_username: 'khaby.lame',
+          fake_avatar_url: 'https://p16-sign-va.tiktokcdn.com/tos-maliva-avt-0068/7341234567890123456~c5_100x100.jpeg',
+          caption: 'It is that simple! 🤲🏾 #learnfromkhaby #vixreel'
+        },
+        {
+          platform: 'instagram',
+          video_url: 'https://www.instagram.com/reels/C4_12345678/',
+          fake_username: 'vixreel_official',
+          fake_avatar_url: 'https://ui-avatars.com/api/?name=VixReel',
+          caption: 'Experience the new narrative protocol. #vixreel #future'
+        }
+      ];
+
+      const { error } = await supabase.from('engaging_videos').insert(seedData);
+      if (error) throw error;
+      await fetchVideos();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -67,9 +102,20 @@ const EngagingVideos: React.FC = () => {
 
   if (videos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 gap-4 opacity-20">
-        <Share2 className="w-16 h-16" />
-        <p className="font-bold uppercase tracking-[0.3em] text-xs">{t('No engaging videos yet')}</p>
+      <div className="flex flex-col items-center justify-center py-32 gap-6">
+        <div className="opacity-20 flex flex-col items-center gap-4">
+          <Share2 className="w-16 h-16" />
+          <p className="font-bold uppercase tracking-[0.3em] text-xs">{t('No engaging videos yet')}</p>
+        </div>
+        {currentUser?.is_admin && (
+          <button 
+            onClick={handleAutoSeed}
+            className="flex items-center gap-2 px-8 py-4 vix-gradient rounded-full text-white font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-105 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            {t('Seed Initial Content')}
+          </button>
+        )}
       </div>
     );
   }

@@ -1,8 +1,8 @@
 
 import React from 'react';
 
-const VerificationBadge: React.FC<{ size?: string }> = ({ size = 'w-3 h-3' }) => (
-  <span className="inline-flex items-center ml-1 shrink-0 relative group">
+const VerificationBadge: React.FC<{ size?: string; className?: string }> = ({ size = 'w-3 h-3', className = '' }) => (
+  <span className={`inline-flex items-center ml-1 shrink-0 relative group ${className}`}>
     <div className={`absolute inset-0 bg-blue-500/40 blur-md rounded-full ${size} opacity-0 group-hover:opacity-100 transition-opacity animate-pulse`}></div>
     <svg 
       viewBox="0 0 24 24" 
