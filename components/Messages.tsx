@@ -215,7 +215,12 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
     if (val.length < 2) { return setSearchResults([]); }
     setIsSearching(true);
     try {
-      const { data } = await supabase.from('profiles').select('*').neq('id', currentUser.id).ilike('username', `%${val}%`).limit(10);
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', currentUser.id)
+        .or(`username.ilike.%${val}%,full_name.ilike.%${val}%`)
+        .limit(10);
       setSearchResults(data || []);
     } finally { setIsSearching(false); }
   };
@@ -328,7 +333,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-80px)] bg-white dark:bg-black overflow-hidden animate-vix-in">
+    <div className="flex flex-col md:flex-row h-full bg-white dark:bg-black overflow-hidden animate-vix-in">
       
       {/* Sidebar - Chat List */}
       <div className={`w-full md:w-80 lg:w-96 md:border-r border-gray-100 dark:border-zinc-900 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'} h-full`}>

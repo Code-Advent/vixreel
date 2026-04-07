@@ -19,6 +19,7 @@ import PostDetail from './components/PostDetail';
 import EngagingVideos from './components/EngagingVideos';
 import LivePage from './components/LivePage';
 import LiveStream from './components/LiveStream';
+import Stories from './components/Stories';
 import ErrorBoundary from './components/ErrorBoundary';
 import { TranslationProvider, useTranslation } from './lib/translation';
 import { StatusProvider, useStatus } from './lib/status';
@@ -357,7 +358,8 @@ const AppContent: React.FC = () => {
                 </div>
 
                 {homeSubView === 'REELS' ? (
-                  <div className="w-full max-[470px] space-y-6">
+                  <div className="w-full max-w-[470px] space-y-6">
+                    <Stories currentUser={currentUser} />
                     {posts.length > 0 ? (
                       posts.map(p => (
                         <Post 
