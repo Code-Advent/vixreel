@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
+import { createNotification } from '../lib/notifications';
 import { UserProfile, Message, MessageReaction } from '../types';
 import VerificationBadge from './VerificationBadge';
 import { useTranslation } from '../lib/translation';
@@ -155,6 +156,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
       }).select().single();
       if (error) throw error;
       setMessages(prev => [...prev, data]);
+      await createNotification(activeChat.id, currentUser.id, 'MESSAGE', undefined, 'Sent a sticker');
     } catch (err) {
       console.error("Sticker send error:", err);
     }
@@ -317,6 +319,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
       
       if (error) throw error;
       setMessages(prev => [...prev, data]);
+      await createNotification(activeChat.id, currentUser.id, 'MESSAGE', undefined, msgContent || 'Sent media');
     } catch (err) {
       console.error("Send error:", err);
       setText(msgContent);
@@ -349,6 +352,18 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, initialChatUser, onJoi
                 <Plus className="w-6 h-6" />
               </button>
             </div>
+          </div>
+
+          {/* Chat Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input 
+              type="text"
+              value={chatSearchQuery}
+              onChange={(e) => setChatSearchQuery(e.target.value)}
+              placeholder={t('Search messages...')}
+              className="w-full bg-gray-100 dark:bg-zinc-900 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none text-black dark:text-white placeholder:text-gray-500"
+            />
           </div>
 
           {/* TikTok Activities Row */}

@@ -1,6 +1,21 @@
+-- VixReel Database Schema
+-- Optimized for Supabase / PostgreSQL
+
+-- 1. EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. PROFILES TABLE
+-- 2. FUNCTIONS
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- 3. TABLES
+
+-- PROFILES
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -10,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     bio TEXT,
     email TEXT,
     phone TEXT,
+    phone_verified BOOLEAN DEFAULT FALSE,
+    date_of_birth DATE,
     is_admin BOOLEAN DEFAULT FALSE,
     is_verified BOOLEAN DEFAULT FALSE,
     is_private BOOLEAN DEFAULT FALSE,
@@ -17,7 +34,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     is_following_public BOOLEAN DEFAULT TRUE,
     boosted_followers INTEGER DEFAULT 0,
     location TEXT,
-    date_of_birth DATE,
     is_location_private BOOLEAN DEFAULT FALSE,
     website TEXT,
     show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME')),
@@ -28,28 +44,22 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Ensure all profile columns exist (Migration for existing tables)
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS location TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_location_private BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS show_followers_to TEXT DEFAULT 'EVERYONE' CHECK (show_followers_to IN ('EVERYONE', 'FOLLOWERS', 'ONLY_ME'));
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS live_channel_name TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_business_mode BOOLEAN DEFAULT FALSE;
+CREATE TRIGGER update_profiles_updated_at
+BEFORE UPDATE ON public.profiles
+FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
--- 3. LOCATIONS TABLE
+-- LOCATIONS
 CREATE TABLE IF NOT EXISTS public.locations (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. POSTS TABLE
+-- POSTS
 CREATE TABLE IF NOT EXISTS public.posts (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     media_url TEXT NOT NULL,
     media_type TEXT CHECK (media_type IN ('image', 'video')) NOT NULL,
@@ -58,133 +68,90 @@ CREATE TABLE IF NOT EXISTS public.posts (
     is_ad BOOLEAN DEFAULT FALSE,
     cta_text TEXT,
     cta_link TEXT,
+    reposted_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL,
+    duet_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL,
+    stitch_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL,
+    location_id UUID REFERENCES public.locations(id) ON DELETE SET NULL,
+    location_name TEXT,
+    feeling TEXT,
+    privacy TEXT DEFAULT 'PUBLIC' CHECK (privacy IN ('PUBLIC', 'FOLLOWERS', 'PRIVATE')),
+    allow_comments BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Ensure all narrative columns exist (Migration for existing tables)
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS reposted_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS duet_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS stitch_from_id UUID REFERENCES public.posts(id) ON DELETE SET NULL;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES public.locations(id) ON DELETE SET NULL;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS location_name TEXT;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS feeling TEXT;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS privacy TEXT DEFAULT 'PUBLIC' CHECK (privacy IN ('PUBLIC', 'FOLLOWERS', 'PRIVATE'));
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS allow_comments BOOLEAN DEFAULT TRUE;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS is_ad BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS cta_text TEXT;
-ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS cta_link TEXT;
-
--- 5. REPOSTS TABLE
-CREATE TABLE IF NOT EXISTS public.reposts (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, post_id)
-);
-
--- 6. DUETS TABLE
-CREATE TABLE IF NOT EXISTS public.duets (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    original_post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
-    duet_post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(duet_post_id)
-);
-
--- 7. STITCHES TABLE
-CREATE TABLE IF NOT EXISTS public.stitches (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    original_post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
-    stitch_post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(stitch_post_id)
-);
-
--- 8. LIKES TABLE
+-- LIKES
 CREATE TABLE IF NOT EXISTS public.likes (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(post_id, user_id)
 );
 
--- 9. COMMENTS TABLE
+-- COMMENTS
 CREATE TABLE IF NOT EXISTS public.comments (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
+    sticker_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 10. FOLLOWS TABLE
+-- FOLLOWS
 CREATE TABLE IF NOT EXISTS public.follows (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     follower_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     following_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(follower_id, following_id)
 );
 
--- 11. SAVES TABLE
+-- SAVES
 CREATE TABLE IF NOT EXISTS public.saves (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(post_id, user_id)
 );
 
--- 12. MESSAGES TABLE
+-- MESSAGES
 CREATE TABLE IF NOT EXISTS public.messages (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT,
     media_url TEXT,
     media_type TEXT CHECK (media_type IN ('image', 'video')),
-    is_read BOOLEAN DEFAULT FALSE,
     sticker_url TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migration for existing messages
-ALTER TABLE public.messages ALTER COLUMN content DROP NOT NULL;
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_url TEXT;
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_type TEXT CHECK (media_type IN ('image', 'video'));
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
-
--- 12a. MESSAGE REACTIONS TABLE
+-- MESSAGE REACTIONS
 CREATE TABLE IF NOT EXISTS public.message_reactions (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    message_id UUID NOT NULL,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    message_id UUID REFERENCES public.messages(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     reaction TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT fk_message FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE,
     UNIQUE(message_id, user_id, reaction)
 );
 
--- Ensure index for performance and relationship detection
-CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON public.message_reactions(message_id);
-
--- 13. STORIES TABLE
+-- STORIES
 CREATE TABLE IF NOT EXISTS public.stories (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     media_url TEXT NOT NULL,
     media_type TEXT CHECK (media_type IN ('image', 'video')) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 14. COMMUNITIES (CHANNELS) TABLE
+-- CHANNELS
 CREATE TABLE IF NOT EXISTS public.channels (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
     cover_url TEXT,
@@ -197,14 +164,13 @@ CREATE TABLE IF NOT EXISTS public.channels (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migration for existing channels
-ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS only_admin_can_post BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS boosted_members INTEGER DEFAULT 0;
+CREATE TRIGGER update_channels_updated_at
+BEFORE UPDATE ON public.channels
+FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
--- 15. CHANNEL MEMBERS TABLE
+-- CHANNEL MEMBERS
 CREATE TABLE IF NOT EXISTS public.channel_members (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     role TEXT DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
@@ -212,9 +178,9 @@ CREATE TABLE IF NOT EXISTS public.channel_members (
     UNIQUE(channel_id, user_id)
 );
 
--- 16. CHANNEL POSTS TABLE
+-- CHANNEL POSTS
 CREATE TABLE IF NOT EXISTS public.channel_posts (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
@@ -223,27 +189,27 @@ CREATE TABLE IF NOT EXISTS public.channel_posts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 16a. CHANNEL POST LIKES TABLE
+-- CHANNEL POST LIKES
 CREATE TABLE IF NOT EXISTS public.channel_post_likes (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(post_id, user_id)
 );
 
--- 16b. CHANNEL POST COMMENTS TABLE
+-- CHANNEL POST COMMENTS
 CREATE TABLE IF NOT EXISTS public.channel_post_comments (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 16c. CHANNEL POST REACTIONS TABLE
+-- CHANNEL POST REACTIONS
 CREATE TABLE IF NOT EXISTS public.channel_post_reactions (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID REFERENCES public.channel_posts(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     reaction TEXT NOT NULL,
@@ -251,11 +217,11 @@ CREATE TABLE IF NOT EXISTS public.channel_post_reactions (
     UNIQUE(post_id, user_id, reaction)
 );
 
--- 16d. NOTIFICATIONS TABLE
+-- NOTIFICATIONS
 CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL, -- Target user
-    actor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL, -- User who triggered the notification
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    actor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     type TEXT CHECK (type IN ('LIKE', 'COMMENT', 'FOLLOW', 'MENTION', 'REPOST', 'DUET', 'STITCH')) NOT NULL,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE,
     content TEXT,
@@ -263,71 +229,115 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 16e. STICKERS TABLE
+-- STICKERS
 CREATE TABLE IF NOT EXISTS public.stickers (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     url TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add sticker_url to messages and comments
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sticker_url TEXT;
-ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS sticker_url TEXT;
-
--- 18. LIVE STREAMS TABLE (REBUILT)
+-- LIVE STREAMS
 CREATE TABLE IF NOT EXISTS public.live_streams (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     channel_name TEXT NOT NULL,
-    token TEXT, -- Agora token for the host
+    token TEXT,
     is_live BOOLEAN DEFAULT TRUE,
     viewer_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Ensure all live_streams columns exist (Migration for existing tables)
-ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS channel_name TEXT;
-ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS token TEXT;
-ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT TRUE;
-ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS viewer_count INTEGER DEFAULT 0;
-
-CREATE INDEX IF NOT EXISTS idx_live_streams_user_id ON public.live_streams(user_id);
-CREATE INDEX IF NOT EXISTS idx_live_streams_is_live ON public.live_streams(is_live);
-
--- 18a. LIVE MESSAGES TABLE (REBUILT)
+-- LIVE MESSAGES
 CREATE TABLE IF NOT EXISTS public.live_messages (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     text TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 18b. LIVE VIEWERS TABLE (REBUILT)
+-- LIVE VIEWERS
 CREATE TABLE IF NOT EXISTS public.live_viewers (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(stream_id, user_id)
 );
 
--- 18c. LIVE LIKES TABLE (REBUILT)
+-- LIVE LIKES
 CREATE TABLE IF NOT EXISTS public.live_likes (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 19. ROW LEVEL SECURITY (RLS)
+-- LIVE GIFTS
+CREATE TABLE IF NOT EXISTS public.live_gifts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    stream_id UUID REFERENCES public.live_streams(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    gift_type TEXT NOT NULL,
+    amount INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ENGAGING VIDEOS
+CREATE TABLE IF NOT EXISTS public.engaging_videos (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    video_url TEXT NOT NULL,
+    platform TEXT CHECK (platform IN ('tiktok', 'instagram')) NOT NULL,
+    caption TEXT,
+    fake_username TEXT,
+    fake_avatar_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. INDEXES
+CREATE INDEX IF NOT EXISTS idx_posts_user_id ON public.posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver ON public.messages(sender_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_live_streams_is_live ON public.live_streams(is_live);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+
+-- 5. RPC FUNCTIONS
+CREATE OR REPLACE FUNCTION increment_live_viewers(stream_channel TEXT)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.live_streams
+    SET viewer_count = viewer_count + 1
+    WHERE channel_name = stream_channel AND is_live = true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION decrement_live_viewers(stream_channel TEXT)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.live_streams
+    SET viewer_count = GREATEST(0, viewer_count - 1)
+    WHERE channel_name = stream_channel AND is_live = true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 6. RLS POLICIES
+
+-- Cleanup existing policies to avoid "already exists" errors
+DO $$ 
+DECLARE 
+    pol RECORD;
+BEGIN
+    FOR pol IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') 
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    END LOOP;
+END $$;
+
+-- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reposts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.duets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.stitches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
@@ -344,60 +354,22 @@ ALTER TABLE public.channel_post_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stickers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_streams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_viewers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_gifts ENABLE ROW LEVEL SECURITY;
-
--- 18. CLEANUP OLD POLICIES
-DO $$ 
-DECLARE 
-    pol RECORD;
-BEGIN
-    FOR pol IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') 
-    LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
-    END LOOP;
-END $$;
-
--- 19. CREATE POLICIES (Public Schema)
+ALTER TABLE public.engaging_videos ENABLE ROW LEVEL SECURITY;
 
 -- Profiles
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
--- Locations
-CREATE POLICY "Locations are viewable by everyone" ON public.locations FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can insert locations" ON public.locations FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
 -- Posts
 CREATE POLICY "Posts are viewable by everyone" ON public.posts FOR SELECT USING (true);
 CREATE POLICY "Users can insert own posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own posts" ON public.posts FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own posts" ON public.posts FOR DELETE USING (auth.uid() = user_id);
-CREATE POLICY "Admins can manage all posts" ON public.posts FOR ALL USING (
-    EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid() AND is_admin = true
-    )
-) WITH CHECK (
-    EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE id = auth.uid() AND is_admin = true
-    )
-);
-
--- Reposts, Duets, Stitches
-CREATE POLICY "Reposts viewable by everyone" ON public.reposts FOR SELECT USING (true);
-CREATE POLICY "Users can insert own reposts" ON public.reposts FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Duets viewable by everyone" ON public.duets FOR SELECT USING (true);
-CREATE POLICY "Users can insert own duets" ON public.duets FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Stitches viewable by everyone" ON public.stitches FOR SELECT USING (true);
-CREATE POLICY "Users can insert own stitches" ON public.stitches FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Admins can manage all interactions" ON public.reposts FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins can manage all duets" ON public.duets FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
-CREATE POLICY "Admins can manage all stitches" ON public.stitches FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true)) WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- Likes & Comments
 CREATE POLICY "Likes are viewable by everyone" ON public.likes FOR SELECT USING (true);
@@ -414,7 +386,10 @@ CREATE POLICY "Users can delete own follows" ON public.follows FOR DELETE USING 
 -- Messages
 CREATE POLICY "Messages are viewable by participants" ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 CREATE POLICY "Users can insert own messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
-CREATE POLICY "Admins can view all messages" ON public.messages FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+-- Stories
+CREATE POLICY "Stories are viewable by everyone" ON public.stories FOR SELECT USING (true);
+CREATE POLICY "Users can insert own stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Message Reactions
 CREATE POLICY "Message reactions are viewable by participants" ON public.message_reactions FOR SELECT USING (
@@ -426,10 +401,6 @@ CREATE POLICY "Message reactions are viewable by participants" ON public.message
 );
 CREATE POLICY "Users can insert own message reactions" ON public.message_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own message reactions" ON public.message_reactions FOR DELETE USING (auth.uid() = user_id);
-
--- Stories
-CREATE POLICY "Stories are viewable by everyone" ON public.stories FOR SELECT USING (true);
-CREATE POLICY "Users can insert own stories" ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Channels
 CREATE POLICY "Channels are viewable by everyone" ON public.channels FOR SELECT USING (true);
@@ -451,94 +422,51 @@ CREATE POLICY "Members can post in channels" ON public.channel_posts FOR INSERT 
 );
 CREATE POLICY "Users can delete own channel posts" ON public.channel_posts FOR DELETE USING (auth.uid() = user_id);
 
--- Channel Post Likes
-CREATE POLICY "Channel post likes are viewable by everyone" ON public.channel_post_likes FOR SELECT USING (true);
-CREATE POLICY "Users can insert own channel post likes" ON public.channel_post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own channel post likes" ON public.channel_post_likes FOR DELETE USING (auth.uid() = user_id);
+-- Channel Post Interactions
+CREATE POLICY "Channel post likes viewable by everyone" ON public.channel_post_likes FOR SELECT USING (true);
+CREATE POLICY "Users can like channel posts" ON public.channel_post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unlike channel posts" ON public.channel_post_likes FOR DELETE USING (auth.uid() = user_id);
 
--- Channel Post Comments
-CREATE POLICY "Channel post comments are viewable by everyone" ON public.channel_post_comments FOR SELECT USING (true);
-CREATE POLICY "Users can insert own channel post comments" ON public.channel_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Channel post comments viewable by everyone" ON public.channel_post_comments FOR SELECT USING (true);
+CREATE POLICY "Users can comment on channel posts" ON public.channel_post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Channel Post Reactions
-CREATE POLICY "Channel post reactions are viewable by everyone" ON public.channel_post_reactions FOR SELECT USING (true);
-CREATE POLICY "Users can insert own channel post reactions" ON public.channel_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own channel post reactions" ON public.channel_post_reactions FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Channel post reactions viewable by everyone" ON public.channel_post_reactions FOR SELECT USING (true);
+CREATE POLICY "Users can react to channel posts" ON public.channel_post_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Notifications
 CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- Stickers
-CREATE POLICY "Stickers are viewable by everyone" ON public.stickers FOR SELECT USING (true);
-CREATE POLICY "Users can insert own stickers" ON public.stickers FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own stickers" ON public.stickers FOR DELETE USING (auth.uid() = user_id);
-
--- Live Streams
-CREATE POLICY "Live streams are viewable by everyone" ON public.live_streams FOR SELECT USING (true);
-CREATE POLICY "Users can insert own live streams" ON public.live_streams FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Live Streams & Sub-tables
+CREATE POLICY "Live streams viewable by everyone" ON public.live_streams FOR SELECT USING (true);
+CREATE POLICY "Users can start live streams" ON public.live_streams FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own live streams" ON public.live_streams FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own live streams" ON public.live_streams FOR DELETE USING (auth.uid() = user_id);
 
--- Live Viewers
-CREATE POLICY "Live viewers are viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
-CREATE POLICY "Users can join streams" ON public.live_viewers FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can leave streams" ON public.live_viewers FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Live messages viewable by everyone" ON public.live_messages FOR SELECT USING (true);
+CREATE POLICY "Users can send live messages" ON public.live_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Live Messages
-CREATE POLICY "Live messages are viewable by everyone" ON public.live_messages FOR SELECT USING (true);
-CREATE POLICY "Users can insert own live messages" ON public.live_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Live viewers viewable by everyone" ON public.live_viewers FOR SELECT USING (true);
+CREATE POLICY "Users can join live streams" ON public.live_viewers FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Live Likes
-CREATE POLICY "Live likes are viewable by everyone" ON public.live_likes FOR SELECT USING (true);
-CREATE POLICY "Users can insert own live likes" ON public.live_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Live likes viewable by everyone" ON public.live_likes FOR SELECT USING (true);
+CREATE POLICY "Users can like live streams" ON public.live_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 20. FUNCTIONS
-CREATE OR REPLACE FUNCTION increment_live_viewers(stream_channel TEXT)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE public.live_streams
-    SET viewer_count = viewer_count + 1
-    WHERE channel_name = stream_channel AND is_live = true;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE POLICY "Live gifts viewable by everyone" ON public.live_gifts FOR SELECT USING (true);
+CREATE POLICY "Users can send live gifts" ON public.live_gifts FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE OR REPLACE FUNCTION decrement_live_viewers(stream_channel TEXT)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE public.live_streams
-    SET viewer_count = GREATEST(0, viewer_count - 1)
-    WHERE channel_name = stream_channel AND is_live = true;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 23. ENGAGING VIDEOS TABLE
-CREATE TABLE IF NOT EXISTS public.engaging_videos (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    video_url TEXT NOT NULL,
-    platform TEXT CHECK (platform IN ('tiktok', 'instagram')) NOT NULL,
-    caption TEXT,
-    fake_username TEXT,
-    fake_avatar_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 24. ENGAGING VIDEOS POLICIES
-ALTER TABLE public.engaging_videos ENABLE ROW LEVEL SECURITY;
+-- Engaging Videos
 CREATE POLICY "Engaging videos are viewable by everyone" ON public.engaging_videos FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can insert engaging videos" ON public.engaging_videos FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Users can delete own engaging videos" ON public.engaging_videos FOR DELETE USING (auth.uid() = user_id);
 
--- 25. STORAGE BUCKETS CONFIGURATION (Existing)
+-- 7. STORAGE BUCKETS
 INSERT INTO storage.buckets (id, name, public) VALUES ('posts', 'posts', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stories', 'stories', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('messages', 'messages', true) ON CONFLICT (id) DO UPDATE SET public = true;
 INSERT INTO storage.buckets (id, name, public) VALUES ('stickers', 'stickers', true) ON CONFLICT (id) DO UPDATE SET public = true;
 
--- 21. CLEANUP OLD STORAGE POLICIES
+-- 8. STORAGE POLICIES
+
+-- Cleanup existing storage policies
 DO $$ 
 DECLARE 
     pol RECORD;
@@ -549,7 +477,6 @@ BEGIN
     END LOOP;
 END $$;
 
--- 22. CREATE STORAGE POLICIES
 CREATE POLICY "Public Access to Posts" ON storage.objects FOR SELECT USING (bucket_id = 'posts');
 CREATE POLICY "Authenticated Upload to Posts" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'posts' AND auth.role() = 'authenticated');
 CREATE POLICY "Owner Delete from Posts" ON storage.objects FOR DELETE USING (bucket_id = 'posts' AND auth.uid()::text = (storage.foldername(name))[1]);

@@ -1,7 +1,7 @@
 
 import { supabase } from './supabase';
 
-export type NotificationType = 'LIKE' | 'COMMENT' | 'FOLLOW' | 'MENTION' | 'REPOST' | 'DUET' | 'STITCH';
+export type NotificationType = 'LIKE' | 'COMMENT' | 'FOLLOW' | 'MENTION' | 'REPOST' | 'DUET' | 'STITCH' | 'MESSAGE' | 'CHANNEL_POST' | 'CHANNEL_INVITE';
 
 export const createNotification = async (
   userId: string, // Target user

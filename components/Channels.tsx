@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { supabase } from '../lib/supabase';
+import { createNotification } from '../lib/notifications';
 import { UserProfile, Channel, ChannelMember, ChannelPost, ChannelPostComment, ChannelPostReaction } from '../types';
 import { sanitizeFilename, formatNumber, formatFileSize } from '../lib/utils';
 import VerificationBadge from './VerificationBadge';
@@ -74,10 +75,20 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
       fetchChannelData(initialChannel.id);
     }
 
+    const handleChannelUpdate = (e: any) => {
+      if (selectedChannel?.id === e.detail?.id) {
+        fetchChannelData(selectedChannel.id);
+      }
+      fetchChannels();
+    };
+
+    window.addEventListener('vixreel-channel-updated', handleChannelUpdate);
+
     return () => {
       supabase.removeChannel(channelsSubscription);
+      window.removeEventListener('vixreel-channel-updated', handleChannelUpdate);
     };
-  }, [initialChannel]);
+  }, [initialChannel, selectedChannel?.id]);
 
   useEffect(() => {
     if (selectedChannel) {
@@ -520,6 +531,12 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
       });
 
       if (error) throw error;
+      
+      // Notify channel creator
+      if (selectedChannel.creator_id !== currentUser.id) {
+        await createNotification(selectedChannel.creator_id, currentUser.id, 'CHANNEL_POST', undefined, `Posted in ${selectedChannel.name}: ${postContent.trim()}`);
+      }
+
       setPostContent('');
       setPostFile(null);
       setPostPreview(null);
@@ -591,8 +608,8 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                   <div className="relative flex-shrink-0">
                     <img src={channel.cover_url} className="w-12 h-12 rounded-2xl object-cover border border-[var(--vix-border)]" alt={channel.name} />
                     {channel.is_verified && (
-                      <div className="absolute -bottom-1 -right-1 bg-[var(--vix-bg)] rounded-full p-0.5 shadow-sm">
-                        <CheckCircle2 className="w-3 h-3 fill-[#ec4899] text-white" />
+                      <div className="absolute -bottom-1 -right-1">
+                        <VerificationBadge size="w-3.5 h-3.5" />
                       </div>
                     )}
                   </div>
@@ -747,7 +764,7 @@ const Channels: React.FC<ChannelsProps> = ({ currentUser, onBack, initialChannel
                         {selectedChannel.name}
                       </h3>
                       {selectedChannel.is_verified && (
-                        <CheckCircle2 className="w-4 h-4 fill-[#ec4899] text-white" />
+                        <VerificationBadge size="w-4 h-4" />
                       )}
                     </div>
                     <p className="text-[11px] text-[var(--vix-muted)] font-medium">

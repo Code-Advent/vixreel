@@ -230,6 +230,10 @@ const Admin: React.FC = () => {
         setViewingChannel(prev => prev ? { ...prev, is_verified: status } : null);
       }
       
+      window.dispatchEvent(new CustomEvent('vixreel-channel-updated', { 
+        detail: { id: channelId, is_verified: status } 
+      }));
+      
       showStatus(status ? "Channel Verified" : "Verification Removed");
     } catch (err: any) {
       showStatus("Update Failed: " + (err.message || "Error saving verification"), 'error');
