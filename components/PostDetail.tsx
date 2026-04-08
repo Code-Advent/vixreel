@@ -355,7 +355,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
           )}
 
           {post.is_ad && (
-            <div className="absolute top-4 right-4 bg-blue-500/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 z-10">
+            <div className="absolute top-4 right-4 bg-gradient-to-br from-pink-500/90 to-blue-500/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 z-10 shadow-lg">
               <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">Ads</span>
             </div>
           )}
@@ -494,10 +494,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ post, currentUser, onClose, onS
                     target="_blank" 
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg text-white text-[9px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all border border-white/10 flex items-center gap-1.5"
+                    className="px-5 py-2 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-xl text-white text-[10px] font-black uppercase tracking-[0.15em] shadow-[0_8px_20px_rgba(236,72,153,0.3)] hover:shadow-[0_8px_25px_rgba(59,130,246,0.4)] hover:scale-105 active:scale-95 transition-all border border-white/20 flex items-center gap-2 backdrop-blur-sm"
                   >
                     {post.cta_text}
-                    <ExternalLink className="w-2.5 h-2.5" />
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
                 <button className={`${saved ? 'text-white' : 'text-zinc-400 hover:text-white'} transition-all`}>

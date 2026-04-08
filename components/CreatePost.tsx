@@ -361,9 +361,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
                       </div>
                       <button 
                         onClick={() => setIsAd(!isAd)}
-                        className={`w-10 h-5 rounded-full relative transition-all ${isAd ? 'bg-blue-500' : 'bg-zinc-800'}`}
+                        className={`w-12 h-6 rounded-full relative transition-all shadow-inner ${isAd ? 'bg-gradient-to-r from-pink-500 to-blue-500' : 'bg-zinc-800'}`}
                       >
-                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isAd ? 'right-1' : 'left-1'}`} />
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-md ${isAd ? 'right-1' : 'left-1'}`} />
                       </button>
                     </div>
 
@@ -377,7 +377,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
                             value={ctaText}
                             onChange={e => setCtaText(e.target.value)}
                             placeholder={t('Button Text (e.g. Shop Now)')}
-                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/30 transition-all"
+                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/20 transition-all"
                           />
                         </div>
                         <div className="relative group">
@@ -388,7 +388,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ user, onClose, onPostSuccess, d
                             value={ctaLink}
                             onChange={e => setCtaLink(e.target.value)}
                             placeholder={t('Redirect Link (https://...)')}
-                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/30 transition-all"
+                            className="w-full bg-[var(--vix-bg)]/50 border border-[var(--vix-border)] rounded-2xl pl-12 pr-6 py-4 text-xs text-[var(--vix-text)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all"
                           />
                         </div>
                       </div>
